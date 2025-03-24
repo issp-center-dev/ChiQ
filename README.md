@@ -1,5 +1,22 @@
 # ChiQ
 
+## What is ChiQ?
+
+This package solves the Bethe-Salpeter equation (BSE) in the dynamical mean-field theory (DMFT) and calculates the momentum-dependent static and dynamical susceptibilities $\chi(q,\nu_m)$ in correlated electron systems.
+Necessary input to this package can be generated using [DCore](https://github.com/issp-center-dev/DCore). Combined with DCore, this package offers investigations of two-particle responses in models and materials.
+
+Features:
+
+- Computes the momentum-dependent spin/charge/orbital susceptibility $\chi_{ijkl}(\boldsymbol{q}, i\nu_m)$ in Matsubara-frequency domain (see [algorightm in doc](doc/algorithms.rst) for the explicit definition).
+
+- Provides several approximation schemes, including BSE, SCL, RPA, and RRPA (see [algorithms in doc](doc/altorithms.rst) for details).
+
+- Runs as a post-processing step of DCore.
+
+  - Allows input from DFT packages via tight-binding bands in the Wannier90 format.
+
+  - Supports the inclusion of spin-orbit coupling (SOC).
+
 ## Setup
 
 ### Requirements
