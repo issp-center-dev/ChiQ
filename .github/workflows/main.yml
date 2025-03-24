@@ -30,7 +30,7 @@ jobs:
       - name: apt
         run: |
           sudo apt update
-          sudo apt install openmpi-bin libopenmpi-dev
+          sudo apt install eigen3 openmpi-bin libopenmpi-dev
 
       - name: pip
         run: |
@@ -41,6 +41,8 @@ jobs:
 
       - name: run
         run: |
+          git submodule init
+          git submodule update
           mkdir build && cd build && cmake ..
           source ./chiqvars.sh
           ctest -V
