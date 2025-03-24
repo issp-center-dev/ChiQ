@@ -1,0 +1,32 @@
+[model]
+seedname = square
+lattice = wannier90
+norb = 1
+nelec = 1.0
+t = -1.0
+kanamori = [(1.0, 0.0, 0.0)]
+nk0 = 32
+nk1 = 32
+nk2 = 1
+
+#[mpi]
+#command = "mpirun -n #"
+
+[system]
+T = 0.5
+n_iw = 1024
+mu = 0.0
+#fix_mu = True
+
+[impurity_solver]
+name = null
+
+[control]
+max_step = 1
+# No self-energy iteration is needed for null solver
+
+[bse]
+num_wb = 1
+num_wf = 20
+X0q_qpoints_saved = "q_path.dat"
+skip_Xloc = True

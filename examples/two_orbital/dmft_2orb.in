@@ -1,0 +1,40 @@
+[model]
+seedname = square_2orb
+lattice = wannier90
+norb = 2
+nelec = 2.0
+t = -1.0
+kanamori = [(12.0, 6.0, 3.0)]
+nk0 = 32
+nk1 = 32
+nk2 = 1
+local_potential_matrix = {0: 'local_pot.in'}
+local_potential_factor = 8.8
+
+#[mpi]
+#command = "mpirun -n #"
+
+[system]
+T = 0.5
+n_iw = 1024
+# fix mu at half-filling
+mu = 10.5
+fix_mu = True
+
+[impurity_solver]
+name = pomerol
+exec_path{str} = pomerol2dcore
+n_bath{int} = 0
+fit_gtol{float} = 1e-6
+
+[control]
+# No iteration is necessary because of fix_mu=True and n_bath=0
+max_step = 1
+sigma_mix = 1.0
+converge_tol = 1e-5
+n_converge = 3
+
+[bse]
+num_wb = 1
+num_wf = 20
+X0q_qpoints_saved = "q_path.dat"

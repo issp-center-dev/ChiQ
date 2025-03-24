@@ -1,0 +1,16 @@
+[H0]
+Lx = 32
+Ly = 32
+Lz = 1
+
+[DMFT]
+beta = 10
+U_int = 12
+#dft_h5file = hubbard.h5
+Loops = 1
+#n_wf_G1 = 1024
+
+[POSTPROCESS]
+flag_G2 = True
+flag_chi0q = True
+n_wf_G2 = 20

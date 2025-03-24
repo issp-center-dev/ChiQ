@@ -1,0 +1,6 @@
+# qx qy qz name  (in unit of reciprocal lattice vectors)
+1/2 0 0  X
+0 0 0  Gamma
+1/2 1/2 0  M
+1/2 0 0  X
+1/4 1/4 0  M'

@@ -1,0 +1,36 @@
+[model]
+seedname = square
+lattice = wannier90
+norb = 1
+nelec = 1.0
+t = -1.0
+kanamori = [(8.0, 0.0, 0.0)]
+nk0 = 32
+nk1 = 32
+nk2 = 1
+
+#[mpi]
+#command = "mpirun -n #"
+
+[system]
+T = 0.5
+n_iw = 1024
+mu = 4.0
+fix_mu = True
+
+[impurity_solver]
+name = pomerol
+exec_path{str} = pomerol2dcore
+n_bath{int} = 0
+fit_gtol{float} = 1e-6
+
+[control]
+max_step = 1
+sigma_mix = 1.0
+converge_tol = 1e-5
+n_converge = 3
+
+[bse]
+num_wb = 1
+num_wf = 20
+X0q_qpoints_saved = "q_path.dat"
