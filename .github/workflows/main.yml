@@ -1,0 +1,47 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 0 1,15 * *' # JST 9:00 on 1st and 15th every month
+
+jobs:
+  main:
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.11', '3.13']
+      fail-fast: false
+
+    name: Run tests with Python ${{ matrix.python-version }}
+    runs-on: 'ubuntu-24.04'
+    # runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: apt
+        run: |
+          sudo apt update
+          sudo apt install openmpi-bin libopenmpi-dev
+
+      - name: pip
+        run: |
+          python -m pip install -U pip
+          python -m pip install numpy scipy mpi4py
+          python -m pip install more-itertools
+          python -m pip install pytest
+
+      - name: run
+        run: |
+          mkdir build && cd build && cmake ..
+          source ./chiqvars.sh
+          ctest -V
+          python -m pytest -v
