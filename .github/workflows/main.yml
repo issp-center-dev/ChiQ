@@ -30,7 +30,7 @@ jobs:
       - name: apt
         run: |
           sudo apt update
-          sudo apt install eigen3 openmpi-bin libopenmpi-dev
+          sudo apt install libeigen3-dev openmpi-bin libopenmpi-dev
 
       - name: pip
         run: |
