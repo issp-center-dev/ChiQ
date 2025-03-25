@@ -10,3 +10,5 @@ install(FILES ${scripts}
  WORLD_EXECUTE WORLD_READ
  DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(DIRECTORY package/chiq DESTINATION ${CMAKE_INSTALL_LIBDIR}/bse-python)
+# make bse package for backward compatibility
+install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/bse-python/chiq ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/bse-python/bse)")

@@ -15,9 +15,7 @@ def test_chiq(request):
     shutil.copy('../bsetool_BSE/ref/dmft_bse.h5', './')  # overwrite if exists
 
     # run
-    assert os.system("g2scl.py --noplot --algo='svd'") == 0
-    assert os.system("g2scl_manip_h5.py -f dmft_bse.h5 --scl='svd'") == 0
-    assert os.system("bse_tool.py bse.toml") == 0
+    assert os.system("calc_Iq_scl.py scl_2pole.in") == 0
     assert os.system("bse_post.py bse.toml") == 0
 
     # compare results (take rounding errors into account)
