@@ -10,7 +10,7 @@ jobs:
   main:
     strategy:
       matrix:
-        python-version: ['3.8', '3.11', '3.13']
+        python-version: ['3.8', '3.13']
       fail-fast: false
 
     name: Run tests with Python ${{ matrix.python-version }}
