@@ -72,3 +72,5 @@ gen_qpath.py $ini qpath.in
 	plot_chiq_path.py ../q_path.dat --label ../label1.in chi_q_eigen.dat
 	plot_chiq_path.py ../q_path.dat --label ../label2.in I_q_eigen.dat --mode='Iq'
 )
+
+echo "Finished successfully"

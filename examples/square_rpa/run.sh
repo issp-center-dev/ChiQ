@@ -57,3 +57,5 @@ bse_post.py bse.in 1>bse_post.log 2>bse_post.err
 	plot_chiq_path.py ../q_path.dat chi0_q_eigen.dat --mode='chi0'
 	plot_chiq_path.py ../q_path.dat chi_q_rpa_eigen.dat --mode='rpa'
 )
+
+echo "Finished successfully"

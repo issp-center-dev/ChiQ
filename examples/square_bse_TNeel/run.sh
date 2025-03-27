@@ -55,11 +55,10 @@ for T in 0.4 0.5 0.6 0.7 0.8 0.9 1.0; do
     plot_chiq_path.py ../q_path.dat chi_q_eigen.dat
   )
 
-  # Plot the inverse susceptibility
-  (
-    cd bse
-    plot_chiinv.plt
-  )
-
   cd "$ROOTDIR"
 done
+
+# Plot the inverse susceptibility
+gnuplot plot_chiinv.plt
+
+echo "Finished successfully"

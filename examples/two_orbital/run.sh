@@ -63,3 +63,5 @@ bse_post.py bse.in 1>bse_post.log 2>bse_post.err
 	# plot with label
 	# plot_chiq_path.py ../q_path.dat -l label.in chi_q_eigen.dat
 )
+
+echo "Finished successfully"
