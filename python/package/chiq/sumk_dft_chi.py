@@ -1,17 +1,13 @@
-# from triqs_dft_tools.sumk_dft import SumkDFT
-import sys
 import os
 import time
-import pprint
 import numpy as np
 from itertools import product
 from mpi4py import MPI
+
 from .index_pair import IndexPair, IndexPair2
 from .h5bse import h5BSE
 from .tools import WallTime
 
-# from .pytriqs_gf_compat import *
-# from .dft_tools_compat import SumkDFT
 from dcore._dispatcher import HDFArchive, mpi, BlockGf, GfImFreq, MeshImFreq
 from dcore.sumkdft_opt import SumkDFT_opt as SumkDFT
 
@@ -268,6 +264,8 @@ class SumkDFTChi(SumkDFTChi_aux):
         misc_data="dft_misc_input",
         dft_data_fbz="dft_input_fbz",
         dft_chi_data="dft_input_chi",
+        h5_compression="gzip",
+        h5_compression_opts=4,
     ):
         """
         Initialization of the class.
@@ -292,6 +290,9 @@ class SumkDFTChi(SumkDFTChi_aux):
 
         # init with FBZ database
         super().__init__(dft_data=dft_data_fbz, **args)
+
+        self.h5_compression = h5_compression
+        self.h5_compression_opts = h5_compression_opts
 
         assert self.symm_op == 0
 
@@ -460,8 +461,6 @@ class SumkDFTChi(SumkDFTChi_aux):
         h5_file="dmft_bse.h5",
         groupname="",
         h5_mode="a",
-        h5_compression="gzip",
-        h5_compression_opts=None,
         with_Sigma=True,
         algo="fft",
         q_dict=None,
@@ -551,12 +550,11 @@ class SumkDFTChi(SumkDFTChi_aux):
         # self.init_for_X0(with_Sigma, n_wf_reduce)
         if mpi.is_master_node():
             print("\nCompute X0q")
-
             self.BS = h5BSE(
                 h5_file,
                 groupname,
-                compression=h5_compression,
-                compression_opts=h5_compression_opts,
+                compression=self.h5_compression,
+                compression_opts=self.h5_compression_opts,
             )
             self.BS.open(h5_mode)
 
