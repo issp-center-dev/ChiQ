@@ -78,7 +78,7 @@ Implementation notes:
 
 - :math:`\hat{X}_0(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X0q`] is computed in ``dcore_chiq.py``.
 - :math:`\hat{X}_\text{loc}(i\Omega_{m})` is computed in the impurity solver, which is called from ``dcore_chiq.py``.
-- :math:`\hat{X}(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`Xq`] and :math:`\hat{\chi}(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X_to_chi`] are computed in C++ part, which is called from ``bse_tool.py``.
+- :math:`\hat{X}(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`Xq`] and :math:`\hat{\chi}(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X_to_chi`] are computed in C++ part, which is called from ``chiq_main.py``.
 - The fermionic Matsubara frequencies are truncated. The number of fermionic Matsubara frequency is specified by the parameter ``num_wf``. The maximum frequency is :math:`(2 \mathtt{num\_wf} + 1) \pi T`.
 - The size of the matrices is :math:`(2N_{\text{orb}})^2 \times \mathtt{num\_wf}`, where :math:`N_{\text{orb}}` is the number of the total orbitals of the correlated shells in the unit cell.
 
@@ -134,7 +134,7 @@ In the single-band Hubbard model, :math:`\Delta_{-}` and :math:`\Delta_{+}` corr
 Implementation notes:
 
 - :math:`\hat{X}_0(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X0q`] is computed in ``dcore_chiq.py``.
-- :math:`\hat{\chi}_\text{SCL}(\boldsymbol{q})` and :math:`\hat{I}_\text{SCL}(\boldsymbol{q})` [Eqs. :eq:`chiq_SCL` and :eq:`Iq_SCL`] are computed in the script ``calc_Iq_scl.py`` (``bse_tool.py`` is not used).
+- :math:`\hat{\chi}_\text{SCL}(\boldsymbol{q})` and :math:`\hat{I}_\text{SCL}(\boldsymbol{q})` [Eqs. :eq:`chiq_SCL` and :eq:`Iq_SCL`] are computed in the script ``calc_Iq_scl.py`` (``chiq_main.py`` is not used).
 - The value of :math:`\Delta_{-}` and :math:`\Delta_{+}` are specified by the parameter ``delta_minus`` and ``delta_plus``, respectively.
 - The size of the matrices is :math:`(2N_{\text{orb}})^2`.
 
@@ -168,7 +168,7 @@ Implementation notes:
 
 - :math:`\hat{\gamma}_0` is generated in ``dcore_chiq.py``.
 - :math:`\hat{X}_0(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X0q`] is computed in ``dcore_chiq.py``.
-- :math:`\hat{\chi}_\text{RPA}(\boldsymbol{q}, i\Omega_{m})` and :math:`\hat{\chi}_0(\boldsymbol{q}, i\Omega_{m})` [Eqs. :eq:`chiq_RPA` and :eq:`chi0q`] are computed in C++ part, which is called from ``bse_tool.py``.
+- :math:`\hat{\chi}_\text{RPA}(\boldsymbol{q}, i\Omega_{m})` and :math:`\hat{\chi}_0(\boldsymbol{q}, i\Omega_{m})` [Eqs. :eq:`chiq_RPA` and :eq:`chi0q`] are computed in C++ part, which is called from ``chiq_main.py``.
 - The size of the matrices is :math:`(2N_{\text{orb}})^2`.
 
 
@@ -191,7 +191,7 @@ Compared with the RPA formula in Eq. :eq:`chiq_RPA`, the bare interaction :math:
 Implementation notes:
 
 - :math:`\hat{X}_0(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X0q`] is computed in ``dcore_chiq.py``.
-- :math:`\hat{\chi}_\text{RRPA}(\boldsymbol{q}, i\Omega_{m})` and :math:`\hat{\chi}_0(\boldsymbol{q}, i\Omega_{m})` [Eqs. :eq:`chi_RRPA` and :eq:`chi0q`] are computed in C++ part, which is called from ``bse_tool.py``.
+- :math:`\hat{\chi}_\text{RRPA}(\boldsymbol{q}, i\Omega_{m})` and :math:`\hat{\chi}_0(\boldsymbol{q}, i\Omega_{m})` [Eqs. :eq:`chi_RRPA` and :eq:`chi0q`] are computed in C++ part, which is called from ``chiq_main.py``.
 - The size of the matrices is :math:`(2N_{\text{orb}})^2`.
 
 
@@ -229,7 +229,7 @@ Implementation notes:
 
 - :math:`\hat{I}(\boldsymbol{q})` [Eq. :eq:`Iq`] is computed in ``calc_Iq.py``.
 - Calculation of Eq. :eq:`Iq` is unstable when the charge fluctuation is tiny. The script ``calc_Iq.py`` takes a special care of the charge fluctuation to avoid the instability. See Appendix B in Ref. :ref:`[Otsuki et al. 2024] <references>` for details.
-- ``bse_tool.py`` also output :math:`\hat{I}(\boldsymbol{q})`, but using ``calc_Iq.py`` is recommended because the special treatment of the charge fluctuation is done only in ``calc_Iq.py``.
+- ``chiq_main.py`` also output :math:`\hat{I}(\boldsymbol{q})`, but using ``calc_Iq.py`` is recommended because the special treatment of the charge fluctuation is done only in ``calc_Iq.py``.
 - :math:`\hat{I}(\boldsymbol{r})` [Eq. :eq:`Ir`] is computed in ``bse_fft.py``.
 
 
@@ -257,7 +257,7 @@ The eigenvalues :math:`\chi_{\xi}(\boldsymbol{q})` represent physical susceptibi
 
 Impelementation notes:
 
-- ``bse_post.py`` outputs eigenvalues by default (``mode = 'eigen'``).
+- ``chiq_post.py`` outputs eigenvalues by default (``mode = 'eigen'``).
 - The eigenvalues are sorted in descending order by default. This behavior can be changed by parameter ``order``.
 - The eigenvectors are output by setting ``vector = true`` (default is ``false``).
 
@@ -281,7 +281,7 @@ With this coefficient :math:`C^{(\gamma)}_{ij}`, we can transform :math:`\chi_{i
 
 Implementation notes:
 
-- ``bse_post.py`` outputs the diagonal componenents :math:`\chi_{\gamma\gamma}(\boldsymbol{q})` when ``mode = 'linear_combination'``.
+- ``chiq_post.py`` outputs the diagonal componenents :math:`\chi_{\gamma\gamma}(\boldsymbol{q})` when ``mode = 'linear_combination'``.
 - The coefficients :math:`C^{(\gamma)}_{ij}` are input by an external file.
 - The number of coefficients can be smaller than the total number of operators.
 

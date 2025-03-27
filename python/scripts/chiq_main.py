@@ -403,7 +403,7 @@ class chi_scl(chi_base):
         return data_Phi, data_PhiSum
 
 
-_version_message = f'BSE version {version}'
+_version_message = f'ChiQ version {version}'
 
 
 def main():

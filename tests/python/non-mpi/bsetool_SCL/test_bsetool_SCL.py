@@ -16,7 +16,7 @@ def test_chiq(request):
 
     # run
     assert os.system("calc_Iq_scl.py scl_2pole.in") == 0
-    assert os.system("bse_post.py bse.toml") == 0
+    assert os.system("chiq_post.py bse.toml") == 0
 
     # compare results (take rounding errors into account)
 

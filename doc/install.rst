@@ -36,7 +36,7 @@ You also need to clone pybind11, which is linked from extern/pybind11 directory 
     git submodule init
     git submodule update
 
-in the bse directory. pybind11 is cloned into ``extern/pybind11``.
+in the ChiQ directory. pybind11 is cloned into ``extern/pybind11``.
 
 For build, make a new directory and go into it
 
@@ -66,9 +66,9 @@ After configuration, type the following to build, test, and install
     make test  # when -DTesting=ON is activated in cmake
     make install
 
-Python scripts such as ``bse_tool.py`` are installed in ``$HOME/local/bin``.
-A python package ``bse`` and a shared library ``bse_solver.cpython-XXX-YYY.so`` (``XXX`` is the python version, and ``YYY`` is the os info) is installed in ``Home/local/lib/bse-python`` (or ``lib64/bse-python``).
-A configurations file ``bsevars.sh`` is installed in ``$HOME/local/share``, see the next section for details.
+Python scripts such as ``chiq_main.py`` are installed in ``$HOME/local/bin``.
+A python package ``chiq`` and a shared library ``bse_solver.cpython-XXX-YYY.so`` (``XXX`` is the python version, and ``YYY`` is the os info) is installed in ``Home/local/lib/bse-python`` (or ``lib64/bse-python``).
+A configurations file ``chiqvars.sh`` is installed in ``$HOME/local/share``, see the next section for details.
 
 Environment variables
 ---------------------

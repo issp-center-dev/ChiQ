@@ -1,16 +1,16 @@
 .. _program_bse_tool:
 
-bse_tool
-========
+chiq_main
+=========
 
 .. code-block:: bash
 
-    bse_tool.py [-h] [--version] toml
+    chiq_main.py [-h] [--version] toml
 
 Description
 -----------
 
-``bse_tool.py`` is a main script for solving the Bethe-Salpeter equation. MPI-based parallel computation is supported. A shared library implemented in C++ is called internally.
+``chiq_main.py`` is a main script for solving the Bethe-Salpeter equation. MPI-based parallel computation is supported. A shared library implemented in C++ is called internally.
 
 Positional Arguments
 ---------------------
@@ -34,11 +34,11 @@ Basic usage:
 
 .. code-block:: console
 
-    $ mpirun -np 4 bse_tool.py parameters.toml
+    $ mpirun -np 4 chiq_main.py parameters.toml
 
 Print version:
 
 .. code-block:: console
 
-    $ bse_tool.py --version
-    BSE version 0.17.0
+    $ chiq_main.py --version
+    ChiQ version 0.17.0

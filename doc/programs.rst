@@ -19,9 +19,9 @@ All python scripts have help messages that can be displayed by running the scrip
    :maxdepth: 1
 
    programs/dcore_chiq
-   programs/bse_tool
-   programs/bse_post
-   programs/bse_fft
+   programs/chiq_main
+   programs/chiq_post
+   programs/chiq_fft
    programs/calc_Iq
    programs/calc_Iq_scl
    programs/gen_qpath

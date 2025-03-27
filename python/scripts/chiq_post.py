@@ -15,7 +15,7 @@ import os
 
 from chiq import h5bse
 from chiq import bse_toml
-import bse_tool # in the same directory
+import chiq_main # in the same directory
 
 
 # ============================================================================
@@ -386,11 +386,11 @@ def main():
         print(f"\ntype={calc_type!r}")
 
         _chi_bse = {
-            "bse": bse_tool.chi_bse,
-            "rpa": bse_tool.chi_rpa,
-            "rrpa": bse_tool.chi_rrpa,
-            "chi0": bse_tool.chi_chi0,
-            "scl": bse_tool.chi_scl,
+            "bse": chiq_main.chi_bse,
+            "rpa": chiq_main.chi_rpa,
+            "rrpa": chiq_main.chi_rrpa,
+            "chi0": chiq_main.chi_chi0,
+            "scl": chiq_main.chi_scl,
         }[calc_type]
 
         for mode in mode_list:
@@ -418,7 +418,7 @@ def main():
                     for _X0LocInfo in chi_post.solver_post.datalist["chi_loc"]:
                         omega = int(_X0LocInfo[1])
                         if flag_calc_all == False:
-                            if bse_tool.get_calc_flg(omega, target_lists_all) == False:
+                            if chiq_main.get_calc_flg(omega, target_lists_all) == False:
                                 continue
 
                         tmp_chi_loc = chi_post.get_matrix(("chi_loc", omega))
@@ -434,9 +434,9 @@ def main():
                 omega = _X0qInfo[1]
                 q = _X0qInfo[2]
                 if flag_calc_all is False:
-                    if bse_tool.get_calc_flg(omega, target_lists_all) == False:
+                    if chiq_main.get_calc_flg(omega, target_lists_all) == False:
                         continue
-                    if bse_tool.get_calc_flg(q, target_lists_all, target="q") == False:
+                    if chiq_main.get_calc_flg(q, target_lists_all, target="q") == False:
                         continue
 
                 header_type = chi_post.solver_post.header_type

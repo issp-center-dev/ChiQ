@@ -37,7 +37,7 @@ echo "##################"
 echo ""
 
 # Print version
-bse_tool.py --version
+chiq_main.py --version
 
 # Generate q_path.dat
 gen_qpath.py $ini qpath.in
@@ -48,8 +48,8 @@ dcore_chiq.py $ini --np $NPROCS 1>dcore_chiq.log 2>dcore_chiq.err
 # SCL3
 calc_Iq_scl.py scl_2pole.in
 
-# BSE post script
-bse_post.py bse.in 1>bse_post.log 2>bse_post.err
+# Chiq post script
+chiq_post.py bse.in 1>chiq_post.log 2>chiq_post.err
 
 # Plot BSE results
 (

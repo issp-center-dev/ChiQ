@@ -11,7 +11,7 @@ calc_Iq
 Description
 -----------
 
-``calc_Iq.py`` is a script for calculating the momentum-dependent interactions from the susceptibility, assuming a localized model. This script should be run after the BSE calculation by ``bse_tool.py``. For the explicit equation, see :ref:`Algorithm_Iq`.
+``calc_Iq.py`` is a script for calculating the momentum-dependent interactions from the susceptibility, assuming a localized model. This script should be run after the BSE calculation by ``chiq_main.py``. For the explicit equation, see :ref:`Algorithm_Iq`.
 
 Options
 -------
@@ -84,4 +84,4 @@ The results are saved as ``I_q`` in the HDF5 file.
 
 .. note::
 
-    The file ``dmft_bse.out.h5`` originally contains ``I_q`` computed in ``bse_tool.py``. It corresponds to a result with no remove option ``--remove 0``. However, removing the charge mode is crucial especially in the strong-coupling regime. We recommend using ``calc_Iq.py`` and removing small eigenvalues manually.
+    The file ``dmft_bse.out.h5`` originally contains ``I_q`` computed in ``chiq_main.py``. It corresponds to a result with no remove option ``--remove 0``. However, removing the charge mode is crucial especially in the strong-coupling regime. We recommend using ``calc_Iq.py`` and removing small eigenvalues manually.

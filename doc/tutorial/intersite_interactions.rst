@@ -36,12 +36,12 @@ Before running ``dcore_chiq.py``, we need to prepare the ``q_fbz.dat`` file by u
 
   gen_allq.py dmft_square.in
 
-Run ``dcore_chiq.py`` and ``bse_tools.py`` to calculate the susceptibility in the momentum space, :math:`\chi(q)` and :math:`\chi_\text{loc}(q)`.
+Run ``dcore_chiq.py`` and ``chiq_main.py`` to calculate the susceptibility in the momentum space, :math:`\chi(q)` and :math:`\chi_\text{loc}(q)`.
 
 .. code-block:: bash
 
   dcore_chiq.py --np 4 dmft_square.in
-  mpiexec -np 4 bse_tools.py bse.in
+  mpiexec -np 4 chiq_main.py bse.in
 
 The input file of ChiQ tools, ``bse.in``, is also the same as in the previous tutorial:
 
@@ -60,7 +60,7 @@ Once these susceptibilities are calculated, we can run ``calc_Iq.py`` to calcula
 
   calc_Iq.py -f dmft_bse.out.h5 --remove 1
 
-``-f`` is used to specify the HDF5 file, which is the output file of ``bse_tools.py`` (in this case, ``dmft_bse.out.h5``).
+``-f`` is used to specify the HDF5 file, which is the output file of ``chiq_main.py`` (in this case, ``dmft_bse.out.h5``).
 ``--remove`` specifies the number of the modes to be removed to stabilize the calculation.
 In this case, we remove one mode with the smallest eigenvalue.
 The obtained :math:`I(q)` is saved in the HDF5 file as ``dmft_bse.out.h5/bse/output/I_q``.
@@ -76,11 +76,11 @@ Next, we perform the FFT from the momentum space :math:`I(q)` to the real space 
 ``--output_dname`` is used to specify the name of the dataset in the HDF5 file of :math:`I(r)` (in this case, ``I_r``).
 In this case, ``bse_fft.py`` reads the :math:`I(q)` from ``dmft_bse.out.h5/bse/output/I_q`` and writes the :math:`I(r)` to ``dmft_bse.out.h5/bse/output/I_r``.
 
-Finally, as in the case of :math:`\chi(q)`, we need to transform (or diagonalize) :math:`I(q)` to :math:`I(r)` by using ``bse_post.py``.
+Finally, as in the case of :math:`\chi(q)`, we need to transform (or diagonalize) :math:`I(q)` to :math:`I(r)` by using ``chiq_post.py``.
 
 .. code-block:: bash
 
-  mpiexec --np 4 bse_post.py bse.in
+  mpiexec --np 4 chiq_post.py bse.in
 
 This also transforms :math:`I(q)` and :math:`I(r)` in the same way as :math:`\chi(q)`.
 The results, ``I_q_eigen.dat`` and ``I_r_eigen.dat``, are saved in the directory specified by ``output_dir`` parameter in the ``[bse_post]`` section of ``bse.in`` (in this case, ``bse`` directory).
