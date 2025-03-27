@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# This comes from DCore's dcore_chiq.py
+# This comes from DCore's dcore_bse.py
 #
 # DCore -- Integrated DMFT software for correlated electrons
 # Copyright (C) 2017 The University of Tokyo
@@ -694,9 +694,9 @@ def dcore_chiq(filename, np=1):
 def run():
     import argparse
     from dcore.option_tables import generate_all_description
-    from dcore.version import version, print_header
+    from chiq import __version__ as version
 
-    print_header()
+    _version_message = f'BSE version {version}'
 
     parser = argparse.ArgumentParser(
         prog='dcore_chiq.py',
@@ -713,12 +713,14 @@ def run():
                         help="Input filename(s)",
                         )
     parser.add_argument('--np', help='Number of MPI processes', required=True)
-    parser.add_argument('--version', action='version', version='DCore {}'.format(version))
+    parser.add_argument('--version', action='version', version=_version_message)
 
     args = parser.parse_args()
     for path_input_file in args.path_input_files:
         if os.path.isfile(path_input_file) is False:
             sys.exit(f"Input file '{path_input_file}' does not exist.")
+
+    print(_version_message)
 
     dcore_chiq(args.path_input_files, int(args.np))
 

@@ -76,8 +76,8 @@ Eliminating :math:`\Gamma_{\text{loc}}(i\Omega_{m})` from the above two BS equat
 
 Implementation notes:
 
-- :math:`\hat{X}_0(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X0q`] is computed in ``dcore_bse``.
-- :math:`\hat{X}_\text{loc}(i\Omega_{m})` is computed in the impurity solver, which is called from ``dcore_bse``.
+- :math:`\hat{X}_0(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X0q`] is computed in ``dcore_chiq.py``.
+- :math:`\hat{X}_\text{loc}(i\Omega_{m})` is computed in the impurity solver, which is called from ``dcore_chiq.py``.
 - :math:`\hat{X}(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`Xq`] and :math:`\hat{\chi}(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X_to_chi`] are computed in C++ part, which is called from ``bse_tool.py``.
 - The fermionic Matsubara frequencies are truncated. The number of fermionic Matsubara frequency is specified by the parameter ``num_wf``. The maximum frequency is :math:`(2 \mathtt{num\_wf} + 1) \pi T`.
 - The size of the matrices is :math:`(2N_{\text{orb}})^2 \times \mathtt{num\_wf}`, where :math:`N_{\text{orb}}` is the number of the total orbitals of the correlated shells in the unit cell.
@@ -133,7 +133,7 @@ In the single-band Hubbard model, :math:`\Delta_{-}` and :math:`\Delta_{+}` corr
 
 Implementation notes:
 
-- :math:`\hat{X}_0(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X0q`] is computed in ``dcore_bse``.
+- :math:`\hat{X}_0(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X0q`] is computed in ``dcore_chiq.py``.
 - :math:`\hat{\chi}_\text{SCL}(\boldsymbol{q})` and :math:`\hat{I}_\text{SCL}(\boldsymbol{q})` [Eqs. :eq:`chiq_SCL` and :eq:`Iq_SCL`] are computed in the script ``calc_Iq_scl.py`` (``bse_tool.py`` is not used).
 - The value of :math:`\Delta_{-}` and :math:`\Delta_{+}` are specified by the parameter ``delta_minus`` and ``delta_plus``, respectively.
 - The size of the matrices is :math:`(2N_{\text{orb}})^2`.
@@ -166,8 +166,8 @@ where :math:`\hat{\chi}_0(\boldsymbol{q}, i\Omega_{m})` is the bare susceptibili
 
 Implementation notes:
 
-- :math:`\hat{\gamma}_0` is generated in ``dcore_bse``.
-- :math:`\hat{X}_0(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X0q`] is computed in ``dcore_bse``.
+- :math:`\hat{\gamma}_0` is generated in ``dcore_chiq.py``.
+- :math:`\hat{X}_0(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X0q`] is computed in ``dcore_chiq.py``.
 - :math:`\hat{\chi}_\text{RPA}(\boldsymbol{q}, i\Omega_{m})` and :math:`\hat{\chi}_0(\boldsymbol{q}, i\Omega_{m})` [Eqs. :eq:`chiq_RPA` and :eq:`chi0q`] are computed in C++ part, which is called from ``bse_tool.py``.
 - The size of the matrices is :math:`(2N_{\text{orb}})^2`.
 
@@ -190,7 +190,7 @@ Compared with the RPA formula in Eq. :eq:`chiq_RPA`, the bare interaction :math:
 
 Implementation notes:
 
-- :math:`\hat{X}_0(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X0q`] is computed in ``dcore_bse``.
+- :math:`\hat{X}_0(\boldsymbol{q}, i\Omega_{m})` [Eq. :eq:`X0q`] is computed in ``dcore_chiq.py``.
 - :math:`\hat{\chi}_\text{RRPA}(\boldsymbol{q}, i\Omega_{m})` and :math:`\hat{\chi}_0(\boldsymbol{q}, i\Omega_{m})` [Eqs. :eq:`chi_RRPA` and :eq:`chi0q`] are computed in C++ part, which is called from ``bse_tool.py``.
 - The size of the matrices is :math:`(2N_{\text{orb}})^2`.
 

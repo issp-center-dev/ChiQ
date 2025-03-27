@@ -41,7 +41,7 @@ for T in 0.4 0.5 0.6 0.7 0.8 0.9 1.0; do
   # (4) calculate susceptibilities by BSE
   dcore $ini --np $NPROCS 1>dcore.log 2>dcore.err
   dcore_check $ini 1>dcore_check.log 2>dcore_check.err
-  dcore_bse $ini --np $NPROCS 1>dcore_bse.log 2>dcore_bse.err
+  dcore_chiq.py $ini --np $NPROCS 1>dcore_chiq.log 2>dcore_chiq.err
   mpirun -np $NPROCS bse_tool.py bse.in 1>bse_tool.log 2>bse_tool.err
   bse_post.py bse.in 1>bse_post.log 2>bse_post.err
 

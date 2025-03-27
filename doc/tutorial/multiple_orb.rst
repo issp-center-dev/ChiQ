@@ -83,7 +83,7 @@ BSE calculation can be performed using the following commands:
 
 .. code-block:: bash
 
-  dcore_bse --np 4 bse.in
+  dcore_chiq.py --np 4 bse.in
   mpiexec --np 4 dcore_tool.py bse.in
 
 The obtained susceptibility is a 16x16 complex-valued matrix.

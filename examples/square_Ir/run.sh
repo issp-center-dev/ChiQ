@@ -43,7 +43,7 @@ bse_tool.py --version
 gen_allq.py $ini
 
 # Calc chi_0(q) and vertex part (heavy)
-dcore_bse $ini --np $NPROCS 1>dcore_bse.log 2>dcore_bse.err
+dcore_chiq.py $ini --np $NPROCS 1>dcore_chiq.log 2>dcore_chiq.err
 
 # BSE main script
 mpirun -np $NPROCS bse_tool.py bse.in 1>bse_tool.log 2>bse_tool.err

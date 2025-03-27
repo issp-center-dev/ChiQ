@@ -1,15 +1,15 @@
-dcore_bse
-=========
+dcore_chiq
+==========
 
 .. code-block:: bash
 
-    dcore_bse.py [-h] --np NP [--version] [path_input_files ...]
+    dcore_chiq.py [-h] --np NP [--version] [path_input_files ...]
 
 Description
 -----------
 
-``dcore_bse`` is an auxiliary programs for **DCore**. It generates necessary data for running **ChiQ**.
-``dcore_bse`` should be executed after completing **DCore** calculations using ``dcore_pre`` and ``dcore``.
+``dcore_chiq`` is an auxiliary program for **DCore**. It generates necessary data for running **ChiQ**.
+``dcore_chiq`` should be executed after completing **DCore** calculations using ``dcore_pre`` and ``dcore``.
 
 Positional Arguments
 ---------------------
@@ -32,23 +32,23 @@ Options
 Example
 -------
 
-The first usage involves adding the BSE input parameters directly to the DCore input file (``square.ini``).
+The first usage involves adding the ChiQ input parameters directly to the DCore input file (``square.ini``).
 
 .. code-block:: console
 
-    $ dcore_bse --np 4 square.ini
+    $ dcore_chiq.py --np 4 square.ini
 
 The second usage keeps the DCore input file (``dcore.ini``) unchanged while specifying the ChiQ input parameters in a separate file (``bse.in``).
 
 .. code-block:: console
 
-    $ dcore_bse --np 4 dcore.ini bse.ini
+    $ dcore_chiq.py --np 4 dcore.ini bse.ini
 
 
 Input parameters
 ----------------
 
-``dcore_bse`` requires parameters in [bse] block in addition to other parameters in **DCore**.
+``dcore_chiq`` requires parameters in [bse] block in addition to other parameters in **DCore**.
 See `DCore document <https://issp-center-dev.github.io/DCore/master/reference/input.html>`_ for **DCore** parameters.
 
 [bse] block
@@ -66,3 +66,5 @@ See `DCore document <https://issp-center-dev.github.io/DCore/master/reference/in
    "calc_only_chiloc", "Bool", "False", "Calculate only chi_loc but no X_loc (for SCL, rRPA). Do not activate skip_Xloc when using this option."
    "use_temp_file", "Bool", "False", "Whether or not temporary file is used in computing X0_q. This option will reduce the memory footprints."
    "X0q_qpoints_saved", "String", "quadrant", "Specifies for which q points X0q are saved in a HDF file. quadrant or path to a q_path.dat file."
+   "h5_compression", "String", "gzip", "Compression algorithm for HDF5 output"
+   "h5_compression_opts", "Integer", "4", "Compression level of gzip for HDF5 output"

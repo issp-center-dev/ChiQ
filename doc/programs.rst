@@ -18,7 +18,7 @@ All python scripts have help messages that can be displayed by running the scrip
 .. toctree::
    :maxdepth: 1
 
-   programs/dcore_bse
+   programs/dcore_chiq
    programs/bse_tool
    programs/bse_post
    programs/bse_fft

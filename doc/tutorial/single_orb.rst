@@ -70,7 +70,7 @@ Once the input files are prepared, the following command:
 
 .. code-block:: bash
 
-  dcore_bse --np 4 dmft_square.in
+  dcore_chiq.py --np 4 dmft_square.in
 
 calculates :math:`\hat{X}_0` and :math:`\hat{X}_\text{loc}` and writes them to :ref:`one of the input file of BSE, dmft_bse.h5 <reference_hdf5_input>` .
 
@@ -84,7 +84,7 @@ The following is `the input file of ChiQ bse.in <reference_bse_in>`_:
   :language: toml
 
 ``[bse_common]`` section is common to all the ChiQ scripts.
-The ``input`` keyword specifies the HDF5 file including the Green's functions, which is the output file of ``dcore_bse``.
+The ``input`` keyword specifies the HDF5 file including the Green's functions, which is the output file of ``dcore_chiq.py``.
 The ``output`` keyword specifies the HDF5 file to store the results of BSE calculation (e.g., the susceptibility).
 The ``type`` keyword specifies the approximation method in calculating the susceptibility.
 The ``omega_q`` keyword specifies the q-path file.
@@ -165,7 +165,7 @@ Note that the names of the output files by the RPA calculation start with ``chi_
   dcore_pre dmft_square.in
   dcore --np 4 dmft_square.in
   gen_qpath.py dmft_square.in qpath.in
-  dcore_bse --np 4 dmft_square.in
+  dcore_chiq.py --np 4 dmft_square.in
   mpiexec --np 4 bse_tool.py bse.in
   mpiexec --np 4 bse_post.py bse.in
   cd bse

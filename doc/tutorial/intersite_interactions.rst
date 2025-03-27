@@ -30,17 +30,17 @@ First, we perform the DMFT calculation as usual.
   dcore_pre dmft_square.in
   dcore --np 4 dmft_square.in
 
-Before running ``dcore_bse``, we need to prepare the ``q_fbz.dat`` file by using the ``gen_allq.py`` script.
+Before running ``dcore_chiq.py``, we need to prepare the ``q_fbz.dat`` file by using the ``gen_allq.py`` script.
 
 .. code-block:: bash
 
   gen_allq.py dmft_square.in
 
-Run ``dcore_bse`` and ``bse_tools.py`` to calculate the susceptibility in the momentum space, :math:`\chi(q)` and :math:`\chi_\text{loc}(q)`.
+Run ``dcore_chiq.py`` and ``bse_tools.py`` to calculate the susceptibility in the momentum space, :math:`\chi(q)` and :math:`\chi_\text{loc}(q)`.
 
 .. code-block:: bash
 
-  dcore_bse --np 4 dmft_square.in
+  dcore_chiq.py --np 4 dmft_square.in
   mpiexec -np 4 bse_tools.py bse.in
 
 The input file of ChiQ tools, ``bse.in``, is also the same as in the previous tutorial:

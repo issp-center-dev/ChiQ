@@ -43,7 +43,7 @@ bse_tool.py --version
 gen_qpath.py $ini qpath.in
 
 # Calc chi_0(q)
-dcore_bse $ini --np $NPROCS 1>dcore_bse.log 2>dcore_bse.err
+dcore_chiq.py $ini --np $NPROCS 1>dcore_chiq.log 2>dcore_chiq.err
 
 # SCL3
 calc_Iq_scl.py scl_2pole.in
