@@ -48,7 +48,7 @@ The input file of ChiQ tools, ``bse.in``, is also the same as in the previous tu
 .. literalinclude:: ../../examples/square_Ir/bse.in
   :language: toml
 
-The only difference is that the ``q_fbz.dat`` file is used instead of ``q_path.dat`` in ``omega_q`` parameter in the ``[bse_common]`` section.
+The only difference is that the ``q_fbz.dat`` file is used instead of ``q_path.dat`` in ``omega_q`` parameter in the ``[chiq_common]`` section.
 
 
 Calculation of intersite interactions :math:`I(q)` and :math:`I(r)`
@@ -65,16 +65,16 @@ Once these susceptibilities are calculated, we can run ``calc_Iq.py`` to calcula
 In this case, we remove one mode with the smallest eigenvalue.
 The obtained :math:`I(q)` is saved in the HDF5 file as ``dmft_bse.out.h5/bse/output/I_q``.
 
-Next, we perform the FFT from the momentum space :math:`I(q)` to the real space :math:`I(r)` by using ``bse_fft.py``.
+Next, we perform the FFT from the momentum space :math:`I(q)` to the real space :math:`I(r)` by using ``chiq_fft.py``.
 
 .. code-block:: bash
 
-  bse_fft.py -f dmft_bse.out.h5 --input_dname I_q --output_dname I_r dmft_square.in
+  chiq_fft.py -f dmft_bse.out.h5 --input_dname I_q --output_dname I_r dmft_square.in
 
 ``-f`` is used to specify the HDF5 file, which is used in ``calc_Iq.py`` (in this case, ``dmft_bse.out.h5``).
 ``--input_dname`` is used to specify the name of the dataset in the HDF5 file of :math:`I(q)` (in this case, ``I_q``).
 ``--output_dname`` is used to specify the name of the dataset in the HDF5 file of :math:`I(r)` (in this case, ``I_r``).
-In this case, ``bse_fft.py`` reads the :math:`I(q)` from ``dmft_bse.out.h5/bse/output/I_q`` and writes the :math:`I(r)` to ``dmft_bse.out.h5/bse/output/I_r``.
+In this case, ``chiq_fft.py`` reads the :math:`I(q)` from ``dmft_bse.out.h5/bse/output/I_q`` and writes the :math:`I(r)` to ``dmft_bse.out.h5/bse/output/I_r``.
 
 Finally, as in the case of :math:`\chi(q)`, we need to transform (or diagonalize) :math:`I(q)` to :math:`I(r)` by using ``chiq_post.py``.
 
@@ -83,7 +83,7 @@ Finally, as in the case of :math:`\chi(q)`, we need to transform (or diagonalize
   mpiexec --np 4 chiq_post.py bse.in
 
 This also transforms :math:`I(q)` and :math:`I(r)` in the same way as :math:`\chi(q)`.
-The results, ``I_q_eigen.dat`` and ``I_r_eigen.dat``, are saved in the directory specified by ``output_dir`` parameter in the ``[bse_post]`` section of ``bse.in`` (in this case, ``bse`` directory).
+The results, ``I_q_eigen.dat`` and ``I_r_eigen.dat``, are saved in the directory specified by ``output_dir`` parameter in the ``[chiq_post]`` section of ``bse.in`` (in this case, ``bse`` directory).
 The file format is also the same as in the :math:`\chi(q)` case.
 
 Plotting the results

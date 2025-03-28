@@ -13,17 +13,17 @@ Below is a template of the input file.
 
 .. code-block:: toml
 
-    [bse_common]
+    [chiq_common]
     input = "dmft_bse.h5"
     output = "dmft_bse.out.h5"
     type = ["chi0", "bse", "rpa", "rrpa"]  # "chi0", "bse", "scl", "rpa", "rrpa"
     omega_q = "q_path.dat"
 
-    [bse_tool]
-    work_dir = "work/bse_tool"
+    [chiq_main]
+    work_dir = "work/chiq"
     # num_wf = 20  # If not specified, the value is determined from X_loc
 
-    [bse_post]
+    [chiq_post]
     output_dir = ""
     mode = ["eigen"]  # "matrix_element", "eigen", "linear_combination"
 
@@ -36,11 +36,10 @@ Below is a template of the input file.
     # coefs_file = "/path/to/coefs.in"
 
 
-The ``[bse_common]`` section contains general settings that apply to both programs ``chiq_main.py`` and ``chiq_post.py``. In contrast, the ``[bse_tool]`` and ``[bse_post]`` sections provide configurations that are specific to each program.
+The ``[chiq_common]`` section contains general settings that apply to both programs ``chiq_main.py`` and ``chiq_post.py``. In contrast, the ``[chiq_main]`` and ``[chiq_post]`` sections provide configurations that are specific to each program.
 
-[bse_common] section
+[chiq_common] section
 ~~~~~~~~~~~~~~~~~~~~
-
 
 .. csv-table::
    :widths: 10, 10, 20, 60
@@ -52,7 +51,7 @@ The ``[bse_common]`` section contains general settings that apply to both progra
    "omega_q", "string", "Not specified", "Filename storing the omega-q list to be computed. If not specified, omega-q list are generated from X0(q) in the input HDF5 file."
 
 
-[bse_tool] section
+[chiq_main] section
 ~~~~~~~~~~~~~~~~~~
 
 
@@ -63,7 +62,7 @@ The ``[bse_common]`` section contains general settings that apply to both progra
    "work_dir", "string", ``""``, "Working directory where intermediate files are stored. The empty string (default value) means the current directory."
    "num_wf", "int", "Not specified", "Number of fermionic Matsubara frequencies. If not specified, num_wf is determined from X_loc in the input HDF5 file. num_wf can be smaller than the actual number of Matsubara frequencies in the input file."
 
-[bse_post] section
+[chiq_post] section
 ~~~~~~~~~~~~~~~~~~
 
 .. csv-table::

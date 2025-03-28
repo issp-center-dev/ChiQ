@@ -441,7 +441,7 @@ class DMFTBSESolver(DMFTCoreSolver):
         else:
             params["h5_compression_opts"] = self._params["bse.compression_options"]
         r = run_sumkdft(
-            'bse.bse_worker.SumkDFTWorkerBSE',
+            'chiq.dcore_chiq_worker.SumkDFTWorkerBSE',
             os.path.abspath(self._seedname+'.h5'), './work/sumkdft_bse', self._mpirun_command, params)
 
     def _calc_bse_xloc(self):

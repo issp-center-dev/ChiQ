@@ -11,7 +11,7 @@ The file names are specified by parameters
 
 .. code-block:: bash
 
-    [bse_common]
+    [chiq_common]
     input = "dmft_bse.h5"
     output = "dmft_bse.out.h5"
 

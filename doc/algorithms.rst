@@ -230,7 +230,7 @@ Implementation notes:
 - :math:`\hat{I}(\boldsymbol{q})` [Eq. :eq:`Iq`] is computed in ``calc_Iq.py``.
 - Calculation of Eq. :eq:`Iq` is unstable when the charge fluctuation is tiny. The script ``calc_Iq.py`` takes a special care of the charge fluctuation to avoid the instability. See Appendix B in Ref. :ref:`[Otsuki et al. 2024] <references>` for details.
 - ``chiq_main.py`` also output :math:`\hat{I}(\boldsymbol{q})`, but using ``calc_Iq.py`` is recommended because the special treatment of the charge fluctuation is done only in ``calc_Iq.py``.
-- :math:`\hat{I}(\boldsymbol{r})` [Eq. :eq:`Ir`] is computed in ``bse_fft.py``.
+- :math:`\hat{I}(\boldsymbol{r})` [Eq. :eq:`Ir`] is computed in ``chiq_fft.py``.
 
 
 .. _Algorithm_Eigen:

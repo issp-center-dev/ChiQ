@@ -480,7 +480,7 @@ def main():
     logger = logging.getLogger("bse")
     fmt = "%(asctime)s %(levelname)s %(name)s :%(message)s"
     # logging.basicConfig(level=logging.DEBUG, format=fmt)
-    logging.basicConfig(level=logging.INFO, filename="bse_tool_{}.log".format(rank), format=fmt, filemode='w')
+    logging.basicConfig(level=logging.INFO, filename="chiq_main_{}.log".format(rank), format=fmt, filemode='w')
 
     # omega list
     omega_list = sorted(set([w for w, _ in target_lists_all]))

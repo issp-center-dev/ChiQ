@@ -1,4 +1,4 @@
-.. _program_bse_tool:
+.. _program_chiq_main:
 
 chiq_main
 =========

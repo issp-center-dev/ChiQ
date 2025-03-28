@@ -78,7 +78,7 @@ Next, we need to prepare the input file for the BSE calculation.
 
 .. literalinclude:: ../../examples/two_orbital/bse.in
 
-The ``[bse_common]`` and ``[bse_tool]`` sections are the same as the previous example.
+The ``[chiq_common]`` and ``[chiq_main]`` sections are the same as the previous example.
 BSE calculation can be performed using the following commands:
 
 .. code-block:: bash
