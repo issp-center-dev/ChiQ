@@ -78,13 +78,13 @@ Next, we need to prepare the input file for the BSE calculation.
 
 .. literalinclude:: ../../examples/two_orbital/bse.in
 
-The ``[bse_common]`` and ``[bse_tool]`` sections are the same as the previous example.
+The ``[chiq_common]`` and ``[chiq_main]`` sections are the same as the previous example.
 BSE calculation can be performed using the following commands:
 
 .. code-block:: bash
 
   dcore_chiq.py --np 4 bse.in
-  mpiexec --np 4 dcore_tool.py bse.in
+  mpiexec --np 4 chiq_main.py bse.in
 
 The obtained susceptibility is a 16x16 complex-valued matrix.
 In this example, we transform the susceptibility to the basis described in the reference paper.
@@ -92,7 +92,7 @@ The transformation matrix is given by ``eigenvec.in`` as follows:
 
 .. literalinclude:: ../../examples/two_orbital/eigenvec.in
 
-This has the same format as the eigenvector file outputted by ``bse_post.py``.
+This has the same format as the eigenvector file outputted by ``chiq_post.py``.
 To check these basis, use ``eigenvec_viewer.py`` as follows:
 
 .. code-block:: bash
@@ -122,11 +122,11 @@ For example, the 11th eigenvector (``#10``) is as follows:
 :math:`2 \times 2` matrices are the orbital components :math:`\tau` coupled to each spin-charge component.
 Therefore, this says that the 11th eigenvector is :math:`\sigma^z \times \tau^x` (one of the :math:`T_{1u}`).
 
-Basis transformation is performed by ``bse_post.py`` as follows:
+Basis transformation is performed by ``chiq_post.py`` as follows:
 
 .. code-block:: bash
 
-  bse_post.py bse.in
+  chiq_post.py bse.in
 
 The transformed susceptibility is stored in ``bse/chi_q_eigen.dat``.
 

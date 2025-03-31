@@ -81,7 +81,7 @@ The following figures show :math:`1/\chi(\boldsymbol{q})` for temperatures :math
   :math:`1/\chi(\boldsymbol{q})` for :math:`T = 0.4 < T_\text{Neel}`.
 
 We need to sort the eigenvalues properly to pursue the diverging modes.
-By setting ``order = overlap`` in the ``[bse_post]`` section, the eigenvalues are sorted based on the overlap with the eigenvector at the previous momentum (at the first momentum, X in this case, the eigenvalues are sorted in descending order).
+By setting ``order = overlap`` in the ``[chiq_post]`` section, the eigenvalues are sorted based on the overlap with the eigenvector at the previous momentum (at the first momentum, X in this case, the eigenvalues are sorted in descending order).
 With this change, the ``bse.in`` file is as follows:
 
 .. literalinclude:: ../../examples/square_bse_TNeel/bse.in

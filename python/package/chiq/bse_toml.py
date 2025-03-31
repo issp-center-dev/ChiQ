@@ -31,37 +31,37 @@ def load_params_from_toml(file_name, print_summary=True):
     dict_post = OrderedDict()
 
     #set common parameters
-    params = dict_toml["bse_common"]
+    params = dict_toml["chiq_common"]
     dict_common["input"] = params.pop("input", "dmft_bse.h5")
     dict_common["output"] = params.pop("output", "dmft_bse.out.h5")
     dict_common["type"] = params.pop("type", ["bse"])
     dict_common["omega_q"] = params.pop("omega_q", None)
-    _check_if_dict_empty(params, block="bse_common")
+    _check_if_dict_empty(params, block="chiq_common")
 
     #set tool parameters
-    params = dict_toml["bse_tool"]
+    params = dict_toml["chiq_main"]
     dict_tool["work_dir"] = params.pop("work_dir", "")
     dict_tool["num_wf"] = params.pop("num_wf", None)
-    _obsolete_param(dict_toml, "bse_tool", "solver")
-    _check_if_dict_empty(params, block="bse_tool")
+    _obsolete_param(dict_toml, "chiq_main", "solver")
+    _check_if_dict_empty(params, block="chiq_main")
 
     #set post parameters
-    if "bse_post" not in dict_toml:
-        dict_toml["bse_post"] = {}
-    params = dict_toml["bse_post"]
+    if "chiq_post" not in dict_toml:
+        dict_toml["chiq_post"] = {}
+    params = dict_toml["chiq_post"]
     dict_post["output_dir"] = params.pop("output_dir", "")
     dict_post["mode"] = params.pop("mode", "eigen")
     dict_post["vector"] = params.pop("vector", False)
     dict_post["order"] = params.pop("order", "descend")
     dict_post["order_file"] = params.pop("order_file", "eigenvec.in")
     dict_post["coefs_file"] = params.pop("coefs_file", "coefs.in")
-    _check_if_dict_empty(params, block="bse_post")
+    _check_if_dict_empty(params, block="chiq_post")
 
     # Print summary
     if print_summary:
         print("=========================================")
         print(f"Summary of parameters")
-        for block, params in [("bse_common", dict_common), ("bse_tool", dict_tool), ("bse_post", dict_post)]:
+        for block, params in [("chiq_common", dict_common), ("chiq_tool", dict_tool), ("chiq_post", dict_post)]:
             print(f"\n[{block}]")
             for key, val in params.items():
                 print(f"{key} = {val!r}")
@@ -72,10 +72,11 @@ def load_params_from_toml(file_name, print_summary=True):
 
 if __name__ == "__main__":
     with open("test.toml", "w") as fw:
-        fw.write("[bse_common]\n")
+        fw.write("[chiq_common]\n")
         fw.write("input = \"test.in\"\n")
-        fw.write("[bse_tool]\n")
-        fw.write("solver = \"bse\"\n")
+        fw.write("[chiq_tool]\n")
+        fw.write("num_wf = 10\n")
+        fw.write("[chiq_post]\n")
+        fw.write("output_dir = \"output/\"\n")
     dict_objs = load_params_from_toml("test.toml")
     print(dict_objs)
-

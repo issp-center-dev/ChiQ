@@ -15,8 +15,8 @@ def test_chiq(request):
     shutil.copy('ref/dmft_bse.h5', './')  # overwrite if exists
 
     # run
-    assert os.system("bse_tool.py bse.toml") == 0
-    assert os.system("bse_post.py bse.toml") == 0
+    assert os.system("chiq_main.py bse.toml") == 0
+    assert os.system("chiq_post.py bse.toml") == 0
 
     # compare results (take rounding errors into account)
     chi0q = read_chiq('chi0_q_eigen.dat')

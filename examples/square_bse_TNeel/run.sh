@@ -42,8 +42,8 @@ for T in 0.4 0.5 0.6 0.7 0.8 0.9 1.0; do
   dcore $ini --np $NPROCS 1>dcore.log 2>dcore.err
   dcore_check $ini 1>dcore_check.log 2>dcore_check.err
   dcore_chiq.py $ini --np $NPROCS 1>dcore_chiq.log 2>dcore_chiq.err
-  mpirun -np $NPROCS bse_tool.py bse.in 1>bse_tool.log 2>bse_tool.err
-  bse_post.py bse.in 1>bse_post.log 2>bse_post.err
+  mpirun -np $NPROCS chiq_main.py bse.in 1>chiq_main.log 2>chiq_main.err
+  chiq_post.py bse.in 1>chiq_post.log 2>chiq_post.err
 
   # (5) get chi at Q_M and save to chi.dat
   chi=$(awk -v Q="${Q_M}" '$2==Q {print $3}' < bse/chi_q_eigen.dat)

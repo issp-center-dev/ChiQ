@@ -78,39 +78,39 @@ calculates :math:`\hat{X}_0` and :math:`\hat{X}_\text{loc}` and writes them to :
 BSE calculation with **ChiQ**
 ------------------------------
 
-The following is `the input file of ChiQ bse.in <reference_bse_in>`_:
+The following is :ref:`the input file of ChiQ bse.in <reference_bse_in>`:
 
 .. literalinclude:: ../../examples/square_bse/bse.in
   :language: toml
 
-``[bse_common]`` section is common to all the ChiQ scripts.
+``[chiq_common]`` section is common to all the ChiQ scripts.
 The ``input`` keyword specifies the HDF5 file including the Green's functions, which is the output file of ``dcore_chiq.py``.
 The ``output`` keyword specifies the HDF5 file to store the results of BSE calculation (e.g., the susceptibility).
 The ``type`` keyword specifies the approximation method in calculating the susceptibility.
 The ``omega_q`` keyword specifies the q-path file.
 
-The BSE calculation is performed by :ref:`bse_tool.py <program_bse_tool>`.
+The BSE calculation is performed by :ref:`chiq_main.py <program_chiq_main>`.
 The following command calculates the susceptibility :math:`\chi_{ijkl}(\boldsymbol{q}, i\Omega_m)` and writes the result to :ref:`the file dmft_bse.out.h5 <reference_hdf5_output>` :
 
 .. code-block:: bash
 
-  mpiexec --np 4 bse_tool.py bse.in
+  mpiexec --np 4 chiq_main.py bse.in
 
-The calculation log from each process is saved in the directory specified by the ``work_dir`` keyword in the ``[bse_tool]`` section.
+The calculation log from each process is saved in the directory specified by the ``work_dir`` keyword in the ``[chiq_main]`` section.
 
 Because the number of the spin-orbitals is 2 (up and down spin), the calculated susceptibility at each q-point is represented as :math:`4 \times 4` matrix, :math:`\chi_{ij,kl}`.
 To analyze further, we need to diagonalize the susceptibility matrix (see :ref:`Algorithm_Eigen`).
-``bse_post.py`` is used to calculate the eigenvalues of them.
-The parameters are specified by the ``[bse_post]`` section.
+``chiq_post.py`` is used to calculate the eigenvalues of them.
+The parameters are specified by the ``[chiq_post]`` section.
 The ``mode`` keyword specifies how to calculate the eigenvalues. ``'eigen'`` calculates the eigenvalues by diagonalizing the susceptibility matrix.
 
 The following command calculates the eigenvalues and eigenvectors of the susceptibility matrix :
 
 .. code-block:: bash
 
-  mpiexec --np 4 bse_post.py bse.in
+  mpiexec --np 4 chiq_post.py bse.in
 
-The result is saved in the text files like ``chi_q_eigen.dat`` in the directory specified by the ``output_dir`` keyword in the ``[bse_post]`` section.
+The result is saved in the text files like ``chi_q_eigen.dat`` in the directory specified by the ``output_dir`` keyword in the ``[chiq_post]`` section.
 The eigenvalue files have :math:`2 + N_\text{eigen}` columns, where :math:`N_\text{eigen}` is the number of the eigenvalues.
 The first two columns are the index of the bosonic Matsubara frequency :math:`m` of :math:`\nu_m` and the index of the q-point :math:`\boldsymbol{q}`, respectively, as same as the q-path file.
 The remaining columns are the eigenvalues.
@@ -118,7 +118,7 @@ The remaining columns are the eigenvalues.
 ``chi_q_eigen.dat`` is the file for the BSE calculation.
 For the RPA, RRPA, and SCL calculation, the file name is ``chi_q_rrpa_eigen.dat``, ``chi_q_rrpa_eigen.dat``, and ``chi_q_scl_eigen.dat``, respectively.
 
-If you set the ``vector`` keyword in the ``[bse_post]`` section to ``true``, the eigenvectors at k-points are also saved in the files like ``chi_q_eigenvec.00.00.00.dat``.
+If you set the ``vector`` keyword in the ``[chiq_post]`` section to ``true``, the eigenvectors at k-points are also saved in the files like ``chi_q_eigenvec.00.00.00.dat``.
 ``eigenvec_viewer.py`` helps to analyze the eigenvectors.
 For details of the eigenvector file format and the usage of ``eigenvec_viewer.py``, see :ref:`program_eigenvec_viewer`.
 
@@ -127,7 +127,7 @@ The first argument is the q-path file, and the second argument is the eigenvalue
 
 .. code-block:: bash
 
-  # Make sure that you are in the output directory of bse_post.py
+  # Make sure that you are in the output directory of chiq_post.py
   plot_chiq_path.py ../q_path.dat chi_q_eigen.dat
 
 The following figure is the result of the BSE calculation (``chi_q_eigen_path.pdf``).
@@ -152,7 +152,7 @@ Note that the interaction strength :math:`U` is set to be one, not eight.
 This is because the RPA overestimates the Neel temperature, and hence the point :math:`U=8` and :math:`T=0.5` is the antiferromagnetic phase and too far from the phase transition point.
 It should also be noted that the chemical potential :math:`\mu` is set to be zero, because the DMFT loop is calculated as :math:`U=0`.
 
-In the input file ``bse.in``, the only difference from the previous calculation is that the ``type`` keyword of ``[bse_common]`` section is set to ``['chi0', 'rpa']``.
+In the input file ``bse.in``, the only difference from the previous calculation is that the ``type`` keyword of ``[chiq_common]`` section is set to ``['chi0', 'rpa']``.
 
 .. literalinclude:: ../../examples/square_rpa/bse.in
   :language: toml
@@ -166,8 +166,8 @@ Note that the names of the output files by the RPA calculation start with ``chi_
   dcore --np 4 dmft_square.in
   gen_qpath.py dmft_square.in qpath.in
   dcore_chiq.py --np 4 dmft_square.in
-  mpiexec --np 4 bse_tool.py bse.in
-  mpiexec --np 4 bse_post.py bse.in
+  mpiexec --np 4 chi_main.py bse.in
+  mpiexec --np 4 chiq_post.py bse.in
   cd bse
   plot_chiq_path.py ../q_path.dat chi_q_rpa_eigen.dat
 
@@ -184,7 +184,7 @@ Strong coupling limit formula (SCL)
 Finally, **ChiQ** provides the calculation tool based on the strong coupling limit formula (SCL) (see :ref:`Algorithm_SCL`).
 The input file of DCore is the same as the previous BSE calculation.
 
-Instead of ``bse_tool.py``, :ref:`calc_Iq_scl.py <program_calc_iq_scl>` is used to calculate the susceptibility.
+Instead of ``chi_main.py``, :ref:`calc_Iq_scl.py <program_calc_iq_scl>` is used to calculate the susceptibility.
 The input file is ``scl_2pole.in``:
 
 .. literalinclude:: ../../examples/square_scl/scl_2pole.in
@@ -196,8 +196,8 @@ The following command calculates the susceptibility :
 
   calc_Iq_scl.py scl_2pole.in
 
-After that, ``bse_post.py`` and ``plot_chiq_path.py`` are used to analyze the result in the same way as the BSE calculation.
-The input file of ``bse_post.py``, ``bse.in``, differs from the previous BSE example only in the ``type`` keyword of ``[bse_common]`` section;
+After that, ``chiq_post.py`` and ``plot_chiq_path.py`` are used to analyze the result in the same way as the BSE calculation.
+The input file of ``chiq_post.py``, ``bse.in``, differs from the previous BSE example only in the ``type`` keyword of ``[chiq_common]`` section;
 The ``type`` keyword is set to ``['chi0', 'scl']``.
 
 .. literalinclude:: ../../examples/square_scl/bse.in

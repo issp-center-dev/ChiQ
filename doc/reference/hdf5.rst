@@ -11,7 +11,7 @@ The file names are specified by parameters
 
 .. code-block:: bash
 
-    [bse_common]
+    [chiq_common]
     input = "dmft_bse.h5"
     output = "dmft_bse.out.h5"
 
@@ -154,7 +154,7 @@ The table below shows the data in **info** subgroup.
 
 The table below shows the data in **input** subgroup.
 
-The columns from 'bse' to 'scl' indicate whether the data is referred to by ``bse_tool`` and ``bse_post`` when the corresponding approximation scheme (selected by 'type' parameter) is specified. The last two columns indicate data access by ``calc_Iq`` and ``calc_Iq_scl``.
+The columns from 'bse' to 'scl' indicate whether the data is referred to by ``chiq_main.py`` and ``chiq_post.py`` when the corresponding approximation scheme (selected by 'type' parameter) is specified. The last two columns indicate data access by ``calc_Iq.py`` and ``calc_Iq_scl.py``.
 
 .. csv-table::
     :header: type, w, q, dtype, 'bse', 'chi0', 'rpa', 'rrpa', 'scl', ``calc_Iq``, ``calc_Iq_scl``
@@ -195,7 +195,7 @@ The table below shows the data in **output** subgroup and which mode output them
 
 
 - ◆: Output
-- ◇\*3: Used as input. ``bse_tool`` with mode='chi0' should be run in advance.
-- ◇\*4: Used as input. ``bse_tool`` with mode='bse' should be run in advance.
-- ◆\*5: Output by ``bse_fft``.
+- ◇\*3: Used as input. ``chiq_main.py`` with mode='chi0' should be run in advance.
+- ◇\*4: Used as input. ``chiq_main.py`` with mode='bse' should be run in advance.
+- ◆\*5: Output by ``chiq_fft``.
 - ✓*6: ``q`` is used for the real space coordinate ``r``.

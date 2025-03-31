@@ -441,7 +441,7 @@ class DMFTBSESolver(DMFTCoreSolver):
         else:
             params["h5_compression_opts"] = self._params["bse.compression_options"]
         r = run_sumkdft(
-            'bse.bse_worker.SumkDFTWorkerBSE',
+            'chiq.dcore_chiq_worker.SumkDFTWorkerBSE',
             os.path.abspath(self._seedname+'.h5'), './work/sumkdft_bse', self._mpirun_command, params)
 
     def _calc_bse_xloc(self):
@@ -450,7 +450,7 @@ class DMFTBSESolver(DMFTCoreSolver):
         """
 
         # NOTE:
-        #   n_flavors may depend on ish, but present BSE code does not support it
+        #   n_flavors may depend on ish, but present ChiQ code does not support it
         def calc_num_flavors(_ish):
             return numpy.sum([len(indices) for indices in list(self._gf_struct[_ish].values())])
         n_flavors = calc_num_flavors(0)
@@ -537,7 +537,7 @@ class DMFTBSESolver(DMFTCoreSolver):
 
     def calc_bse(self):
         """
-        Compute data for BSE
+        Compute data for ChiQ
         """
         self._calc_bse_x0q()
         self._calc_bse_xloc()
@@ -583,8 +583,8 @@ class DMFTBSESolver(DMFTCoreSolver):
             print('Fit ran for {} seconds'.format(t2-t1))
             sys.stdout.flush()
 
-        # save interpolated data for BSE
-        print('\n saving Xloc for BSE...')
+        # save interpolated data for ChiQ
+        print('\n saving Xloc for ChiQ...')
         bse_args = SaveBSE.get_sparse_info(h5_path)
         bse = SaveBSE(**bse_args)
 
@@ -623,7 +623,7 @@ class DMFTBSESolver(DMFTCoreSolver):
 
 def dcore_chiq(filename, np=1):
     """
-    Main routine for the BSE post-processing tool
+    Main routine for the ChiQ post-processing tool
 
     Parameters
     ----------
@@ -696,7 +696,7 @@ def run():
     from dcore.option_tables import generate_all_description
     from chiq import __version__ as version
 
-    _version_message = f'BSE version {version}'
+    _version_message = f'ChiQ version {version}'
 
     parser = argparse.ArgumentParser(
         prog='dcore_chiq.py',
