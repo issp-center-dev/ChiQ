@@ -39,7 +39,7 @@ Below is a template of the input file.
 The ``[chiq_common]`` section contains general settings that apply to both programs ``chiq_main.py`` and ``chiq_post.py``. In contrast, the ``[chiq_main]`` and ``[chiq_post]`` sections provide configurations that are specific to each program.
 
 [chiq_common] section
-~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
 
 .. csv-table::
    :widths: 10, 10, 20, 60
@@ -52,7 +52,7 @@ The ``[chiq_common]`` section contains general settings that apply to both progr
 
 
 [chiq_main] section
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 
 .. csv-table::
@@ -63,7 +63,7 @@ The ``[chiq_common]`` section contains general settings that apply to both progr
    "num_wf", "int", "Not specified", "Number of fermionic Matsubara frequencies. If not specified, num_wf is determined from X_loc in the input HDF5 file. num_wf can be smaller than the actual number of Matsubara frequencies in the input file."
 
 [chiq_post] section
-~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~
 
 .. csv-table::
    :widths: 10, 10, 20, 60

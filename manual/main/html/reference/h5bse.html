@@ -6,9 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Access to HDF5 file &#8212; ChiQ  documentation</title>
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b20cc3f5" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5349f25f" />
     <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
-    <link rel="stylesheet" type="text/css" href="../_static/plot_directive.css" />
     <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
     <script src="../_static/documentation_options.js?v=5929fcd5"></script>
     <script src="../_static/doctools.js?v=9bcbadda"></script>
@@ -77,11 +76,11 @@ See <a class="reference internal" href="hdf5.html#reference-hdf5"><span class="s
 <section id="example">
 <h2>Example<a class="headerlink" href="#example" title="Link to this heading">¶</a></h2>
 <p>This example shows how to access the data (<code class="docutils literal notranslate"><span class="pre">gamma0</span></code> in this example) in the HDF5 file.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">from</span> <span class="nn">bse.h5bse</span> <span class="kn">import</span> <span class="n">h5BSE</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bse.h5bse</span><span class="w"> </span><span class="kn">import</span> <span class="n">h5BSE</span>
 
 
-<span class="k">def</span> <span class="nf">_convert_to_matrix</span><span class="p">(</span><span class="n">block_matrix</span><span class="p">,</span> <span class="n">n_block</span><span class="p">,</span> <span class="n">n_inner</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_convert_to_matrix</span><span class="p">(</span><span class="n">block_matrix</span><span class="p">,</span> <span class="n">n_block</span><span class="p">,</span> <span class="n">n_inner</span><span class="p">):</span>
     <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">block_matrix</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
     <span class="n">dim</span> <span class="o">=</span> <span class="n">n_inner</span> <span class="o">*</span> <span class="n">n_block</span>
     <span class="n">mat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n_block</span><span class="p">,</span> <span class="n">n_inner</span><span class="p">,</span> <span class="n">n_block</span><span class="p">,</span> <span class="n">n_inner</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">)</span>
@@ -91,7 +90,7 @@ See <a class="reference internal" href="hdf5.html#reference-hdf5"><span class="s
     <span class="k">return</span> <span class="n">mat</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">dim</span><span class="p">,</span> <span class="n">dim</span><span class="p">))</span>
 
 
-<span class="k">def</span> <span class="nf">get_gamma0</span><span class="p">(</span><span class="n">h5_file</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_gamma0</span><span class="p">(</span><span class="n">h5_file</span><span class="p">):</span>
     <span class="n">BS</span> <span class="o">=</span> <span class="n">h5BSE</span><span class="p">(</span><span class="n">h5_file</span><span class="p">)</span>
     <span class="n">BS</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
 
