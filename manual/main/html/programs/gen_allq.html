@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>gen_allq &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b20cc3f5" />
+    <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="../_static/plot_directive.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="author" title="About these documents" href="../about.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="plot_chiq_path" href="plot_chiq_path.html" />
+    <link rel="prev" title="gen_qpath" href="gen_qpath.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="plot_chiq_path.html" title="plot_chiq_path"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="gen_qpath.html" title="gen_qpath"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../programs.html" accesskey="U">Programs</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">gen_allq</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="gen-allq">
+<h1>gen_allq<a class="headerlink" href="#gen-allq" title="Link to this heading">¶</a></h1>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gen_allq.py<span class="w"> </span><span class="o">[</span>-h<span class="o">]</span><span class="w"> </span><span class="o">[</span>-o<span class="w"> </span>OUTFILE<span class="o">]</span><span class="w"> </span>file_param
+</pre></div>
+</div>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">gen_allq.py</span></code> is a script for generating a list of all q-points in the Brillouin zone.</p>
+</section>
+<section id="positional-arguments">
+<h2>Positional Arguments<a class="headerlink" href="#positional-arguments" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt><strong>file_param</strong></dt><dd><dl class="simple">
+<dt>Config file or HDF5 file. The config file should include:</dt><dd><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">(nk0,</span> <span class="pre">nk1,</span> <span class="pre">nk2)</span></code> or <code class="docutils literal notranslate"><span class="pre">nk</span></code> in the <code class="docutils literal notranslate"><span class="pre">[model]</span></code> section (<strong>DCore</strong> input),</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">(Lx,</span> <span class="pre">Ly,</span> <span class="pre">Lz)</span></code> in the <code class="docutils literal notranslate"><span class="pre">[H0]</span></code> section, or</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dft_h5file</span></code> in the <code class="docutils literal notranslate"><span class="pre">[DMFT]</span></code> section.</p></li>
+</ul>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt><strong>-h, –help</strong></dt><dd><p>Show this help message and exit.</p>
+</dd>
+<dt><strong>-o OUTFILE, –outfile OUTFILE</strong></dt><dd><p>Specify the output file name. Default is <code class="docutils literal notranslate"><span class="pre">&quot;q_fbz.dat&quot;</span></code>.</p>
+</dd>
+</dl>
+</section>
+<section id="example">
+<h2>Example<a class="headerlink" href="#example" title="Link to this heading">¶</a></h2>
+<p>Basic usage:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>gen_allq.py<span class="w"> </span>dcore.in
+</pre></div>
+</div>
+<p>Example of the standard output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>gen_allq.py<span class="w"> </span>dmft_square.in
+
+<span class="go">Read k-grid from file &#39;dmft_square.in&#39;.</span>
+<span class="go">[model]</span>
+<span class="gp gp-VirtualEnv">(nk0, nk1, nk2)</span> <span class="go">= (32, 32, 1)</span>
+
+<span class="go">File &#39;q_fbz.dat&#39; generated.</span>
+</pre></div>
+</div>
+<p>Example of the output file <code class="docutils literal notranslate"><span class="pre">q_fbz.dat</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>cat<span class="w"> </span>q_fbz.dat
+<span class="go">0 00.00.00</span>
+<span class="go">0 00.01.00</span>
+<span class="go">0 00.02.00</span>
+<span class="go">0 00.03.00</span>
+<span class="go">0 00.04.00</span>
+<span class="go">0 00.05.00</span>
+<span class="go">0 00.06.00</span>
+<span class="go">0 00.07.00</span>
+<span class="go">0 00.08.00</span>
+<span class="go">0 00.09.00</span>
+<span class="go">0 00.10.00</span>
+<span class="go">0 00.11.00</span>
+<span class="go">0 00.12.00</span>
+<span class="go">0 00.13.00</span>
+<span class="go">0 00.14.00</span>
+<span class="go">0 00.15.00</span>
+<span class="go">0 00.16.00</span>
+<span class="go">0 00.17.00</span>
+<span class="go">0 00.18.00</span>
+<span class="go">0 00.19.00</span>
+<span class="go">0 00.20.00</span>
+<span class="go">0 00.21.00</span>
+<span class="go">0 00.22.00</span>
+<span class="go">0 00.23.00</span>
+<span class="go">0 00.24.00</span>
+<span class="go">0 00.25.00</span>
+<span class="go">0 00.26.00</span>
+<span class="go">0 00.27.00</span>
+<span class="go">0 00.28.00</span>
+<span class="go">0 00.29.00</span>
+<span class="go">0 00.30.00</span>
+<span class="go">0 00.31.00</span>
+<span class="go">0 01.00.00</span>
+<span class="go">0 01.01.00</span>
+<span class="go">0 01.02.00</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About ChiQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference.html">Reference Manual</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../programs.html">Programs</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="dcore_chiq.html">dcore_chiq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chiq_main.html">chiq_main</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chiq_post.html">chiq_post</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chiq_fft.html">chiq_fft</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calc_Iq.html">calc_Iq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calc_Iq_scl.html">calc_Iq_scl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gen_qpath.html">gen_qpath</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">gen_allq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plot_chiq_path.html">plot_chiq_path</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plot_Ir.html">plot_Ir</a></li>
+<li class="toctree-l2"><a class="reference internal" href="eigenvec_viewer.html">eigenvec_viewer</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="gen_qpath.html"
+                          title="previous chapter">gen_qpath</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="plot_chiq_path.html"
+                          title="next chapter">plot_chiq_path</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="plot_chiq_path.html" title="plot_chiq_path"
+             >next</a></li>
+        <li class="right" >
+          <a href="gen_qpath.html" title="gen_qpath"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../programs.html" >Programs</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">gen_allq</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Tutorial &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b20cc3f5" />
+    <link rel="stylesheet" type="text/css" href="_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="_static/plot_directive.css" />
+    <link rel="stylesheet" type="text/css" href="_static/chiq.css?v=a9ac29d5" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Single band Hubbard model" href="tutorial/single_orb.html" />
+    <link rel="prev" title="Installation" href="install.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="tutorial/single_orb.html" title="Single band Hubbard model"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="install.html" title="Installation"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">ChiQ  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Tutorial</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="tutorial">
+<h1>Tutorial<a class="headerlink" href="#tutorial" title="Link to this heading">¶</a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tutorial/single_orb.html">Single band Hubbard model</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/single_orb.html#model">Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/single_orb.html#dmft-calculation-with-dcore">DMFT calculation with DCore</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/single_orb.html#bse-calculation-with-chiq">BSE calculation with <strong>ChiQ</strong></a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/single_orb.html#random-phase-approximation-rpa">Random phase approximation (RPA)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/single_orb.html#strong-coupling-limit-formula-scl">Strong coupling limit formula (SCL)</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial/Neel_temperature.html">Search for the Neel temperature</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/Neel_temperature.html#model">Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/Neel_temperature.html#workflow-and-results">Workflow and results</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/Neel_temperature.html#sorting-the-eigenvalues">Sorting the eigenvalues</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial/intersite_interactions.html">Intersite interactions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/intersite_interactions.html#model">Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/intersite_interactions.html#workflow">Workflow</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial/multiple_orb.html">Multiple band Hubbard model</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/multiple_orb.html#model">Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/multiple_orb.html#dmft-calculation-with-dcore">DMFT calculation with DCore</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/multiple_orb.html#bse-calculation">BSE calculation</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About ChiQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/single_orb.html">Single band Hubbard model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/Neel_temperature.html">Search for the Neel temperature</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/intersite_interactions.html">Intersite interactions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/multiple_orb.html">Multiple band Hubbard model</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">Reference Manual</a></li>
+<li class="toctree-l1"><a class="reference internal" href="programs.html">Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="install.html"
+                          title="previous chapter">Installation</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="tutorial/single_orb.html"
+                          title="next chapter">Single band Hubbard model</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="tutorial/single_orb.html" title="Single band Hubbard model"
+             >next</a></li>
+        <li class="right" >
+          <a href="install.html" title="Installation"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">ChiQ  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Tutorial</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>

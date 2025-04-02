@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>chiq_post &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b20cc3f5" />
+    <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="../_static/plot_directive.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="author" title="About these documents" href="../about.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="chiq_fft" href="chiq_fft.html" />
+    <link rel="prev" title="chiq_main" href="chiq_main.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="chiq_fft.html" title="chiq_fft"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="chiq_main.html" title="chiq_main"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../programs.html" accesskey="U">Programs</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">chiq_post</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="chiq-post">
+<h1>chiq_post<a class="headerlink" href="#chiq-post" title="Link to this heading">¶</a></h1>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>chiq_post.py<span class="w"> </span><span class="o">[</span>-h<span class="o">]</span><span class="w"> </span>toml
+</pre></div>
+</div>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">chiq_post.py</span></code> is a post script for outputting text-based data from results stored in HDF5 file. For the basic idea for how to analyze the susceptibility, see <a class="reference internal" href="../algorithms.html#algorithm-eigen"><span class="std std-ref">Analyzing the susceptibility</span></a></p>
+</section>
+<section id="positional-arguments">
+<h2>Positional Arguments<a class="headerlink" href="#positional-arguments" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt><strong>toml</strong></dt><dd><p>Parameter file in TOML format. See <a class="reference internal" href="../reference/input.html#input"><span class="std std-ref">Input files</span></a> for details.</p>
+</dd>
+</dl>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt><strong>-h, –help</strong></dt><dd><p>Show this help message and exit.</p>
+</dd>
+</dl>
+</section>
+<section id="example">
+<h2>Example<a class="headerlink" href="#example" title="Link to this heading">¶</a></h2>
+<p>Basic usage:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>chiq_post.py<span class="w"> </span>parameters.toml
+</pre></div>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About ChiQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference.html">Reference Manual</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../programs.html">Programs</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="dcore_chiq.html">dcore_chiq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chiq_main.html">chiq_main</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">chiq_post</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chiq_fft.html">chiq_fft</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calc_Iq.html">calc_Iq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calc_Iq_scl.html">calc_Iq_scl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gen_qpath.html">gen_qpath</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gen_allq.html">gen_allq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plot_chiq_path.html">plot_chiq_path</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plot_Ir.html">plot_Ir</a></li>
+<li class="toctree-l2"><a class="reference internal" href="eigenvec_viewer.html">eigenvec_viewer</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="chiq_main.html"
+                          title="previous chapter">chiq_main</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="chiq_fft.html"
+                          title="next chapter">chiq_fft</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="chiq_fft.html" title="chiq_fft"
+             >next</a></li>
+        <li class="right" >
+          <a href="chiq_main.html" title="chiq_main"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../programs.html" >Programs</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">chiq_post</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>

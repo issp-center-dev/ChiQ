@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Algorithms &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b20cc3f5" />
+    <link rel="stylesheet" type="text/css" href="_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="_static/plot_directive.css" />
+    <link rel="stylesheet" type="text/css" href="_static/chiq.css?v=a9ac29d5" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Support" href="support.html" />
+    <link rel="prev" title="eigenvec_viewer" href="programs/eigenvec_viewer.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="support.html" title="Support"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="programs/eigenvec_viewer.html" title="eigenvec_viewer"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">ChiQ  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Algorithms</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="algorithms">
+<h1>Algorithms<a class="headerlink" href="#algorithms" title="Link to this heading">¶</a></h1>
+<section id="definition-of-the-susceptibility">
+<h2>Definition of the susceptibility<a class="headerlink" href="#definition-of-the-susceptibility" title="Link to this heading">¶</a></h2>
+<p>The momentum-dependent susceptibility computed by <strong>ChiQ</strong> is defined by</p>
+<div class="math notranslate nohighlight" id="equation-chi-q">
+<span class="eqno">(1)<a class="headerlink" href="#equation-chi-q" title="Link to this equation">¶</a></span>\[\chi_{ij,kl}(\boldsymbol{q}, i\Omega_m) = \frac{1}{N} \sum_{\boldsymbol{r}} \int_{0}^{\beta} d\tau \langle O_{ij}(\boldsymbol{r}, \tau) O_{lk}(\boldsymbol{0}, 0) \rangle  e^{i\Omega_m \tau} e^{-i\boldsymbol{q} \cdot \boldsymbol{r}},\]</div>
+<p>where <span class="math notranslate nohighlight">\(\boldsymbol{q}\)</span> represents the momentum, <span class="math notranslate nohighlight">\(\Omega_m\)</span> represents the bosonic Matsubara frequency, <span class="math notranslate nohighlight">\(\beta\)</span> is the inverse temperature, and
+<span class="math notranslate nohighlight">\(\boldsymbol{r}\)</span> denotes the lattice positions (the origin of each unit cell) with <span class="math notranslate nohighlight">\(N\)</span> being their total number.
+The superscript <span class="math notranslate nohighlight">\(i, j, k, l\)</span> indicates the combined spin and orbital indices. Here, the term “orbital” includes the site within a unit cell, as defined in the tight-binding model in the Wannier90 format.
+The angle brackets denote the thermal average.
+The operator <span class="math notranslate nohighlight">\(O_{ij}(\boldsymbol{r}, \tau)\)</span> is defined by</p>
+<div class="math notranslate nohighlight">
+\[O_{ij}(\boldsymbol{r}) = c_{i}^{\dagger}(\boldsymbol{r}) c_{j}(\boldsymbol{r}),\]</div>
+<p>and the argument <span class="math notranslate nohighlight">\(\tau\)</span> indicates the time evolution in the Heisenberg picture.</p>
+</section>
+<section id="calculation-of-the-susceptibility">
+<h2>Calculation of the susceptibility<a class="headerlink" href="#calculation-of-the-susceptibility" title="Link to this heading">¶</a></h2>
+<section id="bethe-salpeter-equation-bse">
+<span id="algorithm-bse"></span><h3>Bethe-Salpeter equation (BSE)<a class="headerlink" href="#bethe-salpeter-equation-bse" title="Link to this heading">¶</a></h3>
+<p>This part is based on Section II.A in Ref. <a class="reference internal" href="#references"><span class="std std-ref">[Otsuki et al. 2019]</span></a>.</p>
+<p>In DMFT, we compute the two-particle Green’s function <span class="math notranslate nohighlight">\(X_{ij,kl}(i\omega_n, i\omega_{n'}; i\Omega_m)\)</span>, which has two additional fermionic Matsubara frequencies <span class="math notranslate nohighlight">\(i\omega_n\)</span> and <span class="math notranslate nohighlight">\(i\omega_{n'}\)</span>. The susceptibility <span class="math notranslate nohighlight">\(\chi_{ij,kl}(\boldsymbol{q}, i\Omega_m)\)</span> in Eq. <a class="reference internal" href="#equation-chi-q">(1)</a> is obtained by summing over the fermionic frequencies as</p>
+<div class="math notranslate nohighlight" id="equation-x-to-chi">
+<span class="eqno">(2)<a class="headerlink" href="#equation-x-to-chi" title="Link to this equation">¶</a></span>\[\chi_{ij,kl}(\boldsymbol{q}, i\Omega_m) = T \sum_{nn'} X_{ij,kl}(i\omega_n, i\omega_{n'}; \boldsymbol{q}, i\Omega_m).\]</div>
+<p>We introduce a matrix notation by combining spin-orbital indices and the frequency index as</p>
+<div class="math notranslate nohighlight">
+\[[\hat{X}(\boldsymbol{q}, i\Omega_{m})]_{(ijn),(kln')} \equiv X_{ij,kl}(i\omega_{n}, i\omega_{n'}; \boldsymbol{q}, i\Omega_{m}).\]</div>
+<p>Then, the Bethe-Salpeter (BS) equation that <span class="math notranslate nohighlight">\(\hat{X}(\boldsymbol{q}, i\Omega_{m})\)</span> follows is given by</p>
+<div class="math notranslate nohighlight">
+\[\hat{X}^{-1}(\boldsymbol{q}, i\Omega_{m}) = \hat{X}_0^{-1}(\boldsymbol{q}, i\Omega_{m}) - \hat{\Gamma}_{\text{loc}}(i\Omega_{m}),\]</div>
+<p>where <span class="math notranslate nohighlight">\(\hat{X}_0(\boldsymbol{q}, i\Omega_{m})\)</span> is the bare two-particle Green’s function</p>
+<div class="math notranslate nohighlight" id="equation-x0q">
+<span class="eqno">(3)<a class="headerlink" href="#equation-x0q" title="Link to this equation">¶</a></span>\[[\hat{X}_0(\boldsymbol{q}, i\Omega_{m})]_{(ijn),(kln')} = -\delta_{nn'} \frac{1}{N} \sum_k G_{ki}(\boldsymbol{k}, i\omega_{n}) G_{jl}(\boldsymbol{k} + \boldsymbol{q}, i\omega_n + i\Omega_{m}).\]</div>
+<p>Here, <span class="math notranslate nohighlight">\(N\)</span> denotes the number of lattice sites, and <span class="math notranslate nohighlight">\(G_{ki}(\boldsymbol{k}, i\omega_n)\)</span> is the single-particle Green function within DMFT.
+<span class="math notranslate nohighlight">\(\Gamma_{\text{loc}}(i\Omega_m)\)</span> is the vertex part. The vertex part is local (no dependence on <span class="math notranslate nohighlight">\(\boldsymbol{q}\)</span>) in DMFT. The vertex part can be obtained from the local two-particle Green’s function <span class="math notranslate nohighlight">\(\hat{X}_{\text{loc}}(i\Omega_m)\)</span> defined in the effective impurity problem in the DMFT:</p>
+<div class="math notranslate nohighlight">
+\[\hat{X}_\text{loc}^{-1}(i\Omega_{m}) = \hat{X}_\text{0,loc}^{-1}(i\Omega_{m}) - \hat{\Gamma}_{\text{loc}}(i\Omega_{m}).\]</div>
+<p>Eliminating <span class="math notranslate nohighlight">\(\Gamma_{\text{loc}}(i\Omega_{m})\)</span> from the above two BS equations, we obtain the final equation</p>
+<div class="math notranslate nohighlight" id="equation-xq">
+<span class="eqno">(4)<a class="headerlink" href="#equation-xq" title="Link to this equation">¶</a></span>\[\hat{X}(\boldsymbol{q}, i\Omega_{m}) = \left[ \hat{X}_\text{loc}(i\Omega_{m})^{-1} - \hat{X}_\text{0,loc}(i\Omega_{m})^{-1} + \hat{X}_{0}(\boldsymbol{q}, i\Omega_{m})^{-1} \right]^{-1}.\]</div>
+<p>Implementation notes:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\hat{X}_0(\boldsymbol{q}, i\Omega_{m})\)</span> [Eq. <a class="reference internal" href="#equation-x0q">(3)</a>] is computed in <code class="docutils literal notranslate"><span class="pre">dcore_chiq.py</span></code>.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\hat{X}_\text{loc}(i\Omega_{m})\)</span> is computed in the impurity solver, which is called from <code class="docutils literal notranslate"><span class="pre">dcore_chiq.py</span></code>.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\hat{X}(\boldsymbol{q}, i\Omega_{m})\)</span> [Eq. <a class="reference internal" href="#equation-xq">(4)</a>] and <span class="math notranslate nohighlight">\(\hat{\chi}(\boldsymbol{q}, i\Omega_{m})\)</span> [Eq. <a class="reference internal" href="#equation-x-to-chi">(2)</a>] are computed in C++ part, which is called from <code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code>.</p></li>
+<li><p>The fermionic Matsubara frequencies are truncated. The number of fermionic Matsubara frequency is specified by the parameter <code class="docutils literal notranslate"><span class="pre">num_wf</span></code>. The maximum frequency is <span class="math notranslate nohighlight">\((2 \mathtt{num\_wf} + 1) \pi T\)</span>.</p></li>
+<li><p>The size of the matrices is <span class="math notranslate nohighlight">\((2N_{\text{orb}})^2 \times \mathtt{num\_wf}\)</span>, where <span class="math notranslate nohighlight">\(N_{\text{orb}}\)</span> is the number of the total orbitals of the correlated shells in the unit cell.</p></li>
+</ul>
+</section>
+<section id="strong-coupling-limit-formula-scl">
+<span id="algorithm-scl"></span><h3>Strong-coupling limit formula (SCL)<a class="headerlink" href="#strong-coupling-limit-formula-scl" title="Link to this heading">¶</a></h3>
+<p>The desciption below is based on Section III.C in Ref. <a class="reference internal" href="#references"><span class="std std-ref">[Otsuki et al. 2024]</span></a>.</p>
+<p>The strong-coupling limit formula (SCL) is a simplified approach to compute the momentum-dependent static susceptibilities in DMFT. The derivation is based on the strong-coupling feature of the two-particle Green’s function. The validity of the SCL formula has been demonstrated for the single-orbital and two-orbital Hubbard models <a class="reference internal" href="#references"><span class="std std-ref">[Otsuki et al. 2019]</span></a> and for the multipolar ordering in CeB<sub>6</sub> <a class="reference internal" href="#references"><span class="std std-ref">[Otsuki et al. 2024]</span></a>.</p>
+<p>In the original paper <a class="reference internal" href="#references"><span class="std std-ref">[Otsuki et al. 2019]</span></a>, three levels of approximations termed SCL1, SCL2, and SCL3 were proposed. <strong>ChiQ</strong> package provides SCL3, which is the simplest method among the three and does not require the vertex part.</p>
+<p>The momentum-dependent static (<span class="math notranslate nohighlight">\(\Omega_m=0\)</span>) susceptibility in the SCL formula is given by</p>
+<div class="math notranslate nohighlight" id="equation-chiq-scl">
+<span class="eqno">(5)<a class="headerlink" href="#equation-chiq-scl" title="Link to this equation">¶</a></span>\[\hat{\chi}_\text{SCL}(\boldsymbol{q}) = \left[ \hat{\chi}_\text{loc}^{-1} - \hat{I}_\text{SCL}(\boldsymbol{q}) \right]^{-1},\]</div>
+<p>where hat indicates the matrix form defined as</p>
+<div class="math notranslate nohighlight">
+\[[\hat{\chi}(\boldsymbol{q})]_{(ij),(kl)} \equiv \chi_{ij,kl}(\boldsymbol{q}).\]</div>
+<p><span class="math notranslate nohighlight">\(\hat{\chi}_\text{loc}\)</span> is the local susceptibility computed in the effective impurity model.
+<span class="math notranslate nohighlight">\(\hat{I}_\text{SCL}(\boldsymbol{q})\)</span> is the effective intersite interaction defined by</p>
+<div class="math notranslate nohighlight" id="equation-iq-scl">
+<span class="eqno">(6)<a class="headerlink" href="#equation-iq-scl" title="Link to this equation">¶</a></span>\[\hat{I}_\text{SCL}(\boldsymbol{q}) = T \sum_{n} \phi(i\omega_n)^2 \hat{\Lambda}(i\omega_n, \boldsymbol{q}).\]</div>
+<p>The function <span class="math notranslate nohighlight">\(\hat{\Lambda}(i\omega_n, \boldsymbol{q})\)</span> is computed from the bare two-particle Green’s function in the effective impurity and lattice models:</p>
+<div class="math notranslate nohighlight">
+\[\hat{\Lambda}(i\omega_n, \boldsymbol{q}) = \hat{X}_\text{0,loc}(i\omega_n)^{-1} - \hat{X}_{0}(i\omega_n, \boldsymbol{q})^{-1}.\]</div>
+<p><span class="math notranslate nohighlight">\(\phi(i\omega_n)\)</span> is given by</p>
+<div class="math notranslate nohighlight" id="equation-phi">
+<span class="eqno">(7)<a class="headerlink" href="#equation-phi" title="Link to this equation">¶</a></span>\[\phi(i\omega_n) = \frac{1}{i\omega_n + \Delta_{-}} - \frac{1}{i\omega_n - \Delta_{+}},\]</div>
+<p>where <span class="math notranslate nohighlight">\(\Delta_{-}\)</span> and <span class="math notranslate nohighlight">\(\Delta_{+}\)</span> are the excitation energy from <span class="math notranslate nohighlight">\(n\)</span>-electron state to  <span class="math notranslate nohighlight">\((n-1)\)</span>-electron states and <span class="math notranslate nohighlight">\((n+1)\)</span>-electron states, respectively.
+In the single-band Hubbard model, <span class="math notranslate nohighlight">\(\Delta_{-}\)</span> and <span class="math notranslate nohighlight">\(\Delta_{+}\)</span> correspond to the position of the lower and upper Hubbard bands, respectively.</p>
+<p>Implementation notes:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\hat{X}_0(\boldsymbol{q}, i\Omega_{m})\)</span> [Eq. <a class="reference internal" href="#equation-x0q">(3)</a>] is computed in <code class="docutils literal notranslate"><span class="pre">dcore_chiq.py</span></code>.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\hat{\chi}_\text{SCL}(\boldsymbol{q})\)</span> and <span class="math notranslate nohighlight">\(\hat{I}_\text{SCL}(\boldsymbol{q})\)</span> [Eqs. <a class="reference internal" href="#equation-chiq-scl">(5)</a> and <a class="reference internal" href="#equation-iq-scl">(6)</a>] are computed in the script <code class="docutils literal notranslate"><span class="pre">calc_Iq_scl.py</span></code> (<code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code> is not used).</p></li>
+<li><p>The value of <span class="math notranslate nohighlight">\(\Delta_{-}\)</span> and <span class="math notranslate nohighlight">\(\Delta_{+}\)</span> are specified by the parameter <code class="docutils literal notranslate"><span class="pre">delta_minus</span></code> and <code class="docutils literal notranslate"><span class="pre">delta_plus</span></code>, respectively.</p></li>
+<li><p>The size of the matrices is <span class="math notranslate nohighlight">\((2N_{\text{orb}})^2\)</span>.</p></li>
+</ul>
+</section>
+<section id="random-phase-approximation-rpa">
+<span id="algorithm-rpa"></span><h3>Random phase approximation (RPA)<a class="headerlink" href="#random-phase-approximation-rpa" title="Link to this heading">¶</a></h3>
+<p>The random-phase approximation (RPA) is a simple weak-coupling approximation to compute the momentum-dependent susceptibility. The RPA susceptibility is given by</p>
+<div class="math notranslate nohighlight" id="equation-chiq-rpa">
+<span class="eqno">(8)<a class="headerlink" href="#equation-chiq-rpa" title="Link to this equation">¶</a></span>\[\hat{\chi}_\text{RPA}(\boldsymbol{q}, i\Omega_m) = \left[ \hat{\chi}_0(\boldsymbol{q}, i\Omega_{m})^{-1} - \hat{\gamma}_0 \right]^{-1},\]</div>
+<p>where <span class="math notranslate nohighlight">\(\hat{\chi}_0(\boldsymbol{q}, i\Omega_{m})\)</span> is the bare susceptibility, which is calculated from <span class="math notranslate nohighlight">\(\hat{X}_0\)</span> in Eq. <a class="reference internal" href="#equation-x0q">(3)</a> by</p>
+<div class="math notranslate nohighlight" id="equation-chi0q">
+<span class="eqno">(9)<a class="headerlink" href="#equation-chi0q" title="Link to this equation">¶</a></span>\[[\hat{\chi}_0(\boldsymbol{q}, i\Omega_{m})]_{(ij),(kl)} = T \sum_{n} [\hat{X}_0(\boldsymbol{q}, i\Omega_{m})]_{(ijn),(kln)}.\]</div>
+<p><span class="math notranslate nohighlight">\(\hat{\gamma}\)</span> is the symmetrized vertex part given by</p>
+<div class="math notranslate nohighlight">
+\[[ \hat{\gamma}_0 ]_{(ij),(kl)} = U_{ijkl} - U_{ijlk}.\]</div>
+<p>Implementation notes:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\hat{\gamma}_0\)</span> is generated in <code class="docutils literal notranslate"><span class="pre">dcore_chiq.py</span></code>.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\hat{X}_0(\boldsymbol{q}, i\Omega_{m})\)</span> [Eq. <a class="reference internal" href="#equation-x0q">(3)</a>] is computed in <code class="docutils literal notranslate"><span class="pre">dcore_chiq.py</span></code>.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\hat{\chi}_\text{RPA}(\boldsymbol{q}, i\Omega_{m})\)</span> and <span class="math notranslate nohighlight">\(\hat{\chi}_0(\boldsymbol{q}, i\Omega_{m})\)</span> [Eqs. <a class="reference internal" href="#equation-chiq-rpa">(8)</a> and <a class="reference internal" href="#equation-chi0q">(9)</a>] are computed in C++ part, which is called from <code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code>.</p></li>
+<li><p>The size of the matrices is <span class="math notranslate nohighlight">\((2N_{\text{orb}})^2\)</span>.</p></li>
+</ul>
+</section>
+<section id="renormalized-random-phase-approximation-rrpa">
+<span id="algorithm-rrpa"></span><h3>Renormalized random-phase approximation (RRPA)<a class="headerlink" href="#renormalized-random-phase-approximation-rrpa" title="Link to this heading">¶</a></h3>
+<p>This part is based on Section II.B in Ref. <a class="reference internal" href="#references"><span class="std std-ref">[Otsuki et al. 2019]</span></a>.</p>
+<p>The RPA above overestimates the fluctuations. Improvement to the RPA is made by including correlations from DMFT. By taking the Matsubara summation independently for each <span class="math notranslate nohighlight">\(X\)</span> in Eq. <a class="reference internal" href="#equation-xq">(4)</a>, we obtain the renormalized RPA (RRPA) susceptibility as</p>
+<div class="math notranslate nohighlight" id="equation-chi-rrpa">
+<span class="eqno">(10)<a class="headerlink" href="#equation-chi-rrpa" title="Link to this equation">¶</a></span>\[\hat{\chi}_\text{RRPA}(\boldsymbol{q}, i\Omega_{m}) = \left[ \hat{\chi}_{0}(\boldsymbol{q}, i\Omega_{m})^{-1} - \hat{\chi}_\text{0,loc}(i\Omega_{m})^{-1} + \hat{\chi}_\text{loc}(i\Omega_{m})^{-1} \right]^{-1}.\]</div>
+<p>Compared with the RPA formula in Eq. <a class="reference internal" href="#equation-chiq-rpa">(8)</a>, the bare interaction <span class="math notranslate nohighlight">\(\hat{\gamma}\)</span> is replaced by <span class="math notranslate nohighlight">\(\hat{\chi}_\text{0,loc}(i\Omega_{m})^{-1} - \hat{\chi}_\text{loc}(i\Omega_{m})^{-1}\)</span>, which takes the local correlations into account.</p>
+<p>Implementation notes:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\hat{X}_0(\boldsymbol{q}, i\Omega_{m})\)</span> [Eq. <a class="reference internal" href="#equation-x0q">(3)</a>] is computed in <code class="docutils literal notranslate"><span class="pre">dcore_chiq.py</span></code>.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\hat{\chi}_\text{RRPA}(\boldsymbol{q}, i\Omega_{m})\)</span> and <span class="math notranslate nohighlight">\(\hat{\chi}_0(\boldsymbol{q}, i\Omega_{m})\)</span> [Eqs. <a class="reference internal" href="#equation-chi-rrpa">(10)</a> and <a class="reference internal" href="#equation-chi0q">(9)</a>] are computed in C++ part, which is called from <code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code>.</p></li>
+<li><p>The size of the matrices is <span class="math notranslate nohighlight">\((2N_{\text{orb}})^2\)</span>.</p></li>
+</ul>
+</section>
+</section>
+<section id="intersite-interactions">
+<span id="algorithm-iq"></span><h2>Intersite interactions<a class="headerlink" href="#intersite-interactions" title="Link to this heading">¶</a></h2>
+<p>This part is based on Section III.B in Ref. <a class="reference internal" href="#references"><span class="std std-ref">[Otsuki et al. 2024]</span></a>.</p>
+<p>We can estimate the intersite interactions inversly from <span class="math notranslate nohighlight">\(\hat{\chi}(\boldsymbol{q})\)</span> computed by solving the BSE. Assuming that the final results for <span class="math notranslate nohighlight">\(\hat{\chi}(\boldsymbol{q})\)</span> was obtained from a localized model within the mean-field approximation, we can define the momentum-dependent interactions <span class="math notranslate nohighlight">\(\hat{I}(\boldsymbol{q})\)</span> by</p>
+<div class="math notranslate nohighlight" id="equation-iq">
+<span class="eqno">(11)<a class="headerlink" href="#equation-iq" title="Link to this equation">¶</a></span>\[\hat{I}(\boldsymbol{q}) = \hat{\chi}_\text{loc}^{-1} - \hat{\chi}(\boldsymbol{q})^{-1}.\]</div>
+<p>We note that, in the SCL, we directly compute <span class="math notranslate nohighlight">\(\hat{I}(\boldsymbol{q})\)</span> by Eq. <a class="reference internal" href="#equation-iq-scl">(6)</a>.</p>
+<p>Performing the Fourier transform, we obtain the interaction coefficients in the real space</p>
+<div class="math notranslate nohighlight" id="equation-ir">
+<span class="eqno">(12)<a class="headerlink" href="#equation-ir" title="Link to this equation">¶</a></span>\[\hat{I}(\boldsymbol{r}) = \frac{1}{N} \sum_{\boldsymbol{q}} \hat{I}(\boldsymbol{q}) e^{i\boldsymbol{q} \cdot \boldsymbol{r}},\]</div>
+<p>where the summation of <span class="math notranslate nohighlight">\(\boldsymbol{q}\)</span> is taken over the Brillouin zone.
+This quantity defines the effective localized Hamiltonian</p>
+<div class="math notranslate nohighlight">
+\[\mathcal{H}_\text{eff} = -\sum_{\boldsymbol{r} \boldsymbol{r}'} \sum_{ijkl} O_{ij}(\boldsymbol{r}) I_{ij,kl}(\boldsymbol{r} - \boldsymbol{r}') O_{lk}(\boldsymbol{r}').\]</div>
+<p>Implementation notes:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\hat{I}(\boldsymbol{q})\)</span> [Eq. <a class="reference internal" href="#equation-iq">(11)</a>] is computed in <code class="docutils literal notranslate"><span class="pre">calc_Iq.py</span></code>.</p></li>
+<li><p>Calculation of Eq. <a class="reference internal" href="#equation-iq">(11)</a> is unstable when the charge fluctuation is tiny. The script <code class="docutils literal notranslate"><span class="pre">calc_Iq.py</span></code> takes a special care of the charge fluctuation to avoid the instability. See Appendix B in Ref. <a class="reference internal" href="#references"><span class="std std-ref">[Otsuki et al. 2024]</span></a> for details.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code> also output <span class="math notranslate nohighlight">\(\hat{I}(\boldsymbol{q})\)</span>, but using <code class="docutils literal notranslate"><span class="pre">calc_Iq.py</span></code> is recommended because the special treatment of the charge fluctuation is done only in <code class="docutils literal notranslate"><span class="pre">calc_Iq.py</span></code>.</p></li>
+<li><p><span class="math notranslate nohighlight">\(\hat{I}(\boldsymbol{r})\)</span> [Eq. <a class="reference internal" href="#equation-ir">(12)</a>] is computed in <code class="docutils literal notranslate"><span class="pre">chiq_fft.py</span></code>.</p></li>
+</ul>
+</section>
+<section id="analyzing-the-susceptibility">
+<span id="algorithm-eigen"></span><h2>Analyzing the susceptibility<a class="headerlink" href="#analyzing-the-susceptibility" title="Link to this heading">¶</a></h2>
+<p><span class="math notranslate nohighlight">\(\chi_{ij,kl}(\boldsymbol{q}, i\Omega_m)\)</span> is a complicated object with many components. This section describes how to analyze it to extract the physical information. For simplicity, we consider only the static component, <span class="math notranslate nohighlight">\(\Omega_{m}=0\)</span>.</p>
+<section id="eigenvalues">
+<span id="algorithm-eigen-values"></span><h3>Eigenvalues<a class="headerlink" href="#eigenvalues" title="Link to this heading">¶</a></h3>
+<p>A simple way is to diagonalize <span class="math notranslate nohighlight">\(\chi_{ij,kl}(\boldsymbol{q})\)</span> by taking the combined index <span class="math notranslate nohighlight">\((ij)\)</span> as row and <span class="math notranslate nohighlight">\((kl)\)</span> as column.</p>
+<div class="math notranslate nohighlight" id="equation-chi-eigen">
+<span class="eqno">(13)<a class="headerlink" href="#equation-chi-eigen" title="Link to this equation">¶</a></span>\[\chi_{\xi}(\boldsymbol{q}) = \sum_{ijkl} U^{(\xi)}_{ij}(\boldsymbol{q})^{\ast} \chi_{ij,kl}(\boldsymbol{q}) U^{(\xi)}_{kl}(\boldsymbol{q}).\]</div>
+<p>The eigenvalues <span class="math notranslate nohighlight">\(\chi_{\xi}(\boldsymbol{q})\)</span> represent physical susceptibilities. The eigenvectors represent the physical quantitiy corresponding to the fluctuation.</p>
+<p>Impelementation notes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">chiq_post.py</span></code> outputs eigenvalues by default (<code class="docutils literal notranslate"><span class="pre">mode</span> <span class="pre">=</span> <span class="pre">'eigen'</span></code>).</p></li>
+<li><p>The eigenvalues are sorted in descending order by default. This behavior can be changed by parameter <code class="docutils literal notranslate"><span class="pre">order</span></code>.</p></li>
+<li><p>The eigenvectors are output by setting <code class="docutils literal notranslate"><span class="pre">vector</span> <span class="pre">=</span> <span class="pre">true</span></code> (default is <code class="docutils literal notranslate"><span class="pre">false</span></code>).</p></li>
+</ul>
+</section>
+<section id="linear-combinations">
+<span id="algorithm-eigen-linear-combination"></span><h3>Linear combinations<a class="headerlink" href="#linear-combinations" title="Link to this heading">¶</a></h3>
+<p>We can define the spin, charge, orbital, or multipole operator by taking linear comination of the density operator <span class="math notranslate nohighlight">\(O_{\gamma} (\boldsymbol{r})\)</span> as</p>
+<div class="math notranslate nohighlight">
+\[O_{\gamma}(\boldsymbol{r}) = \sum_{ij} C^{(\gamma)}_{ij} O_{ij}(\boldsymbol{r}).\]</div>
+<p>With this coefficient <span class="math notranslate nohighlight">\(C^{(\gamma)}_{ij}\)</span>, we can transform <span class="math notranslate nohighlight">\(\chi_{ij,kl}(\boldsymbol{q})\)</span> as follows:</p>
+<div class="math notranslate nohighlight" id="equation-chi-linear-combination">
+<span class="eqno">(14)<a class="headerlink" href="#equation-chi-linear-combination" title="Link to this equation">¶</a></span>\[\chi_{\gamma\gamma'}(\boldsymbol{q}) = \sum_{ijkl} C^{(\gamma)}_{ij} \chi_{ij,kl}(\boldsymbol{q}) C^{(\gamma') \ast}_{kl}.\]</div>
+<p>Implementation notes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">chiq_post.py</span></code> outputs the diagonal componenents <span class="math notranslate nohighlight">\(\chi_{\gamma\gamma}(\boldsymbol{q})\)</span> when <code class="docutils literal notranslate"><span class="pre">mode</span> <span class="pre">=</span> <span class="pre">'linear_combination'</span></code>.</p></li>
+<li><p>The coefficients <span class="math notranslate nohighlight">\(C^{(\gamma)}_{ij}\)</span> are input by an external file.</p></li>
+<li><p>The number of coefficients can be smaller than the total number of operators.</p></li>
+</ul>
+</section>
+</section>
+<section id="references">
+<span id="id1"></span><h2>References<a class="headerlink" href="#references" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>J. Otsuki, K. Yoshimi, H. Shinaoka, and Y. Nomura, “Strong-coupling formula for momentum-dependent susceptibilities in dynamical mean-field theory”, <a class="reference external" href="https://doi.org/10.1103/PhysRevB.99.165134">Phys. Rev. B, 99, 165134 (2019)</a>.</p></li>
+<li><p>J. Otsuki, K. Yoshimi, H. Shinaoka, and H. Jeschke, “Multipolar ordering from dynamical mean field theory with application to CeB<sub>6</sub>“, <a class="reference external" href="https://doi.org/10.1103/PhysRevB.110.035104">Phys. Rev. B, 110, 035104 (2024)</a>.</p></li>
+</ul>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About ChiQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">Reference Manual</a></li>
+<li class="toctree-l1"><a class="reference internal" href="programs.html">Programs</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Algorithms</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#definition-of-the-susceptibility">Definition of the susceptibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#calculation-of-the-susceptibility">Calculation of the susceptibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#intersite-interactions">Intersite interactions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#analyzing-the-susceptibility">Analyzing the susceptibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="programs/eigenvec_viewer.html"
+                          title="previous chapter">eigenvec_viewer</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="support.html"
+                          title="next chapter">Support</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="support.html" title="Support"
+             >next</a></li>
+        <li class="right" >
+          <a href="programs/eigenvec_viewer.html" title="eigenvec_viewer"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">ChiQ  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Algorithms</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>

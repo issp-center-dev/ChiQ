@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>calc_Iq &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b20cc3f5" />
+    <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="../_static/plot_directive.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="author" title="About these documents" href="../about.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="calc_Iq_scl" href="calc_Iq_scl.html" />
+    <link rel="prev" title="chiq_fft" href="chiq_fft.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="calc_Iq_scl.html" title="calc_Iq_scl"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="chiq_fft.html" title="chiq_fft"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../programs.html" accesskey="U">Programs</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">calc_Iq</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="calc-iq">
+<span id="id1"></span><h1>calc_Iq<a class="headerlink" href="#calc-iq" title="Link to this heading">¶</a></h1>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>calc_Iq.py<span class="w"> </span><span class="o">[</span>-h<span class="o">]</span><span class="w"> </span><span class="o">[</span>-f<span class="w"> </span>FILE<span class="o">]</span><span class="w"> </span><span class="o">[</span>--remove<span class="w"> </span>REMOVE<span class="w"> </span><span class="p">|</span><span class="w"> </span>--retain<span class="w"> </span>RETAIN<span class="o">]</span><span class="w"> </span><span class="o">[</span>-w<span class="w"> </span>W<span class="o">]</span>
+<span class="w">           </span><span class="o">[</span>--verbose<span class="o">]</span>
+</pre></div>
+</div>
+<section id="description">
+<h2>Description<a class="headerlink" href="#description" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">calc_Iq.py</span></code> is a script for calculating the momentum-dependent interactions from the susceptibility, assuming a localized model. This script should be run after the BSE calculation by <code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code>. For the explicit equation, see <a class="reference internal" href="../algorithms.html#algorithm-iq"><span class="std std-ref">Intersite interactions</span></a>.</p>
+</section>
+<section id="options">
+<h2>Options<a class="headerlink" href="#options" title="Link to this heading">¶</a></h2>
+<dl class="simple">
+<dt><strong>-h, –help</strong></dt><dd><p>Show this help message and exit.</p>
+</dd>
+<dt><strong>-f FILE, –file FILE</strong></dt><dd><p>Specify the HDF5 filename. Default is <code class="docutils literal notranslate"><span class="pre">&quot;dmft_bse.out.h5&quot;</span></code>. The file should contain <code class="docutils literal notranslate"><span class="pre">chi_loc</span></code> and <code class="docutils literal notranslate"><span class="pre">chi_q</span></code> data. The results are stored as <code class="docutils literal notranslate"><span class="pre">I_q</span></code> (overwritten if data exist).</p>
+</dd>
+<dt><strong>–remove REMOVE</strong></dt><dd><p>Specify the number of eigenmodes to remove. Default is <code class="docutils literal notranslate"><span class="pre">1</span></code>, typically used to exclude the charge susceptibility.</p>
+</dd>
+<dt><strong>–retain RETAIN</strong></dt><dd><p>Specify the number of eigenmodes to retain. Cannot be used simultaneously with <code class="docutils literal notranslate"><span class="pre">--remove</span></code>.</p>
+</dd>
+<dt><strong>-w W</strong></dt><dd><p>Specify the bosonic Matsubara frequency. Default is <code class="docutils literal notranslate"><span class="pre">0</span></code> (static susceptibility).</p>
+</dd>
+<dt><strong>–verbose</strong></dt><dd><p>Enable verbose output for detailed execution logs.</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Options <code class="docutils literal notranslate"><span class="pre">--remove</span></code> and <code class="docutils literal notranslate"><span class="pre">--retain</span></code> are mutually exclusive.</p>
+</div>
+</section>
+<section id="example">
+<h2>Example<a class="headerlink" href="#example" title="Link to this heading">¶</a></h2>
+<p>Example for using <code class="docutils literal notranslate"><span class="pre">calc_Iq.py</span></code> in the single-orbital Hubbard model:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>calc_Iq.py
+<span class="go">Namespace(file=&#39;dmft_bse.out.h5&#39;, remove=1, retain=None, w=0, verbose=False)</span>
+
+<span class="go">Load data from &#39;dmft_bse.out.h5&#39;</span>
+<span class="go">inner_name: [b&#39;0-0&#39;]</span>
+<span class="go">block_name: [b&#39;0-up-0-up&#39;, b&#39;0-up-0-down&#39;, b&#39;0-down-0-up&#39;, b&#39;0-down-0-down&#39;]</span>
+
+<span class="go">Load &#39;chi_loc&#39;</span>
+<span class="go">&#39;chi_loc&#39; found</span>
+
+<span class="go">Diagonalize chi_loc</span>
+<span class="go">Number of eigenmodes retained = 3</span>
+<span class="go">0: 0.9996646498695337</span>
+<span class="go">1: 0.9996646498695336</span>
+<span class="go">2: 0.9996646498695334</span>
+<span class="go">------------------------- Remove eigenmodes below</span>
+<span class="go">3: 0.0003353501304669271</span>
+
+<span class="go">55 data of &#39;chi_q&#39; found</span>
+<span class="go">Compute &#39;I_q&#39; (existing data are overwritten)</span>
+
+<span class="go">Start q-loop</span>
+<span class="go">End q-loop</span>
+</pre></div>
+</div>
+<p>The description “————————- Remove eigenmodes below” indicates that the charge mode with the smallest eigenvalue of <code class="docutils literal notranslate"><span class="pre">chi_loc</span></code> is removed by default (<code class="docutils literal notranslate"><span class="pre">--remove</span> <span class="pre">1</span></code>). This treatment ensures a stable inversion of the <code class="docutils literal notranslate"><span class="pre">chi_loc</span></code> matrix.</p>
+<p>The results are saved as <code class="docutils literal notranslate"><span class="pre">I_q</span></code> in the HDF5 file.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ h5ls dmft_bse.out.h5/bse/output
+I_q                      Group
+chi0_loc                 Group
+chi0_q                   Group
+chi_loc                  Group
+chi_q                    Group
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The file <code class="docutils literal notranslate"><span class="pre">dmft_bse.out.h5</span></code> originally contains <code class="docutils literal notranslate"><span class="pre">I_q</span></code> computed in <code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code>. It corresponds to a result with no remove option <code class="docutils literal notranslate"><span class="pre">--remove</span> <span class="pre">0</span></code>. However, removing the charge mode is crucial especially in the strong-coupling regime. We recommend using <code class="docutils literal notranslate"><span class="pre">calc_Iq.py</span></code> and removing small eigenvalues manually.</p>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About ChiQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../reference.html">Reference Manual</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../programs.html">Programs</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="dcore_chiq.html">dcore_chiq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chiq_main.html">chiq_main</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chiq_post.html">chiq_post</a></li>
+<li class="toctree-l2"><a class="reference internal" href="chiq_fft.html">chiq_fft</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">calc_Iq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="calc_Iq_scl.html">calc_Iq_scl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gen_qpath.html">gen_qpath</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gen_allq.html">gen_allq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plot_chiq_path.html">plot_chiq_path</a></li>
+<li class="toctree-l2"><a class="reference internal" href="plot_Ir.html">plot_Ir</a></li>
+<li class="toctree-l2"><a class="reference internal" href="eigenvec_viewer.html">eigenvec_viewer</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="chiq_fft.html"
+                          title="previous chapter">chiq_fft</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="calc_Iq_scl.html"
+                          title="next chapter">calc_Iq_scl</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="calc_Iq_scl.html" title="calc_Iq_scl"
+             >next</a></li>
+        <li class="right" >
+          <a href="chiq_fft.html" title="chiq_fft"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../programs.html" >Programs</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">calc_Iq</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>

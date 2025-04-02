@@ -1,9 +1,0 @@
-[SCL]
-E_plus = 4.0
-E_minus = 4.0
-
-# input = dmft_bse.h5
-# output = dmft_bse.out.h5
-# iw_cutoff = 20
-# wb = 0
-# verbose = True

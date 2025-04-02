@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>About ChiQ &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b20cc3f5" />
+    <link rel="stylesheet" type="text/css" href="_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="_static/plot_directive.css" />
+    <link rel="stylesheet" type="text/css" href="_static/chiq.css?v=a9ac29d5" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="author" title="About these documents" href="#" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Installation" href="install.html" />
+    <link rel="prev" title="ChiQ" href="index.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="install.html" title="Installation"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="index.html" title="ChiQ"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">ChiQ  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">About ChiQ</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="about-chiq">
+<h1>About ChiQ<a class="headerlink" href="#about-chiq" title="Link to this heading">¶</a></h1>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>This package solves the Bethe-Salpeter equation (BSE) in the dynamical mean-field theory (DMFT) and calculates the momentum-dependent static and dynamical susceptibilities in correlated electron systems.
+Necessary input to this package can be generated using <strong>DCore</strong>. Combined with <strong>DCore</strong>, this package offers investigations of two-particle responses in models and materials.</p>
+<p>Features:</p>
+<ul class="simple">
+<li><p>Computes the momentum-dependent spin/charge/orbital susceptibility <span class="math notranslate nohighlight">\(\chi_{ijkl}(\boldsymbol{q}, i\nu_m)\)</span> in Matsubara-frequency domain (see <a class="reference internal" href="algorithms.html"><span class="doc">Algorithms</span></a> for the explicit definition).</p></li>
+<li><p>Provides several approximation schemes, including BSE, SCL, RPA, and RRPA (see <a class="reference internal" href="algorithms.html"><span class="doc">Algorithms</span></a> for details).</p></li>
+<li><p>Runs as a post-processing step of <strong>DCore</strong>.</p>
+<ul>
+<li><p>Allows input from DFT packages via tight-binding bands in the Wannier90 format.</p></li>
+<li><p>Supports the inclusion of spin-orbit coupling (SOC).</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="license">
+<h2>License<a class="headerlink" href="#license" title="Link to this heading">¶</a></h2>
+<p>The <strong>ChiQ</strong> package is published under the
+<a class="reference external" href="http://www.gnu.org/licenses/gpl.html">GNU General Public License, version 3</a>.</p>
+<p>This package of ver.1.0 was developed under the support of “Project for advancement of software usability in materials science” by The Institute for Solid State Physics, The University of Tokyo. The copyright of DCore ver.1.0 belongs to The University of Tokyo.</p>
+</section>
+<section id="citing-chiq">
+<span id="chiq-paper"></span><h2>Citing ChiQ<a class="headerlink" href="#citing-chiq" title="Link to this heading">¶</a></h2>
+<p>We have not yet published a paper of ChiQ.
+We will post the information here as soon as a paper is published.</p>
+<p>Furthermore, please cite DCore and related papers if you use them. Please refer to <a class="reference external" href="https://issp-center-dev.github.io/DCore/master/index.html">DCore documentation</a> for citing DCore.</p>
+</section>
+<section id="developers">
+<h2>Developers<a class="headerlink" href="#developers" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>ver. 1.0</p>
+<ol class="upperalpha simple" start="10">
+<li><p>Otsuki, K. Yoshimi, H. Shinaoka, Y. Motoyama, T. Aoyama</p></li>
+</ol>
+</li>
+</ul>
+</section>
+<section id="github-repository">
+<h2>GitHub repository<a class="headerlink" href="#github-repository" title="Link to this heading">¶</a></h2>
+<p>You can download the source code of <strong>ChiQ</strong> from <a class="reference external" href="https://github.com/issp-center-dev/ChiQ">https://github.com/issp-center-dev/ChiQ</a>.</p>
+</section>
+<section id="disclaimer">
+<h2>Disclaimer<a class="headerlink" href="#disclaimer" title="Link to this heading">¶</a></h2>
+<p>The program is provided as is, i.e. WITHOUT ANY WARRANTY of any kind, as
+stated in the license.  In particular, its authors and contributors will take
+no responsibility for any possible bugs or any improper use of these programs,
+including those resulting in incorrect scientific publications.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">About ChiQ</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#license">License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#citing-chiq">Citing ChiQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#developers">Developers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#github-repository">GitHub repository</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#disclaimer">Disclaimer</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">Reference Manual</a></li>
+<li class="toctree-l1"><a class="reference internal" href="programs.html">Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="index.html"
+                          title="previous chapter">ChiQ</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="install.html"
+                          title="next chapter">Installation</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="install.html" title="Installation"
+             >next</a></li>
+        <li class="right" >
+          <a href="index.html" title="ChiQ"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">ChiQ  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">About ChiQ</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>

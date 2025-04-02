@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Single band Hubbard model &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b20cc3f5" />
+    <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="../_static/plot_directive.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="author" title="About these documents" href="../about.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Search for the Neel temperature" href="Neel_temperature.html" />
+    <link rel="prev" title="Tutorial" href="../tutorial.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="Neel_temperature.html" title="Search for the Neel temperature"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="../tutorial.html" title="Tutorial"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../tutorial.html" accesskey="U">Tutorial</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Single band Hubbard model</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="single-band-hubbard-model">
+<h1>Single band Hubbard model<a class="headerlink" href="#single-band-hubbard-model" title="Link to this heading">¶</a></h1>
+<p>In this tutorial, we calculate the susceptibility of the single band Hubbard model on the square lattice by using the BSE, RPA, and SCL approximations with the DMFT.
+Sample files for this tutorial are available at <code class="docutils literal notranslate"><span class="pre">examples/square_bse</span></code> (BSE), <code class="docutils literal notranslate"><span class="pre">examples/square_rpa</span></code> (RPA), and <code class="docutils literal notranslate"><span class="pre">examples/square_scl</span></code> (SCL).</p>
+<section id="model">
+<h2>Model<a class="headerlink" href="#model" title="Link to this heading">¶</a></h2>
+<p>As the first example, we consider the single band Hubbard model on the <span class="math notranslate nohighlight">\(32 \times 32\)</span> square lattice with the periodic boundary condition,</p>
+<div class="math notranslate nohighlight">
+\[\mathcal{H} = \sum_{\boldsymbol{k}, \sigma} \varepsilon_{\boldsymbol{k}} c_{\boldsymbol{k}\sigma}^\dagger c_{\boldsymbol{k}\sigma} + U \sum_i n_{i\uparrow} n_{i\downarrow},\]</div>
+<p>where <span class="math notranslate nohighlight">\(\varepsilon_{\boldsymbol{k}} = -2t(\cos k_x + \cos k_y)\)</span> is the dispersion relation of the non-interacting electrons with momentum <span class="math notranslate nohighlight">\(\boldsymbol{k}\)</span> and <span class="math notranslate nohighlight">\(t\)</span> is the hopping constant.
+<span class="math notranslate nohighlight">\(c_{\boldsymbol{k}\sigma}^\dagger\)</span> and <span class="math notranslate nohighlight">\(c_{\boldsymbol{k}\sigma}\)</span> are the creation and annihilation operators of electrons with momentum <span class="math notranslate nohighlight">\(\boldsymbol{k}\)</span> and spin <span class="math notranslate nohighlight">\(\sigma\)</span>, respectively,
+and <span class="math notranslate nohighlight">\(n_{i\sigma} = c_{i\sigma}^\dagger c_{i\sigma}\)</span> is the number operator of electrons with spin <span class="math notranslate nohighlight">\(\sigma\)</span> at site <span class="math notranslate nohighlight">\(i\)</span>.
+The onsite Coulomb interaction strength is denoted by <span class="math notranslate nohighlight">\(U\)</span>.
+We consider the half-filled case with one electron per site.
+The parameters are set to be <span class="math notranslate nohighlight">\(t = 1.0\)</span> (the unit of energy), <span class="math notranslate nohighlight">\(U = 8.0\)</span>.
+We can fix the chemical potential as <span class="math notranslate nohighlight">\(\mu = U/2 = 4.0\)</span>.
+The temperature is set to be <span class="math notranslate nohighlight">\(T = 0.5\)</span> and the number of Matsubara frequencies is set to be <span class="math notranslate nohighlight">\(N_{\text{freq}} = 1024\)</span>.
+The impurity solver in the DMFT loop is the Hubbard-I (the exact diagonalization with no bath sites).
+We can safely set the number of DMFT iterations to be <span class="math notranslate nohighlight">\(N_{\text{iter}} = 1\)</span>.</p>
+</section>
+<section id="dmft-calculation-with-dcore">
+<h2>DMFT calculation with DCore<a class="headerlink" href="#dmft-calculation-with-dcore" title="Link to this heading">¶</a></h2>
+<p>To implement this setup, <a class="reference external" href="https://issp-center-dev.github.io/DCore/master/reference/input.html">an input file of DCore dmft_square.in</a> is prepared as follows,</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[model]</span>
+<span class="na">seedname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">square</span>
+<span class="na">lattice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">wannier90</span>
+<span class="na">norb</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1</span>
+<span class="na">nelec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1.0</span>
+<span class="na">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">-1.0</span>
+<span class="na">kanamori</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">[(8.0, 0.0, 0.0)]</span>
+<span class="na">nk0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">32</span>
+<span class="na">nk1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">32</span>
+<span class="na">nk2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1</span>
+
+<span class="c1">#[mpi]</span>
+<span class="c1">#command = &quot;mpirun -n #&quot;</span>
+
+<span class="k">[system]</span>
+<span class="na">T</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">0.5</span>
+<span class="na">n_iw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1024</span>
+<span class="na">mu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">4.0</span>
+<span class="na">fix_mu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">True</span>
+
+<span class="k">[impurity_solver]</span>
+<span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">pomerol</span>
+<span class="na">exec_path{str}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">pomerol2dcore</span>
+<span class="na">n_bath{int}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">0</span>
+<span class="na">fit_gtol{float}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1e-6</span>
+
+<span class="k">[control]</span>
+<span class="na">max_step</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1</span>
+<span class="na">sigma_mix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1.0</span>
+<span class="na">converge_tol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1e-5</span>
+<span class="na">n_converge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">3</span>
+
+<span class="k">[bse]</span>
+<span class="na">num_wb</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1</span>
+<span class="na">num_wf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">20</span>
+<span class="na">X0q_qpoints_saved</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;q_path.dat&quot;</span>
+</pre></div>
+</div>
+<p>In this example, the Wannier90 format is used to describe the hopping constants (set <code class="docutils literal notranslate"><span class="pre">lattice</span> <span class="pre">=</span> <span class="pre">wannier90</span></code>).
+Because <code class="docutils literal notranslate"><span class="pre">seed</span> <span class="pre">=</span> <span class="pre">square</span></code>, the hopping constants are read from the following file <code class="docutils literal notranslate"><span class="pre">square_hr.dat</span></code>,</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>square lattice
+1
+9
+1 1 1 1 1 1 1 1 1
+-1 -1 0 1 1   0.0 0.0
+-1  0 0 1 1  -1.0 0.0
+-1  1 0 1 1   0.0 0.0
+ 0 -1 0 1 1  -1.0 0.0
+ 0  0 0 1 1   0.0 0.0
+ 0  1 0 1 1  -1.0 0.0
+ 1 -1 0 1 1   0.0 0.0
+ 1  0 0 1 1  -1.0 0.0
+ 1  1 0 1 1   0.0 0.0
+</pre></div>
+</div>
+<p>This file says that the number of the orbitals in the unit cell is 1 and the electrons hop to the nearest neighbors on a square lattice with <span class="math notranslate nohighlight">\(t = 1.0\)</span> (watch out the sign of the hopping constant).
+For details, see <a class="reference external" href="https://scipost.org/10.21468/SciPostPhys.10.5.117">the paper of DCore</a> and <a class="reference external" href="https://wannier90.readthedocs.io/en/latest/user_guide/wannier90/files/#seedname_hrdat">the Wannier90 manual</a>.</p>
+<p>Before running the DMFT calculation, make sure that <code class="docutils literal notranslate"><span class="pre">pomerol2dcore</span></code> is installed and in your PATH.
+A DMFT calculation is performed with DCore as follows (we will use 4 MPI processes in the following):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dcore_pre<span class="w"> </span>dmft_square.in
+dcore<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>dmft_square.in
+</pre></div>
+</div>
+<p>After the DMFT loop is finished, the impurity problem is solved again to calculate the bare two-particle Green’s functions <span class="math notranslate nohighlight">\(\hat{X}_0\)</span> and the local two-particle Green’s function <span class="math notranslate nohighlight">\(\hat{X}_\text{loc}\)</span> (see <a class="reference internal" href="../algorithms.html#algorithm-bse"><span class="std std-ref">Bethe-Salpeter equation (BSE)</span></a>).
+The number of the fermionic and bosonic Matsubara frequencies <span class="math notranslate nohighlight">\(\omega_n\)</span> and <span class="math notranslate nohighlight">\(\Omega_m\)</span> are specified by the keywords <code class="docutils literal notranslate"><span class="pre">num_wf</span></code> and <code class="docutils literal notranslate"><span class="pre">num_wb</span></code>, respectively, in the <code class="docutils literal notranslate"><span class="pre">[bse]</span></code> section of the input file of DCore (see above).
+<code class="docutils literal notranslate"><span class="pre">X0q_qpoints_saved</span></code> is the file name describing <span class="math notranslate nohighlight">\((\boldsymbol{q}, i\Omega_m)\)</span> points where <span class="math notranslate nohighlight">\(\hat{X}_0\)</span> and <span class="math notranslate nohighlight">\(\hat{X}_\text{loc}\)</span> are calculated.
+Generally, a <a class="reference internal" href="../reference/input.html#reference-q-path-dat"><span class="std std-ref">q-path file</span></a> is used as this file.</p>
+<p>To generate the q-path file easily, an utility script <a class="reference internal" href="../programs/gen_qpath.html#program-gen-qpath"><span class="std std-ref">gen_qpath.py</span></a> is available.
+By using the following <a class="reference internal" href="../reference/input.html#reference-qpath-in"><span class="std std-ref">symmetry point file qpath.in</span></a></p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span># qx qy qz name  (in unit of reciprocal lattice vectors)
+1/2 0 0  X
+0 0 0  Gamma
+1/2 1/2 0  M
+1/2 0 0  X
+1/4 1/4 0  M&#39;
+</pre></div>
+</div>
+<p>and the input file of DCore <code class="docutils literal notranslate"><span class="pre">dmft_square.in</span></code>, the q-path file <code class="docutils literal notranslate"><span class="pre">q_path.dat</span></code> is generated by the following command</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gen_qpath.py<span class="w"> </span>dmft_square.in<span class="w"> </span>qpath.in
+</pre></div>
+</div>
+<p>Once the input files are prepared, the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dcore_chiq.py<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>dmft_square.in
+</pre></div>
+</div>
+<p>calculates <span class="math notranslate nohighlight">\(\hat{X}_0\)</span> and <span class="math notranslate nohighlight">\(\hat{X}_\text{loc}\)</span> and writes them to <a class="reference internal" href="../reference/hdf5.html#reference-hdf5-input"><span class="std std-ref">one of the input file of BSE, dmft_bse.h5</span></a> .</p>
+</section>
+<section id="bse-calculation-with-chiq">
+<h2>BSE calculation with <strong>ChiQ</strong><a class="headerlink" href="#bse-calculation-with-chiq" title="Link to this heading">¶</a></h2>
+<p>The following is <a class="reference internal" href="../reference/input.html#reference-bse-in"><span class="std std-ref">the input file of ChiQ bse.in</span></a>:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[chiq_common]</span>
+<span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dmft_bse.h5&quot;</span>
+<span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dmft_bse.out.h5&quot;</span>
+<span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;chi0&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;bse&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;rpa&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;rrpa&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># &quot;chi0&quot;, &quot;bse&quot;, &quot;scl&quot;, &quot;rpa&quot;, &quot;rrpa&quot;</span>
+<span class="n">omega_q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;q_path.dat&quot;</span>
+
+<span class="k">[chiq_main]</span>
+<span class="n">work_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;work/chiq&quot;</span>
+<span class="c1"># num_wf = 20  # If not specified, the value is determined from X_loc</span>
+
+<span class="k">[chiq_post]</span>
+<span class="n">output_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;bse&quot;</span>
+<span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eigen&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># &quot;matrix_element&quot;, &quot;eigen&quot;, &quot;linear_combination&quot;</span>
+
+<span class="c1"># for mode=&quot;eigen&quot;</span>
+<span class="n">vector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">  </span><span class="c1"># output eigenvectors</span>
+<span class="c1"># order = &quot;file&quot;  # &quot;descend&quot; (default), &quot;overlap&quot;, &quot;file&quot;</span>
+<span class="c1"># order_file = &quot;/path/to/eigenvec.in&quot;  # for order=&quot;file&quot;</span>
+
+<span class="c1"># for mode=&quot;linear_combination&quot;</span>
+<span class="c1"># coefs_file = &quot;/path/to/coefs.in&quot;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">[chiq_common]</span></code> section is common to all the ChiQ scripts.
+The <code class="docutils literal notranslate"><span class="pre">input</span></code> keyword specifies the HDF5 file including the Green’s functions, which is the output file of <code class="docutils literal notranslate"><span class="pre">dcore_chiq.py</span></code>.
+The <code class="docutils literal notranslate"><span class="pre">output</span></code> keyword specifies the HDF5 file to store the results of BSE calculation (e.g., the susceptibility).
+The <code class="docutils literal notranslate"><span class="pre">type</span></code> keyword specifies the approximation method in calculating the susceptibility.
+The <code class="docutils literal notranslate"><span class="pre">omega_q</span></code> keyword specifies the q-path file.</p>
+<p>The BSE calculation is performed by <a class="reference internal" href="../programs/chiq_main.html#program-chiq-main"><span class="std std-ref">chiq_main.py</span></a>.
+The following command calculates the susceptibility <span class="math notranslate nohighlight">\(\chi_{ijkl}(\boldsymbol{q}, i\Omega_m)\)</span> and writes the result to <a class="reference internal" href="../reference/hdf5.html#reference-hdf5-output"><span class="std std-ref">the file dmft_bse.out.h5</span></a> :</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mpiexec<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>chiq_main.py<span class="w"> </span>bse.in
+</pre></div>
+</div>
+<p>The calculation log from each process is saved in the directory specified by the <code class="docutils literal notranslate"><span class="pre">work_dir</span></code> keyword in the <code class="docutils literal notranslate"><span class="pre">[chiq_main]</span></code> section.</p>
+<p>Because the number of the spin-orbitals is 2 (up and down spin), the calculated susceptibility at each q-point is represented as <span class="math notranslate nohighlight">\(4 \times 4\)</span> matrix, <span class="math notranslate nohighlight">\(\chi_{ij,kl}\)</span>.
+To analyze further, we need to diagonalize the susceptibility matrix (see <a class="reference internal" href="../algorithms.html#algorithm-eigen"><span class="std std-ref">Analyzing the susceptibility</span></a>).
+<code class="docutils literal notranslate"><span class="pre">chiq_post.py</span></code> is used to calculate the eigenvalues of them.
+The parameters are specified by the <code class="docutils literal notranslate"><span class="pre">[chiq_post]</span></code> section.
+The <code class="docutils literal notranslate"><span class="pre">mode</span></code> keyword specifies how to calculate the eigenvalues. <code class="docutils literal notranslate"><span class="pre">'eigen'</span></code> calculates the eigenvalues by diagonalizing the susceptibility matrix.</p>
+<p>The following command calculates the eigenvalues and eigenvectors of the susceptibility matrix :</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mpiexec<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>chiq_post.py<span class="w"> </span>bse.in
+</pre></div>
+</div>
+<p>The result is saved in the text files like <code class="docutils literal notranslate"><span class="pre">chi_q_eigen.dat</span></code> in the directory specified by the <code class="docutils literal notranslate"><span class="pre">output_dir</span></code> keyword in the <code class="docutils literal notranslate"><span class="pre">[chiq_post]</span></code> section.
+The eigenvalue files have <span class="math notranslate nohighlight">\(2 + N_\text{eigen}\)</span> columns, where <span class="math notranslate nohighlight">\(N_\text{eigen}\)</span> is the number of the eigenvalues.
+The first two columns are the index of the bosonic Matsubara frequency <span class="math notranslate nohighlight">\(m\)</span> of <span class="math notranslate nohighlight">\(\nu_m\)</span> and the index of the q-point <span class="math notranslate nohighlight">\(\boldsymbol{q}\)</span>, respectively, as same as the q-path file.
+The remaining columns are the eigenvalues.</p>
+<p><code class="docutils literal notranslate"><span class="pre">chi_q_eigen.dat</span></code> is the file for the BSE calculation.
+For the RPA, RRPA, and SCL calculation, the file name is <code class="docutils literal notranslate"><span class="pre">chi_q_rrpa_eigen.dat</span></code>, <code class="docutils literal notranslate"><span class="pre">chi_q_rrpa_eigen.dat</span></code>, and <code class="docutils literal notranslate"><span class="pre">chi_q_scl_eigen.dat</span></code>, respectively.</p>
+<p>If you set the <code class="docutils literal notranslate"><span class="pre">vector</span></code> keyword in the <code class="docutils literal notranslate"><span class="pre">[chiq_post]</span></code> section to <code class="docutils literal notranslate"><span class="pre">true</span></code>, the eigenvectors at k-points are also saved in the files like <code class="docutils literal notranslate"><span class="pre">chi_q_eigenvec.00.00.00.dat</span></code>.
+<code class="docutils literal notranslate"><span class="pre">eigenvec_viewer.py</span></code> helps to analyze the eigenvectors.
+For details of the eigenvector file format and the usage of <code class="docutils literal notranslate"><span class="pre">eigenvec_viewer.py</span></code>, see <a class="reference internal" href="../programs/eigenvec_viewer.html#program-eigenvec-viewer"><span class="std std-ref">eigenvec_viewer</span></a>.</p>
+<p>Finally, <a class="reference internal" href="../programs/plot_chiq_path.html#program-plot-chiq-path"><span class="std std-ref">plot_chiq_path.py</span></a> plots the eigenvalues <code class="docutils literal notranslate"><span class="pre">*_eigen_path.pdf</span></code> and their inverse <code class="docutils literal notranslate"><span class="pre">*_eigen_path_inv.pdf</span></code> along the q-path.
+The first argument is the q-path file, and the second argument is the eigenvalue file.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Make sure that you are in the output directory of chiq_post.py</span>
+plot_chiq_path.py<span class="w"> </span>../q_path.dat<span class="w"> </span>chi_q_eigen.dat
+</pre></div>
+</div>
+<p>The following figure is the result of the BSE calculation (<code class="docutils literal notranslate"><span class="pre">chi_q_eigen_path.pdf</span></code>).
+The susceptibility has a sharp peak at the M point, <span class="math notranslate nohighlight">\(\boldsymbol{q} = (\pi, \pi)\)</span>, indicating the growth of the antiferromagnetic fluctuations.</p>
+<figure class="align-center" id="id1">
+<img alt="../_images/chi_q_eigen_path1.png" src="../_images/chi_q_eigen_path1.png" />
+<figcaption>
+<p><span class="caption-text">The eigenvalues of the two-body susceptibility calculated by solving the BSE.</span><a class="headerlink" href="#id1" title="Link to this image">¶</a></p>
+</figcaption>
+</figure>
+</section>
+<section id="random-phase-approximation-rpa">
+<h2>Random phase approximation (RPA)<a class="headerlink" href="#random-phase-approximation-rpa" title="Link to this heading">¶</a></h2>
+<p><strong>ChiQ</strong> also provides the RPA calculation.
+In the RPA calculation, the interaction is taken into account only via the symmetrized vertex function <span class="math notranslate nohighlight">\(\hat{\gamma}\)</span>, not via the self-energy <span class="math notranslate nohighlight">\(\Sigma\)</span>.
+So, the DMFT calculation needs to be solved with the “null” solver, which gives the self-energy <span class="math notranslate nohighlight">\(\Sigma = 0\)</span> (see <a class="reference internal" href="../algorithms.html#algorithm-rpa"><span class="std std-ref">Random phase approximation (RPA)</span></a>).
+The input file of DCore follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">model</span><span class="p">]</span>
+<span class="n">seedname</span> <span class="o">=</span> <span class="n">square</span>
+<span class="n">lattice</span> <span class="o">=</span> <span class="n">wannier90</span>
+<span class="n">norb</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">nelec</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="n">t</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span>
+<span class="n">kanamori</span> <span class="o">=</span> <span class="p">[(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)]</span>
+<span class="n">nk0</span> <span class="o">=</span> <span class="mi">32</span>
+<span class="n">nk1</span> <span class="o">=</span> <span class="mi">32</span>
+<span class="n">nk2</span> <span class="o">=</span> <span class="mi">1</span>
+
+<span class="c1">#[mpi]</span>
+<span class="c1">#command = &quot;mpirun -n #&quot;</span>
+
+<span class="p">[</span><span class="n">system</span><span class="p">]</span>
+<span class="n">T</span> <span class="o">=</span> <span class="mf">0.5</span>
+<span class="n">n_iw</span> <span class="o">=</span> <span class="mi">1024</span>
+<span class="n">mu</span> <span class="o">=</span> <span class="mf">0.0</span>
+<span class="c1">#fix_mu = True</span>
+
+<span class="p">[</span><span class="n">impurity_solver</span><span class="p">]</span>
+<span class="n">name</span> <span class="o">=</span> <span class="n">null</span>
+
+<span class="p">[</span><span class="n">control</span><span class="p">]</span>
+<span class="n">max_step</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="c1"># No self-energy iteration is needed for null solver</span>
+
+<span class="p">[</span><span class="n">bse</span><span class="p">]</span>
+<span class="n">num_wb</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">num_wf</span> <span class="o">=</span> <span class="mi">20</span>
+<span class="n">X0q_qpoints_saved</span> <span class="o">=</span> <span class="s2">&quot;q_path.dat&quot;</span>
+<span class="n">skip_Xloc</span> <span class="o">=</span> <span class="kc">True</span>
+</pre></div>
+</div>
+<p>Note that the interaction strength <span class="math notranslate nohighlight">\(U\)</span> is set to be one, not eight.
+This is because the RPA overestimates the Neel temperature, and hence the point <span class="math notranslate nohighlight">\(U=8\)</span> and <span class="math notranslate nohighlight">\(T=0.5\)</span> is the antiferromagnetic phase and too far from the phase transition point.
+It should also be noted that the chemical potential <span class="math notranslate nohighlight">\(\mu\)</span> is set to be zero, because the DMFT loop is calculated as <span class="math notranslate nohighlight">\(U=0\)</span>.</p>
+<p>In the input file <code class="docutils literal notranslate"><span class="pre">bse.in</span></code>, the only difference from the previous calculation is that the <code class="docutils literal notranslate"><span class="pre">type</span></code> keyword of <code class="docutils literal notranslate"><span class="pre">[chiq_common]</span></code> section is set to <code class="docutils literal notranslate"><span class="pre">['chi0',</span> <span class="pre">'rpa']</span></code>.</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[chiq_common]</span>
+<span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dmft_bse.h5&quot;</span>
+<span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dmft_bse.out.h5&quot;</span>
+<span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;chi0&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;rpa&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># &quot;chi0&quot;, &quot;bse&quot;, &quot;scl&quot;, &quot;rpa&quot;, &quot;rrpa&quot;</span>
+<span class="n">omega_q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;q_path.dat&quot;</span>
+
+<span class="k">[chiq_main]</span>
+<span class="n">work_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;work/chiq&quot;</span>
+<span class="c1"># num_wf = 20  # If not specified, the value is determined from X_loc</span>
+
+<span class="k">[chiq_post]</span>
+<span class="n">output_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;bse&quot;</span>
+<span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eigen&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># &quot;matrix_element&quot;, &quot;eigen&quot;, &quot;linear_combination&quot;</span>
+
+<span class="c1"># for mode=&quot;eigen&quot;</span>
+<span class="c1">#vector = true  # output eigenvectors</span>
+<span class="c1">#order = &quot;file&quot;  # &quot;descend&quot; (default), &quot;overlap&quot;, &quot;file&quot;</span>
+<span class="c1">#order_file = &quot;/path/to/eigenvec.in&quot;  # for order=&quot;file&quot;</span>
+
+<span class="c1"># for mode=&quot;linear_combination&quot;</span>
+<span class="c1"># coefs_file = &quot;/path/to/coefs.in&quot;</span>
+</pre></div>
+</div>
+<p>The workflow is the same as the previous calculation.
+Note that the names of the output files by the RPA calculation start with <code class="docutils literal notranslate"><span class="pre">chi_q_rpa_</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dcore_pre<span class="w"> </span>dmft_square.in
+dcore<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>dmft_square.in
+gen_qpath.py<span class="w"> </span>dmft_square.in<span class="w"> </span>qpath.in
+dcore_chiq.py<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>dmft_square.in
+mpiexec<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>chi_main.py<span class="w"> </span>bse.in
+mpiexec<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>chiq_post.py<span class="w"> </span>bse.in
+<span class="nb">cd</span><span class="w"> </span>bse
+plot_chiq_path.py<span class="w"> </span>../q_path.dat<span class="w"> </span>chi_q_rpa_eigen.dat
+</pre></div>
+</div>
+<figure class="align-center" id="id2">
+<img alt="../_images/chi_q_rpa_eigen_path.png" src="../_images/chi_q_rpa_eigen_path.png" />
+<figcaption>
+<p><span class="caption-text">The eigenvalues of the two-body susceptibility calculated by the RPA.</span><a class="headerlink" href="#id2" title="Link to this image">¶</a></p>
+</figcaption>
+</figure>
+</section>
+<section id="strong-coupling-limit-formula-scl">
+<h2>Strong coupling limit formula (SCL)<a class="headerlink" href="#strong-coupling-limit-formula-scl" title="Link to this heading">¶</a></h2>
+<p>Finally, <strong>ChiQ</strong> provides the calculation tool based on the strong coupling limit formula (SCL) (see <a class="reference internal" href="../algorithms.html#algorithm-scl"><span class="std std-ref">Strong-coupling limit formula (SCL)</span></a>).
+The input file of DCore is the same as the previous BSE calculation.</p>
+<p>Instead of <code class="docutils literal notranslate"><span class="pre">chi_main.py</span></code>, <a class="reference internal" href="../programs/calc_Iq_scl.html#program-calc-iq-scl"><span class="std std-ref">calc_Iq_scl.py</span></a> is used to calculate the susceptibility.
+The input file is <code class="docutils literal notranslate"><span class="pre">scl_2pole.in</span></code>:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[SCL]</span>
+<span class="n">E_plus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">4.0</span>
+<span class="n">E_minus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">4.0</span>
+
+<span class="c1"># input = dmft_bse.h5</span>
+<span class="c1"># output = dmft_bse.out.h5</span>
+<span class="c1"># iw_cutoff = 20</span>
+<span class="c1"># wb = 0</span>
+<span class="c1"># verbose = True</span>
+</pre></div>
+</div>
+<p>The following command calculates the susceptibility :</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>calc_Iq_scl.py<span class="w"> </span>scl_2pole.in
+</pre></div>
+</div>
+<p>After that, <code class="docutils literal notranslate"><span class="pre">chiq_post.py</span></code> and <code class="docutils literal notranslate"><span class="pre">plot_chiq_path.py</span></code> are used to analyze the result in the same way as the BSE calculation.
+The input file of <code class="docutils literal notranslate"><span class="pre">chiq_post.py</span></code>, <code class="docutils literal notranslate"><span class="pre">bse.in</span></code>, differs from the previous BSE example only in the <code class="docutils literal notranslate"><span class="pre">type</span></code> keyword of <code class="docutils literal notranslate"><span class="pre">[chiq_common]</span></code> section;
+The <code class="docutils literal notranslate"><span class="pre">type</span></code> keyword is set to <code class="docutils literal notranslate"><span class="pre">['chi0',</span> <span class="pre">'scl']</span></code>.</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[chiq_common]</span>
+<span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dmft_bse.h5&quot;</span>
+<span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dmft_bse.out.h5&quot;</span>
+<span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;scl&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># &quot;chi0&quot;, &quot;bse&quot;, &quot;scl&quot;, &quot;rpa&quot;, &quot;rrpa&quot;</span>
+<span class="n">omega_q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;q_path.dat&quot;</span>
+
+<span class="k">[chiq_main]</span>
+<span class="n">work_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;work/chiq&quot;</span>
+<span class="c1"># num_wf = 20  # If not specified, the value is determined from X_loc</span>
+
+<span class="k">[chiq_post]</span>
+<span class="n">output_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;bse&quot;</span>
+<span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eigen&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># &quot;matrix_element&quot;, &quot;eigen&quot;, &quot;linear_combination&quot;</span>
+
+<span class="c1"># for mode=&quot;eigen&quot;</span>
+<span class="c1">#vector = true  # output eigenvectors</span>
+<span class="c1">#order = &quot;file&quot;  # &quot;descend&quot; (default), &quot;overlap&quot;, &quot;file&quot;</span>
+<span class="c1">#order_file = &quot;/path/to/eigenvec.in&quot;  # for order=&quot;file&quot;</span>
+
+<span class="c1"># for mode=&quot;linear_combination&quot;</span>
+<span class="c1"># coefs_file = &quot;/path/to/coefs.in&quot;</span>
+</pre></div>
+</div>
+<p>The following figure is the result of the SCL calculation.</p>
+<figure class="align-center" id="id3">
+<img alt="../_images/chi_q_scl_eigen_path.png" src="../_images/chi_q_scl_eigen_path.png" />
+<figcaption>
+<p><span class="caption-text">The eigenvalues of the two-body susceptibility calculated by the SCL.</span><a class="headerlink" href="#id3" title="Link to this image">¶</a></p>
+</figcaption>
+</figure>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About ChiQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../tutorial.html">Tutorial</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Single band Hubbard model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Neel_temperature.html">Search for the Neel temperature</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intersite_interactions.html">Intersite interactions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multiple_orb.html">Multiple band Hubbard model</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference.html">Reference Manual</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../programs.html">Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="../tutorial.html"
+                          title="previous chapter">Tutorial</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="Neel_temperature.html"
+                          title="next chapter">Search for the Neel temperature</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="Neel_temperature.html" title="Search for the Neel temperature"
+             >next</a></li>
+        <li class="right" >
+          <a href="../tutorial.html" title="Tutorial"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../tutorial.html" >Tutorial</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Single band Hubbard model</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>

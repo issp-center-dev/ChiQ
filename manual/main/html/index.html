@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>ChiQ &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b20cc3f5" />
+    <link rel="stylesheet" type="text/css" href="_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="_static/plot_directive.css" />
+    <link rel="stylesheet" type="text/css" href="_static/chiq.css?v=a9ac29d5" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="About ChiQ" href="about.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="about.html" title="About ChiQ"
+             accesskey="N">next</a></li>
+        <li class="nav-item nav-item-0"><a href="#">ChiQ  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">ChiQ</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="chiq">
+<h1>ChiQ<a class="headerlink" href="#chiq" title="Link to this heading">¶</a></h1>
+<p>ChiQ is a solver for calculating susceptibility <span class="math notranslate nohighlight">\(\chi(q,\omega)\)</span> with the Bethe-Salpeter equation solver as a postscript of <a class="reference external" href="https://issp-center-dev.github.io/DCore/">DCore</a>.</p>
+<section id="table-of-contents">
+<h2>Table of Contents<a class="headerlink" href="#table-of-contents" title="Link to this heading">¶</a></h2>
+</section>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="about.html">About ChiQ</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="about.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="about.html#license">License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="about.html#citing-chiq">Citing ChiQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="about.html#developers">Developers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="about.html#github-repository">GitHub repository</a></li>
+<li class="toctree-l2"><a class="reference internal" href="about.html#disclaimer">Disclaimer</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="install.html#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="install.html#id2">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="install.html#environment-variables">Environment variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="install.html#dependency-on-external-python-packages">Dependency on external python packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="install.html#test-of-python-package-scripts">Test of python package/scripts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="install.html#build-documentation">Build documentation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/single_orb.html">Single band Hubbard model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/Neel_temperature.html">Search for the Neel temperature</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/intersite_interactions.html">Intersite interactions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tutorial/multiple_orb.html">Multiple band Hubbard model</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">Reference Manual</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="reference/input.html">Input files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/output.html">Output files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/hdf5.html">Structure of HDF5 file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="reference/h5bse.html">Access to HDF5 file</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="programs.html">Programs</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="programs/dcore_chiq.html">dcore_chiq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="programs/chiq_main.html">chiq_main</a></li>
+<li class="toctree-l2"><a class="reference internal" href="programs/chiq_post.html">chiq_post</a></li>
+<li class="toctree-l2"><a class="reference internal" href="programs/chiq_fft.html">chiq_fft</a></li>
+<li class="toctree-l2"><a class="reference internal" href="programs/calc_Iq.html">calc_Iq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="programs/calc_Iq_scl.html">calc_Iq_scl</a></li>
+<li class="toctree-l2"><a class="reference internal" href="programs/gen_qpath.html">gen_qpath</a></li>
+<li class="toctree-l2"><a class="reference internal" href="programs/gen_allq.html">gen_allq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="programs/plot_chiq_path.html">plot_chiq_path</a></li>
+<li class="toctree-l2"><a class="reference internal" href="programs/plot_Ir.html">plot_Ir</a></li>
+<li class="toctree-l2"><a class="reference internal" href="programs/eigenvec_viewer.html">eigenvec_viewer</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="algorithms.html">Algorithms</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html#definition-of-the-susceptibility">Definition of the susceptibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html#calculation-of-the-susceptibility">Calculation of the susceptibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html#intersite-interactions">Intersite interactions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html#analyzing-the-susceptibility">Analyzing the susceptibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="support.html">Support</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="support/issues.html">Reporting issues</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="#">Table of Contents</a></h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="about.html">About ChiQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">Reference Manual</a></li>
+<li class="toctree-l1"><a class="reference internal" href="programs.html">Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="about.html"
+                          title="next chapter">About ChiQ</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="about.html" title="About ChiQ"
+             >next</a></li>
+        <li class="nav-item nav-item-0"><a href="#">ChiQ  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">ChiQ</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>
