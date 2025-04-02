@@ -56,7 +56,7 @@ mkdir ChiQ.build; cd ChiQ.build
 cmake -DCMAKE_BUILD_TYPE=Release \
       -DTesting=ON \
       -DCMAKE_INSTALL_PREFIX=$HOME/local \
-      ../bse
+      ../ChiQ
 ```
 
 #### Troubleshooting
@@ -116,8 +116,8 @@ pytest tests/python/non-mpi/bsetool_BSE/test_bsetool_BSE.py
 ## How to use
 
 ``` bash
-mpirun -np 4 bse_tool.py bse.toml
-bse_post.py bse.toml
+mpiexec -np 4 chiq_main.py chiq.toml
+chiq_post.py chiq.toml
 ```
 
 ### Input parameters
@@ -126,17 +126,17 @@ Parameters are given by a file with TOML format.
 An example is shown below.
 
 ``` toml
-[bse_common]
+[chiq_common]
 input = "dmft_bse.h5"
 output = "dmft_bse.out.h5"
 type = ['chi0', 'bse', 'rpa', 'rrpa']  # 'chi0', 'bse', 'scl', 'rpa', 'rrpa'
 omega_q = "q_path.dat"
 
-[bse_tool]
-work_dir = "work/bse_tool"
+[chiq_main]
+work_dir = "work/chiq_main"
 # num_wf = 20  # If not specified, the value is determined from X_loc
 
-[bse_post]
+[chiq_post]
 output_dir = ""
 mode = ['eigen']  # 'matrix_element', 'eigen', 'linear_combination'
 
@@ -148,3 +148,11 @@ mode = ['eigen']  # 'matrix_element', 'eigen', 'linear_combination'
 # for mode='linear_combination'
 #coefs_file = "/path/to/coefs.in"
 ```
+
+### For detailed usage
+
+See the `manual <https://issp-center-dev.github.io/ChiQ/manual/main/html/index.html>`_ for the detailed usage.
+
+## Release History
+
+See the `release page on GitHub <https://github.com/issp-center-dev/ChiQ/releases>`_ for the release history.
