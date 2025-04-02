@@ -6,7 +6,7 @@ extensions = [
     # 'sphinx.ext.autodoc',
     'sphinx.ext.mathjax',
     'sphinx.ext.intersphinx',
-    'matplotlib.sphinxext.plot_directive',
+    # 'matplotlib.sphinxext.plot_directive',
     # 'sphinx.ext.doctest',
     'sphinx.ext.todo',
     # 'sphinx.ext.viewcode',
