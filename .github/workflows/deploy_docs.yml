@@ -65,13 +65,14 @@ jobs:
             TARGET_NAME=${REF_SLUG}
           fi
           rm -rf "gh-pages/manual/${TARGET_NAME}"
+          mkdir -p "gh-pages/manual/${TARGET_NAME}"
           cp -r "main/built_doc" "gh-pages/manual/${TARGET_NAME}/html"
           cd gh-pages
           git config --local user.name "${GIT_USER}"
           git config --local user.email "${GIT_EMAIL}"
           git remote set-url origin git@github.com:${GITHUB_REPOSITORY}.git
           git pull
-          git add ${TARGET_NAME}
+          git add "manual/${TARGET_NAME}"
           if git commit -m "Deploy docs to ${TARGET_NAME} by GitHub Actions triggered by ${GITHUB_SHA}"
           then
             git push origin gh-pages
