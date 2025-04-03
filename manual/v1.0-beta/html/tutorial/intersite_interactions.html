@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Intersite interactions &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5349f25f" />
+    <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="author" title="About these documents" href="../about.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Multiple band Hubbard model" href="multiple_orb.html" />
+    <link rel="prev" title="Search for the Neel temperature" href="Neel_temperature.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="multiple_orb.html" title="Multiple band Hubbard model"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="Neel_temperature.html" title="Search for the Neel temperature"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../tutorial.html" accesskey="U">Tutorial</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Intersite interactions</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="intersite-interactions">
+<h1>Intersite interactions<a class="headerlink" href="#intersite-interactions" title="Link to this heading">¶</a></h1>
+<p>In this tutorial, we calculate the intersite interactions of the single band Hubbard model on the square lattice.
+For details of the intersite interactions, see <a class="reference internal" href="../algorithms.html#algorithm-iq"><span class="std std-ref">Intersite interactions in Algorithms</span></a>.
+Sample files for this tutorial are available at <code class="docutils literal notranslate"><span class="pre">examples/square_Ir</span></code>.</p>
+<section id="model">
+<h2>Model<a class="headerlink" href="#model" title="Link to this heading">¶</a></h2>
+<p>The model parameters such as <span class="math notranslate nohighlight">\(U\)</span> are the same as in the previous tutorial.
+The input file of DCore is <code class="docutils literal notranslate"><span class="pre">dmft_square.in</span></code>:</p>
+<div class="highlight-ini notranslate"><div class="highlight"><pre><span></span><span class="k">[model]</span>
+<span class="na">seedname</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">square</span>
+<span class="na">lattice</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">wannier90</span>
+<span class="na">norb</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1</span>
+<span class="na">nelec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1.0</span>
+<span class="na">t</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">-1.0</span>
+<span class="na">kanamori</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">[(8.0, 0.0, 0.0)]</span>
+<span class="na">nk0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">32</span>
+<span class="na">nk1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">32</span>
+<span class="na">nk2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1</span>
+
+<span class="c1">#[mpi]</span>
+<span class="c1">#command = &quot;mpirun -n #&quot;</span>
+
+<span class="k">[system]</span>
+<span class="na">T</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">0.5</span>
+<span class="na">n_iw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1024</span>
+<span class="na">mu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">4.0</span>
+<span class="na">fix_mu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">True</span>
+
+<span class="k">[impurity_solver]</span>
+<span class="na">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">pomerol</span>
+<span class="na">exec_path{str}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">pomerol2dcore</span>
+<span class="na">n_bath{int}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">0</span>
+<span class="na">fit_gtol{float}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1e-6</span>
+
+<span class="k">[control]</span>
+<span class="na">max_step</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">10</span>
+<span class="na">sigma_mix</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1.0</span>
+<span class="na">converge_tol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1e-5</span>
+<span class="na">n_converge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">3</span>
+
+<span class="k">[bse]</span>
+<span class="na">num_wb</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1</span>
+<span class="na">num_wf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">20</span>
+<span class="na">X0q_qpoints_saved</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;q_fbz.dat&quot;</span>
+</pre></div>
+</div>
+<p>Compared to the previous example, the <code class="docutils literal notranslate"><span class="pre">X0q_qpoints_saved</span></code> parameter in the <code class="docutils literal notranslate"><span class="pre">[bse]</span></code> section is set to <code class="docutils literal notranslate"><span class="pre">q_fbz.dat</span></code> from <code class="docutils literal notranslate"><span class="pre">q_path.dat</span></code>.
+This is because we need to calculate the intersite interactions for all the points in the BZ (<code class="docutils literal notranslate"><span class="pre">fbz</span></code> means full Brillouin zone) in order to perform FFT from the momentum space to the real space.</p>
+</section>
+<section id="workflow">
+<h2>Workflow<a class="headerlink" href="#workflow" title="Link to this heading">¶</a></h2>
+<section id="calculation-of-susceptibility-chi-q">
+<h3>Calculation of susceptibility <span class="math notranslate nohighlight">\(\chi(q)\)</span><a class="headerlink" href="#calculation-of-susceptibility-chi-q" title="Link to this heading">¶</a></h3>
+<p>First, we perform the DMFT calculation as usual.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dcore_pre<span class="w"> </span>dmft_square.in
+dcore<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>dmft_square.in
+</pre></div>
+</div>
+<p>Before running <code class="docutils literal notranslate"><span class="pre">dcore_chiq.py</span></code>, we need to prepare the <code class="docutils literal notranslate"><span class="pre">q_fbz.dat</span></code> file by using the <code class="docutils literal notranslate"><span class="pre">gen_allq.py</span></code> script.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gen_allq.py<span class="w"> </span>dmft_square.in
+</pre></div>
+</div>
+<p>Run <code class="docutils literal notranslate"><span class="pre">dcore_chiq.py</span></code> and <code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code> to calculate the susceptibility in the momentum space, <span class="math notranslate nohighlight">\(\chi(q)\)</span> and <span class="math notranslate nohighlight">\(\chi_\text{loc}(q)\)</span>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dcore_chiq.py<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>dmft_square.in
+mpiexec<span class="w"> </span>-np<span class="w"> </span><span class="m">4</span><span class="w"> </span>chiq_main.py<span class="w"> </span>bse.in
+</pre></div>
+</div>
+<p>The input file of ChiQ tools, <code class="docutils literal notranslate"><span class="pre">bse.in</span></code>, is also the same as in the previous tutorial:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[chiq_common]</span>
+<span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dmft_bse.h5&quot;</span>
+<span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dmft_bse.out.h5&quot;</span>
+<span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;chi0&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;bse&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># &quot;chi0&quot;, &quot;bse&quot;, &quot;scl&quot;, &quot;rpa&quot;, &quot;rrpa&quot;</span>
+<span class="n">omega_q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;q_fbz.dat&quot;</span>
+
+<span class="k">[chiq_main]</span>
+<span class="n">work_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;work/chiq&quot;</span>
+<span class="c1"># num_wf = 20  # If not specified, the value is determined from X_loc</span>
+
+<span class="k">[chiq_post]</span>
+<span class="n">output_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;bse&quot;</span>
+<span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eigen&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># &quot;matrix_element&quot;, &quot;eigen&quot;, &quot;linear_combination&quot;</span>
+
+<span class="c1"># for mode=&quot;eigen&quot;</span>
+<span class="c1">#vector = true  # output eigenvectors</span>
+<span class="n">order</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;file&quot;</span><span class="w">  </span><span class="c1"># &quot;descend&quot; (default), &quot;overlap&quot;, &quot;file&quot;</span>
+<span class="n">order_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;eigenvec.in&quot;</span><span class="w">  </span><span class="c1"># for order=&quot;file&quot;</span>
+
+<span class="c1"># for mode=&quot;linear_combination&quot;</span>
+<span class="c1"># coefs_file = &quot;/path/to/coefs.in&quot;</span>
+</pre></div>
+</div>
+<p>The only difference is that the <code class="docutils literal notranslate"><span class="pre">q_fbz.dat</span></code> file is used instead of <code class="docutils literal notranslate"><span class="pre">q_path.dat</span></code> in <code class="docutils literal notranslate"><span class="pre">omega_q</span></code> parameter in the <code class="docutils literal notranslate"><span class="pre">[chiq_common]</span></code> section.</p>
+</section>
+<section id="calculation-of-intersite-interactions-i-q-and-i-r">
+<h3>Calculation of intersite interactions <span class="math notranslate nohighlight">\(I(q)\)</span> and <span class="math notranslate nohighlight">\(I(r)\)</span><a class="headerlink" href="#calculation-of-intersite-interactions-i-q-and-i-r" title="Link to this heading">¶</a></h3>
+<p>Once these susceptibilities are calculated, we can run <code class="docutils literal notranslate"><span class="pre">calc_Iq.py</span></code> to calculate the intersite interactions in the momentum space, <span class="math notranslate nohighlight">\(I(q)\)</span>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>calc_Iq.py<span class="w"> </span>-f<span class="w"> </span>dmft_bse.out.h5<span class="w"> </span>--remove<span class="w"> </span><span class="m">1</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">-f</span></code> is used to specify the HDF5 file, which is the output file of <code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code> (in this case, <code class="docutils literal notranslate"><span class="pre">dmft_bse.out.h5</span></code>).
+<code class="docutils literal notranslate"><span class="pre">--remove</span></code> specifies the number of the modes to be removed to stabilize the calculation.
+In this case, we remove one mode with the smallest eigenvalue.
+The obtained <span class="math notranslate nohighlight">\(I(q)\)</span> is saved in the HDF5 file as <code class="docutils literal notranslate"><span class="pre">dmft_bse.out.h5/bse/output/I_q</span></code>.</p>
+<p>Next, we perform the FFT from the momentum space <span class="math notranslate nohighlight">\(I(q)\)</span> to the real space <span class="math notranslate nohighlight">\(I(r)\)</span> by using <code class="docutils literal notranslate"><span class="pre">chiq_fft.py</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>chiq_fft.py<span class="w"> </span>-f<span class="w"> </span>dmft_bse.out.h5<span class="w"> </span>--input_dname<span class="w"> </span>I_q<span class="w"> </span>--output_dname<span class="w"> </span>I_r<span class="w"> </span>dmft_square.in
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">-f</span></code> is used to specify the HDF5 file, which is used in <code class="docutils literal notranslate"><span class="pre">calc_Iq.py</span></code> (in this case, <code class="docutils literal notranslate"><span class="pre">dmft_bse.out.h5</span></code>).
+<code class="docutils literal notranslate"><span class="pre">--input_dname</span></code> is used to specify the name of the dataset in the HDF5 file of <span class="math notranslate nohighlight">\(I(q)\)</span> (in this case, <code class="docutils literal notranslate"><span class="pre">I_q</span></code>).
+<code class="docutils literal notranslate"><span class="pre">--output_dname</span></code> is used to specify the name of the dataset in the HDF5 file of <span class="math notranslate nohighlight">\(I(r)\)</span> (in this case, <code class="docutils literal notranslate"><span class="pre">I_r</span></code>).
+In this case, <code class="docutils literal notranslate"><span class="pre">chiq_fft.py</span></code> reads the <span class="math notranslate nohighlight">\(I(q)\)</span> from <code class="docutils literal notranslate"><span class="pre">dmft_bse.out.h5/bse/output/I_q</span></code> and writes the <span class="math notranslate nohighlight">\(I(r)\)</span> to <code class="docutils literal notranslate"><span class="pre">dmft_bse.out.h5/bse/output/I_r</span></code>.</p>
+<p>Finally, as in the case of <span class="math notranslate nohighlight">\(\chi(q)\)</span>, we need to transform (or diagonalize) <span class="math notranslate nohighlight">\(I(q)\)</span> to <span class="math notranslate nohighlight">\(I(r)\)</span> by using <code class="docutils literal notranslate"><span class="pre">chiq_post.py</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mpiexec<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>chiq_post.py<span class="w"> </span>bse.in
+</pre></div>
+</div>
+<p>This also transforms <span class="math notranslate nohighlight">\(I(q)\)</span> and <span class="math notranslate nohighlight">\(I(r)\)</span> in the same way as <span class="math notranslate nohighlight">\(\chi(q)\)</span>.
+The results, <code class="docutils literal notranslate"><span class="pre">I_q_eigen.dat</span></code> and <code class="docutils literal notranslate"><span class="pre">I_r_eigen.dat</span></code>, are saved in the directory specified by <code class="docutils literal notranslate"><span class="pre">output_dir</span></code> parameter in the <code class="docutils literal notranslate"><span class="pre">[chiq_post]</span></code> section of <code class="docutils literal notranslate"><span class="pre">bse.in</span></code> (in this case, <code class="docutils literal notranslate"><span class="pre">bse</span></code> directory).
+The file format is also the same as in the <span class="math notranslate nohighlight">\(\chi(q)\)</span> case.</p>
+</section>
+<section id="plotting-the-results">
+<h3>Plotting the results<a class="headerlink" href="#plotting-the-results" title="Link to this heading">¶</a></h3>
+<p><span class="math notranslate nohighlight">\(I(q)\)</span> can be plotted in the same way as <span class="math notranslate nohighlight">\(\chi(q)\)</span> in the previous tutorial.</p>
+<p>First, we prepare a q-path file, <code class="docutils literal notranslate"><span class="pre">q_path.dat</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gen_qpath.py<span class="w"> </span>dmft_square.in<span class="w"> </span>qpath.in
+</pre></div>
+</div>
+<p>Then, we plot <span class="math notranslate nohighlight">\(I(q)\)</span> as follows in the <code class="docutils literal notranslate"><span class="pre">bse</span></code> directory:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot_chiq_path.py<span class="w"> </span>--label<span class="w"> </span>../label2.in<span class="w"> </span>--mode<span class="o">=</span>Iq<span class="w"> </span>../q_path.in<span class="w"> </span>I_q_eigen.dat
+</pre></div>
+</div>
+<p>The following figure <code class="docutils literal notranslate"><span class="pre">I_q_eigen_path.pdf</span></code> is saved.</p>
+<figure class="align-center" id="id1">
+<img alt="../_images/I_q_eigen_path.png" src="../_images/I_q_eigen_path.png" />
+<figcaption>
+<p><span class="caption-text"><span class="math notranslate nohighlight">\(I(q)\)</span> calculated by the BSE.</span><a class="headerlink" href="#id1" title="Link to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>On the other hand, <span class="math notranslate nohighlight">\(I(r)\)</span> can be plotted by using <code class="docutils literal notranslate"><span class="pre">plot_Ir.py</span></code>.
+This script plots <span class="math notranslate nohighlight">\(I(r)\)</span> as a function of the distance from the origin.
+In the <code class="docutils literal notranslate"><span class="pre">bse</span></code> directory, run the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot_Ir.py<span class="w"> </span>--label<span class="w"> </span>../label2.in<span class="w"> </span>I_r_eigen.dat
+</pre></div>
+</div>
+<p>The following figure <code class="docutils literal notranslate"><span class="pre">I_r_eigen_distance.pdf</span></code> is saved.</p>
+<figure class="align-center" id="id2">
+<img alt="../_images/I_r_eigen_distance.png" src="../_images/I_r_eigen_distance.png" />
+<figcaption>
+<p><span class="caption-text"><span class="math notranslate nohighlight">\(I(r)\)</span> calculated by the BSE.</span><a class="headerlink" href="#id2" title="Link to this image">¶</a></p>
+</figcaption>
+</figure>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About ChiQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../tutorial.html">Tutorial</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="single_orb.html">Single band Hubbard model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Neel_temperature.html">Search for the Neel temperature</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Intersite interactions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="multiple_orb.html">Multiple band Hubbard model</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference.html">Reference Manual</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../programs.html">Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="Neel_temperature.html"
+                          title="previous chapter">Search for the Neel temperature</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="multiple_orb.html"
+                          title="next chapter">Multiple band Hubbard model</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="multiple_orb.html" title="Multiple band Hubbard model"
+             >next</a></li>
+        <li class="right" >
+          <a href="Neel_temperature.html" title="Search for the Neel temperature"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../tutorial.html" >Tutorial</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Intersite interactions</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>

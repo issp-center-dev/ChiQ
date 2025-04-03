@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Output files &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5349f25f" />
+    <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="author" title="About these documents" href="../about.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Structure of HDF5 file" href="hdf5.html" />
+    <link rel="prev" title="Input files" href="input.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="hdf5.html" title="Structure of HDF5 file"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="input.html" title="Input files"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../reference.html" accesskey="U">Reference Manual</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Output files</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="output-files">
+<h1>Output files<a class="headerlink" href="#output-files" title="Link to this heading">¶</a></h1>
+<section id="the-prefix-of-the-output-files">
+<h2>The prefix of the output files<a class="headerlink" href="#the-prefix-of-the-output-files" title="Link to this heading">¶</a></h2>
+<p>The prefix of the output files shows the type of the quantity and the used method.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 50.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>type part</p></th>
+<th class="head"><p>description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chi_q</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\(\chi(q)\)</span></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">chi0_q</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\(\chi_0(q)\)</span></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chi_loc</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\(\chi_\text{loc}\)</span></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">I_q</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\(I(q)\)</span></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">I_r</span></code></p></td>
+<td><p><span class="math notranslate nohighlight">\(I(r)\)</span></p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 50.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>method part</p></th>
+<th class="head"><p>description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>(nothing)</p></td>
+<td><p>BSE</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">_rpa</span></code></p></td>
+<td><p>RPA</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">_rrpa</span></code></p></td>
+<td><p>RRPA</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">_scl</span></code></p></td>
+<td><p>SCL</p></td>
+</tr>
+</tbody>
+</table>
+<p>For example, <code class="docutils literal notranslate"><span class="pre">chi_q_eigen.dat</span></code> means that the susceptibility <span class="math notranslate nohighlight">\(\chi(q)\)</span> is calculated by the BSE method,
+and <code class="docutils literal notranslate"><span class="pre">I_q_rpa_eigen.dat</span></code> means that the intersite interaction <span class="math notranslate nohighlight">\(I(q)\)</span> is calculated by the RPA method.</p>
+<p>This scheme is applied to all the output files descibed below.</p>
+</section>
+<section id="chi-q-eigen-dat">
+<h2><code class="docutils literal notranslate"><span class="pre">chi_q_eigen.dat</span></code><a class="headerlink" href="#chi-q-eigen-dat" title="Link to this heading">¶</a></h2>
+<p>This file is generated by <code class="docutils literal notranslate"><span class="pre">chiq_post.py</span></code>, which contains <a class="reference external" href="Algorithm_Eigen_values">the eigenvalues</a> or <a class="reference external" href="Algorithm_Eigen_linear_combination">the linear combinations</a> of the two-particle susceptibilities <span class="math notranslate nohighlight">\(\chi_{\xi}(\boldsymbol{q}, i\Omega_m)\)</span> or <span class="math notranslate nohighlight">\(\chi_{\gamma\gamma}(\boldsymbol{q}, i\Omega_m)\)</span>, respectively.</p>
+<p>This file has three or more columns.
+The first column is the index <span class="math notranslate nohighlight">\(m\)</span> of the Matsubara frequency <span class="math notranslate nohighlight">\(\Omega_m\)</span>.
+The second column is the three integers <code class="docutils literal notranslate"><span class="pre">X.Y.Z</span></code> separated by a dot without any spaces, which specify the momentum <span class="math notranslate nohighlight">\(\boldsymbol{q} = 2\pi/a \times [X, Y, Z]\)</span> where <span class="math notranslate nohighlight">\(a\)</span> is the lattice constant.
+The third and subsequent columns are the susceptibilities, <span class="math notranslate nohighlight">\(\chi_{0}(\boldsymbol{q}, i\Omega_m), \chi_{1}(\boldsymbol{q}, i\Omega_m), \cdots\)</span>.
+The following is the first few lines of an example.</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>#Temperature: 0.5
+0 00.00.00 0.5851252932088625 0.5851252932088622 0.5851252932088622 -0.010185534590226983
+0 01.00.00 0.5871784814635085 0.587178481463508 0.5871784814635079 -0.010043078925395688
+0 01.01.00 0.5892514011643883 0.5892514011643873 0.5892514011643873 -0.009901741925596026
+</pre></div>
+</div>
+</section>
+<section id="chi-q-eigenvector-xx-yy-zz-dat">
+<span id="output-eigenvec-dat"></span><h2><code class="docutils literal notranslate"><span class="pre">chi_q_eigenvector.XX.YY.ZZ.dat</span></code><a class="headerlink" href="#chi-q-eigenvector-xx-yy-zz-dat" title="Link to this heading">¶</a></h2>
+<p>These files are generated by <code class="docutils literal notranslate"><span class="pre">chiq_post.py</span></code> with <code class="docutils literal notranslate"><span class="pre">vector</span> <span class="pre">=</span> <span class="pre">true</span></code> in <code class="docutils literal notranslate"><span class="pre">[chiq_post]</span></code>, which contain <a class="reference external" href="Algorithm_Eigen">the eigenvectors</a> of the two-particle susceptibilities, <span class="math notranslate nohighlight">\(U_{kl}^{(\xi)}(\boldsymbol{q}, i\Omega_m)\)</span>.
+<code class="docutils literal notranslate"><span class="pre">XX.YY.ZZ</span></code> is the momentum <span class="math notranslate nohighlight">\(\boldsymbol{q} = 2\pi/a \times [X, Y, Z]\)</span> where <span class="math notranslate nohighlight">\(a\)</span> is the lattice constant.
+By combining <span class="math notranslate nohighlight">\(k\)</span> and <span class="math notranslate nohighlight">\(l\)</span> into one index, <span class="math notranslate nohighlight">\(U_{kl}^{(\xi)}\)</span> is represented as a <span class="math notranslate nohighlight">\(N \times N\)</span> complex-valued matrix with <span class="math notranslate nohighlight">\(\xi\)</span> as row and <span class="math notranslate nohighlight">\((k,l)\)</span> as column.</p>
+<p>These files have <span class="math notranslate nohighlight">\(N\)</span> rows and <span class="math notranslate nohighlight">\(2N\)</span> columns.
+One row corresponds to one eigenvector.
+In one row, the real part and the imaginary part are alternated; real, imaginary, real, imaginary, and so on.
+These files can be analyzed by <a class="reference external" href="program_eigenvec_viewer">eigenvec_viewer.py</a>.</p>
+</section>
+<section id="chi-q-eigen-path-pdf">
+<h2><code class="docutils literal notranslate"><span class="pre">chi_q_eigen_path.pdf</span></code><a class="headerlink" href="#chi-q-eigen-path-pdf" title="Link to this heading">¶</a></h2>
+<p>This file is generated by <code class="docutils literal notranslate"><span class="pre">plot_chiq_path.py</span></code>, which shows the plot of the susceptibilities <span class="math notranslate nohighlight">\(\chi_{\xi}(q)\)</span> along the path.</p>
+</section>
+<section id="chi-q-eigen-path-inv-pdf">
+<h2><code class="docutils literal notranslate"><span class="pre">chi_q_eigen_path_inv.pdf</span></code><a class="headerlink" href="#chi-q-eigen-path-inv-pdf" title="Link to this heading">¶</a></h2>
+<p>This file is generated by <code class="docutils literal notranslate"><span class="pre">plot_chiq_path.py</span></code>, which shows the plot of the inverse susceptibilities <span class="math notranslate nohighlight">\(1/\chi_{\xi}(q)\)</span> along the path.</p>
+</section>
+<section id="i-r-eigen-distance-pdf">
+<h2><code class="docutils literal notranslate"><span class="pre">I_r_eigen_distance.pdf</span></code><a class="headerlink" href="#i-r-eigen-distance-pdf" title="Link to this heading">¶</a></h2>
+<p>This file is generated by <code class="docutils literal notranslate"><span class="pre">plot_Ir.py</span></code>, which shows the plot of the intersite interaction <span class="math notranslate nohighlight">\(I(r)\)</span> as a function of the distance from the origin.</p>
+</section>
+<section id="chi-q-eigen-path-dat">
+<h2><code class="docutils literal notranslate"><span class="pre">chi_q_eigen_path.dat</span></code><a class="headerlink" href="#chi-q-eigen-path-dat" title="Link to this heading">¶</a></h2>
+<p>This file is generated by <code class="docutils literal notranslate"><span class="pre">plot_chiq_path.py</span></code> or <code class="docutils literal notranslate"><span class="pre">plot_Ir.py</span></code> by option <code class="docutils literal notranslate"><span class="pre">--data_out</span> <span class="pre">FILENAME</span></code>.
+This file stores the numerical data of the susceptibilities along the path, which helps to draw the plot of the susceptibilities along the path manually.
+The first column is distance from the origin along the path (<code class="docutils literal notranslate"><span class="pre">plot_chiq_path.py</span></code>) or the distance from the origin (<code class="docutils literal notranslate"><span class="pre">plot_Ir.py</span></code>).
+The remaining columns are the values <span class="math notranslate nohighlight">\(\chi_{0}(\boldsymbol{q}, i\Omega_m), \chi_{1}(\boldsymbol{q}, i\Omega_m), \cdots\)</span>.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About ChiQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorial.html">Tutorial</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../reference.html">Reference Manual</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="input.html">Input files</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Output files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hdf5.html">Structure of HDF5 file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="h5bse.html">Access to HDF5 file</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../programs.html">Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="input.html"
+                          title="previous chapter">Input files</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="hdf5.html"
+                          title="next chapter">Structure of HDF5 file</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="hdf5.html" title="Structure of HDF5 file"
+             >next</a></li>
+        <li class="right" >
+          <a href="input.html" title="Input files"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../reference.html" >Reference Manual</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Output files</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>

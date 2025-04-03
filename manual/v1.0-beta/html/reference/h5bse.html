@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Access to HDF5 file &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5349f25f" />
+    <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="author" title="About these documents" href="../about.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Programs" href="../programs.html" />
+    <link rel="prev" title="Structure of HDF5 file" href="hdf5.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../programs.html" title="Programs"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="hdf5.html" title="Structure of HDF5 file"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../reference.html" accesskey="U">Reference Manual</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Access to HDF5 file</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="access-to-hdf5-file">
+<span id="reference-h5bse"></span><h1>Access to HDF5 file<a class="headerlink" href="#access-to-hdf5-file" title="Link to this heading">¶</a></h1>
+<section id="h5bse-class">
+<h2><code class="docutils literal notranslate"><span class="pre">h5BSE</span></code> class<a class="headerlink" href="#h5bse-class" title="Link to this heading">¶</a></h2>
+<p>The data in HDF5 files should be accessed via class <code class="docutils literal notranslate"><span class="pre">bse.h5bse.h5BSE</span></code>.</p>
+<section id="class-methods">
+<h3>class methods<a class="headerlink" href="#class-methods" title="Link to this heading">¶</a></h3>
+<p><strong>__init__(filename, groupname=””, compression=”gzip”, compression_opts=None)</strong></p>
+<dl class="simple">
+<dt><strong>open(mode=’r’)</strong></dt><dd><p>Keep the file open.</p>
+</dd>
+<dt><strong>close()</strong></dt><dd><p>Close the file if <code class="docutils literal notranslate"><span class="pre">open</span></code> method is called.</p>
+</dd>
+<dt><strong>save(key, data)</strong></dt><dd><p>Save data to the file. See the available <cite>key</cite> and data structure below.</p>
+</dd>
+<dt><strong>get(key)</strong>  <cite>return data(Dict)</cite></dt><dd><p>Get data from the file.</p>
+</dd>
+<dt><strong>get_keylist_data(input_output=’input’)</strong>  <cite>return List[(key, path), …]</cite></dt><dd><p>Get the list of keys in the file.</p>
+</dd>
+</dl>
+</section>
+<section id="key-argument">
+<h3><code class="docutils literal notranslate"><span class="pre">key</span></code> argument<a class="headerlink" href="#key-argument" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">key</span></code> argument is a tuple that contains three elements or less. The maximum case is as follows:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">key</span><span class="o">=</span><span class="p">(</span><span class="nb">type</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">q</span><span class="p">)</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>type</strong> <cite>(string)</cite>: <code class="docutils literal notranslate"><span class="pre">'beta'</span></code>, <code class="docutils literal notranslate"><span class="pre">'X_loc'</span></code>, <code class="docutils literal notranslate"><span class="pre">'chi_q'</span></code>, etc. See the table below.</p></li>
+<li><p><strong>w</strong> <cite>(int)</cite>: Index for the bosonic frequency.</p></li>
+<li><p><strong>q</strong> <cite>(string)</cite>: A string to distinguish different q-points.</p></li>
+</ul>
+<p>If <code class="docutils literal notranslate"><span class="pre">w</span></code> and/or <code class="docutils literal notranslate"><span class="pre">q</span></code> are not necessary, one can omit them.
+See <a class="reference internal" href="hdf5.html#reference-hdf5"><span class="std std-ref">Structure of HDF5 file</span></a> for the list of available <code class="docutils literal notranslate"><span class="pre">type</span></code>.</p>
+</section>
+</section>
+<section id="example">
+<h2>Example<a class="headerlink" href="#example" title="Link to this heading">¶</a></h2>
+<p>This example shows how to access the data (<code class="docutils literal notranslate"><span class="pre">gamma0</span></code> in this example) in the HDF5 file.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">bse.h5bse</span><span class="w"> </span><span class="kn">import</span> <span class="n">h5BSE</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_convert_to_matrix</span><span class="p">(</span><span class="n">block_matrix</span><span class="p">,</span> <span class="n">n_block</span><span class="p">,</span> <span class="n">n_inner</span><span class="p">):</span>
+    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">block_matrix</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
+    <span class="n">dim</span> <span class="o">=</span> <span class="n">n_inner</span> <span class="o">*</span> <span class="n">n_block</span>
+    <span class="n">mat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n_block</span><span class="p">,</span> <span class="n">n_inner</span><span class="p">,</span> <span class="n">n_block</span><span class="p">,</span> <span class="n">n_inner</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">block</span><span class="p">,</span> <span class="n">bmat</span> <span class="ow">in</span> <span class="n">block_matrix</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">i</span><span class="p">,</span> <span class="n">j</span> <span class="o">=</span> <span class="n">block</span>
+        <span class="n">mat</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:,</span> <span class="n">j</span><span class="p">,</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">bmat</span>
+    <span class="k">return</span> <span class="n">mat</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">dim</span><span class="p">,</span> <span class="n">dim</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_gamma0</span><span class="p">(</span><span class="n">h5_file</span><span class="p">):</span>
+    <span class="n">BS</span> <span class="o">=</span> <span class="n">h5BSE</span><span class="p">(</span><span class="n">h5_file</span><span class="p">)</span>
+    <span class="n">BS</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+
+    <span class="c1"># get info</span>
+    <span class="n">block_name</span> <span class="o">=</span> <span class="n">BS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;block_name&#39;</span><span class="p">))</span>
+    <span class="n">inner_name</span> <span class="o">=</span> <span class="n">BS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;inner_name&#39;</span><span class="p">))</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;block_name: </span><span class="si">{</span><span class="n">block_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;inner_name: </span><span class="si">{</span><span class="n">inner_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">n_block</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">block_name</span><span class="p">)</span>
+    <span class="n">n_inner</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">inner_name</span><span class="p">)</span>
+    <span class="n">dim</span> <span class="o">=</span> <span class="n">n_inner</span> <span class="o">*</span> <span class="n">n_block</span>
+
+    <span class="c1"># get gamma0</span>
+    <span class="n">gamma0_dict</span> <span class="o">=</span> <span class="n">BS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="p">(</span><span class="s1">&#39;gamma0&#39;</span><span class="p">,))</span>
+
+    <span class="n">BS</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="c1"># convert dict to ndarray</span>
+    <span class="n">gamma0_mat</span> <span class="o">=</span> <span class="n">_convert_to_matrix</span><span class="p">(</span><span class="n">gamma0_dict</span><span class="p">,</span> <span class="n">n_block</span><span class="p">,</span> <span class="n">n_inner</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">gamma0_mat</span><span class="o">.</span><span class="n">shape</span> <span class="o">==</span> <span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">dim</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">gamma0_mat</span>
+
+
+<span class="n">gamma0</span> <span class="o">=</span> <span class="n">get_gamma0</span><span class="p">(</span><span class="s2">&quot;dmft_bse.h5&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">gamma0 loaded. shape=</span><span class="si">{</span><span class="n">gamma0</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Data is obtained using the <code class="docutils literal notranslate"><span class="pre">get</span></code> method of the <code class="docutils literal notranslate"><span class="pre">bse.h5bse.h5BSE</span></code> class.
+The returned data is a dictionary type (block matrix), and should be converted to ndarray.</p>
+<p>Standard output of the above script for a six-orbital system with <code class="docutils literal notranslate"><span class="pre">j=5/2</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>python3<span class="w"> </span>get_gamma0.py
+block_name:<span class="w"> </span><span class="o">[</span>b<span class="s1">&#39;0-ud-0-ud&#39;</span><span class="o">]</span>
+inner_name:<span class="w"> </span><span class="o">[</span>b<span class="s1">&#39;0-0&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;0-1&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;0-2&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;0-3&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;0-4&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;0-5&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;1-0&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;1-1&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;1-2&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;1-3&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;1-4&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;1-5&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;2-0&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;2-1&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;2-2&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;2-3&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;2-4&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;2-5&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;3-0&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;3-1&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;3-2&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;3-3&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;3-4&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;3-5&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;4-0&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;4-1&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;4-2&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;4-3&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;4-4&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;4-5&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;5-0&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;5-1&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;5-2&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;5-3&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;5-4&#39;</span>,<span class="w"> </span>b<span class="s1">&#39;5-5&#39;</span><span class="o">]</span>
+
+gamma0<span class="w"> </span>loaded
+<span class="w">  </span><span class="nv">dtype</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>complex128
+<span class="w">  </span><span class="nv">shape</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">(</span><span class="m">36</span>,<span class="w"> </span><span class="m">36</span><span class="o">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About ChiQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorial.html">Tutorial</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../reference.html">Reference Manual</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="input.html">Input files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="output.html">Output files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hdf5.html">Structure of HDF5 file</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Access to HDF5 file</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../programs.html">Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="hdf5.html"
+                          title="previous chapter">Structure of HDF5 file</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="../programs.html"
+                          title="next chapter">Programs</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../programs.html" title="Programs"
+             >next</a></li>
+        <li class="right" >
+          <a href="hdf5.html" title="Structure of HDF5 file"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../reference.html" >Reference Manual</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Access to HDF5 file</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>
