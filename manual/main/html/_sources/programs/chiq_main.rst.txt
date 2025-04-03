@@ -41,4 +41,4 @@ Print version:
 .. code-block:: console
 
     $ chiq_main.py --version
-    ChiQ version 0.17.0
+    ChiQ version 1.0-beta
