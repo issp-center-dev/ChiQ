@@ -21,7 +21,7 @@ Features:
 
 ### Requirements
 
-- CMake (>= 3.4)
+- CMake (>= 3.5)
 - C++ compiler compatible with C++11
 - [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page) (>= 3.1)
 - Python
@@ -77,8 +77,8 @@ make test  # when -DTesting=ON is activated in cmake
 make install
 ```
 
-Python scripts such as `bse_tool.py` are installed in **$HOME/local/bin**.
-A python package **bse** and a shared library **bse_solver.cpython-XXX-YYY.so** (XXX is the python version, and YYY is the os info) is installed in **$Home/local/lib/bse-python** (or **lib64/bse-python**).
+Python scripts such as `chiq_main.py` are installed in **$HOME/local/bin**.
+A python package **chiq** and a shared library **bse_solver.cpython-XXX-YYY.so** (XXX is the python version, and YYY is the os info) is installed in **$Home/local/lib/bse-python** (or **lib64/bse-python**).
 A configurations file **chiqvars.sh** is installed in **$HOME/local/share**, see the next section.
 
 You can build the documentation as follows.

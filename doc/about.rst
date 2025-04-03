@@ -19,8 +19,6 @@ Features:
 
   - Supports the inclusion of spin-orbit coupling (SOC).
 
-
-
 License
 -------
 
@@ -52,6 +50,9 @@ GitHub repository
 -----------------
 
 You can download the source code of **ChiQ** from https://github.com/issp-center-dev/ChiQ.
+
+See the `release page on GitHub <https://github.com/issp-center-dev/ChiQ/releases>`_ for the release history.
+
 
 Disclaimer
 ----------
