@@ -52,7 +52,6 @@ Make a new directory and go into it
 ``` bash
 mkdir ChiQ.build; cd ChiQ.build
 
-``` bash
 cmake -DCMAKE_BUILD_TYPE=Release \
       -DTesting=ON \
       -DCMAKE_INSTALL_PREFIX=$HOME/local \
@@ -94,6 +93,7 @@ To set up the environment variables **PATH** and **PYTHONPATH** properly, use th
 
 ``` bash
 source $HOME/local/share/chiqvars.sh
+```
 
 ## Test of python package/scripts
 
@@ -151,8 +151,8 @@ mode = ['eigen']  # 'matrix_element', 'eigen', 'linear_combination'
 
 ### For detailed usage
 
-See the `manual <https://issp-center-dev.github.io/ChiQ/manual/main/html/index.html>`_ for the detailed usage.
+See the [manual](https://issp-center-dev.github.io/ChiQ/manual/main/html/index.html) for the detailed usage.
 
 ## Release History
 
-See the `release page on GitHub <https://github.com/issp-center-dev/ChiQ/releases>`_ for the release history.
+See the [release page on GitHub](https://github.com/issp-center-dev/ChiQ/releases) for the release history.
