@@ -1,5 +1,4 @@
 # include guard
-cmake_minimum_required(VERSION 3.4)
 if (${CMAKE_PROJECT_NAME} STREQUAL "Project")
     message(FATAL_ERROR "cmake should be executed not for 'src' subdirectory, but for the top directory of ChiQ.")
 endif (${CMAKE_PROJECT_NAME} STREQUAL "Project")
