@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Multiple band Hubbard model &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5349f25f" />
+    <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="author" title="About these documents" href="../about.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Reference Manual" href="../reference.html" />
+    <link rel="prev" title="Intersite interactions" href="intersite_interactions.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../reference.html" title="Reference Manual"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="intersite_interactions.html" title="Intersite interactions"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../tutorial.html" accesskey="U">Tutorial</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Multiple band Hubbard model</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="multiple-band-hubbard-model">
+<h1>Multiple band Hubbard model<a class="headerlink" href="#multiple-band-hubbard-model" title="Link to this heading">¶</a></h1>
+<p>In this tutorial, we will calculate the susceptibility of the multiple band Hubbard model.
+For details, see the section VII of the reference paper, <a class="reference external" href="https://journals.aps.org/prb/abstract/10.1103/PhysRevB.99.165134">J. Otsuki, et al., Phys. Rev. B 99, 165134 (2019)</a>.
+Sample files for this tutorial are available at <code class="docutils literal notranslate"><span class="pre">examples/two_orbital</span></code>.</p>
+<section id="model">
+<h2>Model<a class="headerlink" href="#model" title="Link to this heading">¶</a></h2>
+<div class="math notranslate nohighlight">
+\[\begin{split}\mathcal{H}
+= \sum_{\boldsymbol{k}, \alpha, \sigma} \varepsilon_{\boldsymbol{k}} c_{\alpha\sigma}^\dagger(\boldsymbol{k}) c_{\alpha\sigma}(\boldsymbol{k})
++ \frac{1}{2} \sum_{i, \alpha, \sigma} \Delta_\alpha n_{i\alpha\sigma}
++ U \sum_{i,\alpha} n_{i\alpha\uparrow} n_{i\alpha\downarrow} \\
++ \frac{U'}{2} \sum_{i,\alpha\ne\beta,\sigma} n_{i\alpha\sigma}n_{i\beta\bar{\sigma}}
++ \frac{U'-J}{2} \sum_{i,\alpha\ne\beta,\sigma} n_{i\alpha\sigma}n_{i\beta\sigma} \\
++ J \sum_{i,\alpha \ne \beta} \left[
+c_{i\alpha\downarrow}^{\dagger}c_{i\beta\uparrow}^{\dagger} c_{i\beta\uparrow}c_{i\alpha\downarrow}
++
+c_{i\alpha\uparrow}^{\dagger}c_{i\alpha\downarrow}^{\dagger} c_{i\beta\downarrow}c_{i\beta\uparrow}
+\right],\end{split}\]</div>
+<p>where <span class="math notranslate nohighlight">\(i\)</span> is the site index and <span class="math notranslate nohighlight">\(\alpha\)</span>, <span class="math notranslate nohighlight">\(\beta\)</span> are the orbital indices.
+<span class="math notranslate nohighlight">\(\sigma\)</span> is the spin index and <span class="math notranslate nohighlight">\(\bar{\sigma}\)</span> means the opposite spin of <span class="math notranslate nohighlight">\(\sigma\)</span>.
+<span class="math notranslate nohighlight">\(\varepsilon_{\boldsymbol{k}} = -2t(\cos k_x + \cos k_y)\)</span> is the dispersion relation, <span class="math notranslate nohighlight">\(\Delta_\alpha\)</span> is the crystal field splitting, <span class="math notranslate nohighlight">\(U\)</span> is the intra-orbital Coulomb interaction, <span class="math notranslate nohighlight">\(U'\)</span> is the inter-orbital Coulomb interaction, and <span class="math notranslate nohighlight">\(J\)</span> is the Hund’s coupling.
+In this tutorial, we consider the two-band Hubbard model with the following parameters:
+<span class="math notranslate nohighlight">\(t = 1\)</span> (set as the unit of energy), <span class="math notranslate nohighlight">\(U = 12.0\)</span>, <span class="math notranslate nohighlight">\(U' = 6.0\)</span>, <span class="math notranslate nohighlight">\(J = 3.0\)</span>, <span class="math notranslate nohighlight">\(\Delta_0 = 8.8\)</span>, and <span class="math notranslate nohighlight">\(\Delta_1 = -8.8\)</span>.</p>
+</section>
+<section id="dmft-calculation-with-dcore">
+<h2>DMFT calculation with DCore<a class="headerlink" href="#dmft-calculation-with-dcore" title="Link to this heading">¶</a></h2>
+<p>To implement this setup in DCore, we need to prepare the input file as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">model</span><span class="p">]</span>
+<span class="n">seedname</span> <span class="o">=</span> <span class="n">square_2orb</span>
+<span class="n">lattice</span> <span class="o">=</span> <span class="n">wannier90</span>
+<span class="n">norb</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">nelec</span> <span class="o">=</span> <span class="mf">2.0</span>
+<span class="n">t</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span>
+<span class="n">kanamori</span> <span class="o">=</span> <span class="p">[(</span><span class="mf">12.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">)]</span>
+<span class="n">nk0</span> <span class="o">=</span> <span class="mi">32</span>
+<span class="n">nk1</span> <span class="o">=</span> <span class="mi">32</span>
+<span class="n">nk2</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">local_potential_matrix</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s1">&#39;local_pot.in&#39;</span><span class="p">}</span>
+<span class="n">local_potential_factor</span> <span class="o">=</span> <span class="mf">8.8</span>
+
+<span class="c1">#[mpi]</span>
+<span class="c1">#command = &quot;mpirun -n #&quot;</span>
+
+<span class="p">[</span><span class="n">system</span><span class="p">]</span>
+<span class="n">T</span> <span class="o">=</span> <span class="mf">0.5</span>
+<span class="n">n_iw</span> <span class="o">=</span> <span class="mi">1024</span>
+<span class="c1"># fix mu at half-filling</span>
+<span class="n">mu</span> <span class="o">=</span> <span class="mf">10.5</span>
+<span class="n">fix_mu</span> <span class="o">=</span> <span class="kc">True</span>
+
+<span class="p">[</span><span class="n">impurity_solver</span><span class="p">]</span>
+<span class="n">name</span> <span class="o">=</span> <span class="n">pomerol</span>
+<span class="n">exec_path</span><span class="p">{</span><span class="nb">str</span><span class="p">}</span> <span class="o">=</span> <span class="n">pomerol2dcore</span>
+<span class="n">n_bath</span><span class="p">{</span><span class="nb">int</span><span class="p">}</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">fit_gtol</span><span class="p">{</span><span class="nb">float</span><span class="p">}</span> <span class="o">=</span> <span class="mf">1e-6</span>
+
+<span class="p">[</span><span class="n">control</span><span class="p">]</span>
+<span class="c1"># No iteration is necessary because of fix_mu=True and n_bath=0</span>
+<span class="n">max_step</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">sigma_mix</span> <span class="o">=</span> <span class="mf">1.0</span>
+<span class="n">converge_tol</span> <span class="o">=</span> <span class="mf">1e-5</span>
+<span class="n">n_converge</span> <span class="o">=</span> <span class="mi">3</span>
+
+<span class="p">[</span><span class="n">bse</span><span class="p">]</span>
+<span class="n">num_wb</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">num_wf</span> <span class="o">=</span> <span class="mi">20</span>
+<span class="n">X0q_qpoints_saved</span> <span class="o">=</span> <span class="s2">&quot;q_path.dat&quot;</span>
+</pre></div>
+</div>
+<p>As for the previous example for the single-band Hubbard model, the <code class="docutils literal notranslate"><span class="pre">[model]</span></code> section specifies the model parameters.
+<code class="docutils literal notranslate"><span class="pre">norb</span></code> is set to <code class="docutils literal notranslate"><span class="pre">2</span></code> to specify the number of orbitals. <code class="docutils literal notranslate"><span class="pre">nelec</span> <span class="pre">=</span> <span class="pre">2</span></code> means that the number of electrons per site is 2 (half-filling).
+The hopping constants are specified by the Wannier90 format file <code class="docutils literal notranslate"><span class="pre">square_2orb_hr.dat</span></code>.
+When <code class="docutils literal notranslate"><span class="pre">norb</span></code> increases, the number of lines in this file will increase as <span class="math notranslate nohighlight">\(O(n_{\text{orb}}^2)\)</span>.
+Hence, a python script <code class="docutils literal notranslate"><span class="pre">make_hr_norb.py</span></code> is offered to generate this file as follows:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>make_hr_norb.py<span class="w"> </span><span class="m">2</span><span class="w"> </span>&gt;<span class="w"> </span>square_2orb_hr.dat
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">kanamori</span></code> section specifies <a class="reference external" href="https://issp-center-dev.github.io/DCore/develop/reference/interaction.html">the Kanamori interaction parameters</a> <span class="math notranslate nohighlight">\((U, U', J) = (12.0, 6.0, 3.0)\)</span>.
+<code class="docutils literal notranslate"><span class="pre">local_potential_matrix</span></code> and <code class="docutils literal notranslate"><span class="pre">local_potential_factor</span></code> are used to specify <a class="reference external" href="https://issp-center-dev.github.io/DCore/develop/reference/local_potential.html">the local_potential parameters</a>.
+In this case, <code class="docutils literal notranslate"><span class="pre">local_potential_matrix</span></code> points to the file containing the local potential matrix as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># spin orb1 orb2  Re Im</span>
+<span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span>   <span class="mf">0.5</span> <span class="mf">0.</span>
+<span class="mi">0</span> <span class="mi">1</span> <span class="mi">1</span>  <span class="o">-</span><span class="mf">0.5</span> <span class="mf">0.</span>
+<span class="mi">1</span> <span class="mi">0</span> <span class="mi">0</span>   <span class="mf">0.5</span> <span class="mf">0.</span>
+<span class="mi">1</span> <span class="mi">1</span> <span class="mi">1</span>  <span class="o">-</span><span class="mf">0.5</span> <span class="mf">0.</span>
+</pre></div>
+</div>
+<p>and <code class="docutils literal notranslate"><span class="pre">local_potential_factor</span></code> is set to <code class="docutils literal notranslate"><span class="pre">8.8</span></code>.</p>
+<p>Once the input file is prepared, we can run the DMFT calculation as the previous example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dcore_pre<span class="w"> </span>dmft_2orb.in
+dcore<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>dmft_2orb.in
+dcore_check<span class="w"> </span>dmft_2orb.in
+</pre></div>
+</div>
+</section>
+<section id="bse-calculation">
+<h2>BSE calculation<a class="headerlink" href="#bse-calculation" title="Link to this heading">¶</a></h2>
+<p>First, we need to generate the q-path file from the input file</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># qx qy qz name  (in unit of reciprocal lattice vectors)</span>
+<span class="mi">1</span><span class="o">/</span><span class="mi">2</span> <span class="mi">0</span> <span class="mi">0</span>  <span class="n">X</span>
+<span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span>  <span class="n">Gamma</span>
+<span class="mi">1</span><span class="o">/</span><span class="mi">2</span> <span class="mi">1</span><span class="o">/</span><span class="mi">2</span> <span class="mi">0</span>  <span class="n">M</span>
+<span class="mi">1</span><span class="o">/</span><span class="mi">2</span> <span class="mi">0</span> <span class="mi">0</span>  <span class="n">X</span>
+<span class="mi">1</span><span class="o">/</span><span class="mi">4</span> <span class="mi">1</span><span class="o">/</span><span class="mi">4</span> <span class="mi">0</span>  <span class="n">M</span><span class="s1">&#39;</span>
+</pre></div>
+</div>
+<p>as follows:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gen_qpath.py<span class="w"> </span>dmft_2orb.in<span class="w"> </span>qpath.in
+</pre></div>
+</div>
+<p>Next, we need to prepare the input file for the BSE calculation.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">chiq_common</span><span class="p">]</span>
+<span class="nb">input</span> <span class="o">=</span> <span class="s2">&quot;dmft_bse.h5&quot;</span>
+<span class="n">output</span> <span class="o">=</span> <span class="s2">&quot;dmft_bse.out.h5&quot;</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;chi0&quot;</span><span class="p">,</span> <span class="s2">&quot;bse&quot;</span><span class="p">]</span>  <span class="c1"># &quot;chi0&quot;, &quot;bse&quot;, &quot;scl&quot;, &quot;rpa&quot;, &quot;rrpa&quot;</span>
+<span class="n">omega_q</span> <span class="o">=</span> <span class="s2">&quot;q_path.dat&quot;</span>
+
+<span class="p">[</span><span class="n">chiq_main</span><span class="p">]</span>
+<span class="n">work_dir</span> <span class="o">=</span> <span class="s2">&quot;work/chiq&quot;</span>
+<span class="c1"># num_wf = 20  # If not specified, the value is determined from X_loc</span>
+
+<span class="p">[</span><span class="n">chiq_post</span><span class="p">]</span>
+<span class="n">output_dir</span> <span class="o">=</span> <span class="s2">&quot;bse&quot;</span>
+<span class="n">mode</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;eigen&quot;</span><span class="p">]</span>  <span class="c1"># &quot;matrix_element&quot;, &quot;eigen&quot;, &quot;linear_combination&quot;</span>
+
+<span class="c1"># for mode=&quot;eigen&quot;</span>
+<span class="c1">#vector = true  # output eigenvectors</span>
+<span class="n">order</span> <span class="o">=</span> <span class="s2">&quot;file&quot;</span>  <span class="c1"># &quot;descend&quot; (default), &quot;overlap&quot;, &quot;file&quot;</span>
+<span class="n">order_file</span> <span class="o">=</span> <span class="s2">&quot;eigenvec.in&quot;</span>  <span class="c1"># for order=&quot;file&quot;</span>
+
+<span class="c1"># for mode=&quot;linear_combination&quot;</span>
+<span class="c1"># coefs_file = &quot;/path/to/coefs.in&quot;</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">[chiq_common]</span></code> and <code class="docutils literal notranslate"><span class="pre">[chiq_main]</span></code> sections are the same as the previous example.
+BSE calculation can be performed using the following commands:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>dcore_chiq.py<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>bse.in
+mpiexec<span class="w"> </span>--np<span class="w"> </span><span class="m">4</span><span class="w"> </span>chiq_main.py<span class="w"> </span>bse.in
+</pre></div>
+</div>
+<p>The obtained susceptibility is a 16x16 complex-valued matrix.
+In this example, we transform the susceptibility to the basis described in the reference paper.
+The transformation matrix is given by <code class="docutils literal notranslate"><span class="pre">eigenvec.in</span></code> as follows:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># from Table I in J. Otsuki et al. PRB 99, 165134 (2019)</span>
+<span class="c1"># sigma^0  tau^0 : charge</span>
+<span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>
+<span class="c1">#</span>
+<span class="c1"># sigma^z  tau^0 : spin^z</span>
+<span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="o">-</span><span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.5</span> <span class="mi">0</span>
+<span class="c1"># sigma^+  tau^0 : spin^+</span>
+<span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mf">0.707106781186</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.707106781186</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>
+<span class="c1"># sigma^-  tau^0 : spin^-</span>
+<span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mf">0.707106781186</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.707106781186</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>
+<span class="c1">#</span>
+<span class="c1"># sigma^0  tau^z : orbital (Eg in Oh)</span>
+<span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.5</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.5</span> <span class="mi">0</span>
+<span class="c1">#</span>
+<span class="c1"># sigma^0  tau^x : orbital (Eg in Oh)</span>
+<span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>
+<span class="c1">#</span>
+<span class="c1"># sigma^z  tau^y : orbital (T2g in Oh)</span>
+<span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.5</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>
+<span class="c1"># sigma^+  tau^y : orbital (T2g in Oh)</span>
+<span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.707106781186</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.707106781186</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>
+<span class="c1"># sigma^-  tau^y : orbital (T2g in Oh)</span>
+<span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.707106781186</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.707106781186</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>
+<span class="c1">#</span>
+<span class="c1"># sigma^0  tau^y : magnetic high-rank multipole (A1u in Oh)</span>
+<span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>
+<span class="c1">#</span>
+<span class="c1"># sigma^z  tau^x : magnetic high-rank multipole (T1u in Oh)</span>
+<span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.5</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>
+<span class="c1"># sigma^+  tau^x : magnetic high-rank multipole (T1u in Oh)</span>
+<span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.707106781186</span> <span class="mi">0</span>  <span class="mf">0.707106781186</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>
+<span class="c1"># sigma^-  tau^x : magnetic high-rank multipole (T1u in Oh)</span>
+<span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.707106781186</span> <span class="mi">0</span>  <span class="mf">0.707106781186</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>
+<span class="c1">#</span>
+<span class="c1"># sigma^z  tau^z : magnetic high-rank multipole (T2u in Oh)</span>
+<span class="mf">0.5</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.5</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="o">-</span><span class="mf">0.5</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mf">0.5</span> <span class="mi">0</span>
+<span class="c1"># sigma^+  tau^z : magnetic high-rank multipole (T2u in Oh)</span>
+<span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mf">0.707106781186</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.707106781186</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>
+<span class="c1"># sigma^-  tau^z : magnetic high-rank multipole (T2u in Oh)</span>
+<span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>   <span class="mf">0.707106781186</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="o">-</span><span class="mf">0.707106781186</span> <span class="mi">0</span>   <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>  <span class="mi">0</span> <span class="mi">0</span>
+</pre></div>
+</div>
+<p>This has the same format as the eigenvector file outputted by <code class="docutils literal notranslate"><span class="pre">chiq_post.py</span></code>.
+To check these basis, use <code class="docutils literal notranslate"><span class="pre">eigenvec_viewer.py</span></code> as follows:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>eigenvec_viewer.py<span class="w"> </span>eigenvec.in<span class="w"> </span>-a<span class="w"> </span><span class="m">1</span><span class="w"> </span>--spin-charge
+</pre></div>
+</div>
+<p>For example, the 11th eigenvector (<code class="docutils literal notranslate"><span class="pre">#10</span></code>) is as follows:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1">#10</span>
+atom<span class="w"> </span><span class="m">0</span>
+ch
+<span class="w">  </span><span class="m">0</span><span class="w">               </span><span class="m">0</span>
+<span class="w">  </span><span class="m">0</span><span class="w">               </span><span class="m">0</span>
+sp+
+<span class="w">  </span><span class="m">0</span><span class="w">               </span><span class="m">0</span>
+<span class="w">  </span><span class="m">0</span><span class="w">               </span><span class="m">0</span>
+sp-
+<span class="w">  </span><span class="m">0</span><span class="w">               </span><span class="m">0</span>
+<span class="w">  </span><span class="m">0</span><span class="w">               </span><span class="m">0</span>
+spz
+<span class="w">  </span><span class="m">0</span><span class="w">               </span><span class="m">0</span>.707
+<span class="w">  </span><span class="m">0</span>.707<span class="w">           </span><span class="m">0</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">ch</span></code>, <code class="docutils literal notranslate"><span class="pre">sp+</span></code>, <code class="docutils literal notranslate"><span class="pre">sp-</span></code>, and <code class="docutils literal notranslate"><span class="pre">spz</span></code> are the charge <span class="math notranslate nohighlight">\(n\)</span>, spin-up <span class="math notranslate nohighlight">\(\sigma^+\)</span>, spin-down <span class="math notranslate nohighlight">\(\sigma^-\)</span>, and spin-z <span class="math notranslate nohighlight">\(\sigma^z\)</span>, respectively.
+<span class="math notranslate nohighlight">\(2 \times 2\)</span> matrices are the orbital components <span class="math notranslate nohighlight">\(\tau\)</span> coupled to each spin-charge component.
+Therefore, this says that the 11th eigenvector is <span class="math notranslate nohighlight">\(\sigma^z \times \tau^x\)</span> (one of the <span class="math notranslate nohighlight">\(T_{1u}\)</span>).</p>
+<p>Basis transformation is performed by <code class="docutils literal notranslate"><span class="pre">chiq_post.py</span></code> as follows:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>chiq_post.py<span class="w"> </span>bse.in
+</pre></div>
+</div>
+<p>The transformed susceptibility is stored in <code class="docutils literal notranslate"><span class="pre">bse/chi_q_eigen.dat</span></code>.</p>
+<p>In the plotting tool, <code class="docutils literal notranslate"><span class="pre">plot_chiq_path.py</span></code>, you can select the susceptibility to plot by specifying the eigenvector index by using the following file, <code class="docutils literal notranslate"><span class="pre">label.in</span></code>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># from Table I in J. Otsuki et al. PRB 99, 165134 (2019)</span>
+<span class="p">{</span>
+<span class="c1">#		0: &quot;charge&quot;,</span>
+		<span class="mi">1</span><span class="p">:</span> <span class="s2">&quot;spin&quot;</span><span class="p">,</span>
+		<span class="mi">4</span><span class="p">:</span> <span class="s2">&quot;HS/LS&quot;</span><span class="p">,</span>
+<span class="c1">#		5: &quot;tau^x&quot;,</span>
+		<span class="mi">6</span><span class="p">:</span> <span class="s2">&quot;orb^3&quot;</span><span class="p">,</span>
+<span class="c1">#		9: &quot;sp-orb^1&quot;,</span>
+		<span class="mi">10</span><span class="p">:</span> <span class="s2">&quot;EI&quot;</span><span class="p">,</span>
+<span class="c1">#		13: &quot;sp-orb^{3z}&quot;,</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>This file has a python dictionary, where the key is the eigenvector index and the value is the label in the plot.
+Note that the line starting with <code class="docutils literal notranslate"><span class="pre">#</span></code> is a comment, and then the four bands, 1, 4, 6, and 10, are specified in this case.
+<code class="docutils literal notranslate"><span class="pre">label.in</span></code> is passed to <code class="docutils literal notranslate"><span class="pre">plot_chiq_path.py</span></code> as follows:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot_chiq_path.py<span class="w"> </span>q_path.dat<span class="w"> </span>bse/chi_q_eigen.dat<span class="w"> </span>--label<span class="o">=</span>label.in
+</pre></div>
+</div>
+<p>The obtained figure shows the susceptibility along the path in the Brillouin zone as follows:</p>
+<figure class="align-center" id="id1">
+<a class="reference internal image-reference" href="../_images/chi_q_eigen_path.png"><img alt="../_images/chi_q_eigen_path.png" src="../_images/chi_q_eigen_path.png" style="width: 70%;" />
+</a>
+<figcaption>
+<p><span class="caption-text">The susceptibility <span class="math notranslate nohighlight">\(\chi(\boldsymbol{q})\)</span> calculated by the BSE.</span><a class="headerlink" href="#id1" title="Link to this image">¶</a></p>
+</figcaption>
+</figure>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About ChiQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../tutorial.html">Tutorial</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="single_orb.html">Single band Hubbard model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Neel_temperature.html">Search for the Neel temperature</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intersite_interactions.html">Intersite interactions</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Multiple band Hubbard model</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../reference.html">Reference Manual</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../programs.html">Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="intersite_interactions.html"
+                          title="previous chapter">Intersite interactions</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="../reference.html"
+                          title="next chapter">Reference Manual</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../reference.html" title="Reference Manual"
+             >next</a></li>
+        <li class="right" >
+          <a href="intersite_interactions.html" title="Intersite interactions"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../tutorial.html" >Tutorial</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Multiple band Hubbard model</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Structure of HDF5 file &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5349f25f" />
+    <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
+    <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="author" title="About these documents" href="../about.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Access to HDF5 file" href="h5bse.html" />
+    <link rel="prev" title="Output files" href="output.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="h5bse.html" title="Access to HDF5 file"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="output.html" title="Output files"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../reference.html" accesskey="U">Reference Manual</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Structure of HDF5 file</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="structure-of-hdf5-file">
+<span id="reference-hdf5"></span><h1>Structure of HDF5 file<a class="headerlink" href="#structure-of-hdf5-file" title="Link to this heading">¶</a></h1>
+<section id="basics">
+<h2>Basics<a class="headerlink" href="#basics" title="Link to this heading">¶</a></h2>
+<p>All input and output data are stored in HDF5 format.
+The file names are specified by parameters</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="o">[</span>chiq_common<span class="o">]</span>
+<span class="nv">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dmft_bse.h5&quot;</span>
+<span class="nv">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dmft_bse.out.h5&quot;</span>
+</pre></div>
+</div>
+<p>One may specify the same file for both input and output.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>One can print the stored data using <code class="docutils literal notranslate"><span class="pre">h5ls</span></code> command as shown below. However, it is recommended to use the class <cite>h5BSE</cite> to save/load data. See <a class="reference internal" href="h5bse.html#reference-h5bse"><span class="std std-ref">Access to HDF5 file</span></a> for details.</p>
+</div>
+<section id="dmft-bse-h5">
+<span id="reference-hdf5-input"></span><h3><strong>dmft_bse.h5</strong><a class="headerlink" href="#dmft-bse-h5" title="Link to this heading">¶</a></h3>
+<p>One can print the structure of the stored data using <code class="docutils literal notranslate"><span class="pre">h5ls</span></code> command.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>h5ls<span class="w"> </span>dmft_bse.h5
+bse<span class="w">                      </span>Group
+</pre></div>
+</div>
+<p>All data are stored in the <strong>bse</strong> group.
+One can print subgroups in <strong>bse</strong> group by</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>h5ls<span class="w"> </span>dmft_bse.h5/bse
+info<span class="w">                     </span>Group
+input<span class="w">                    </span>Group
+</pre></div>
+</div>
+<p><strong>info</strong> subgroup contains basic information</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>h5ls<span class="w"> </span>dmft_bse.h5/bse/info
+beta<span class="w">                     </span>Dataset<span class="w"> </span><span class="o">{</span>SCALAR<span class="o">}</span>
+block_name<span class="w">               </span>Group
+inner_name<span class="w">               </span>Group
+</pre></div>
+</div>
+<p><strong>input</strong> subgroup contains input data necessary for BSE calculations</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>h5ls<span class="w"> </span>dmft_bse.h5/bse/input
+X0_loc<span class="w">                   </span>Group
+X0_q<span class="w">                     </span>Group
+X_loc<span class="w">                    </span>Group
+chi0_loc_in<span class="w">              </span>Group
+chi_loc_in<span class="w">               </span>Group
+gamma0<span class="w">                   </span>Group
+</pre></div>
+</div>
+</section>
+<section id="dmft-bse-out-h5">
+<span id="reference-hdf5-output"></span><h3><strong>dmft_bse.out.h5</strong><a class="headerlink" href="#dmft-bse-out-h5" title="Link to this heading">¶</a></h3>
+<p>The output file <strong>dmft_bse.out.h5</strong> contain <strong>output</strong> subgroup as follows.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$<span class="w"> </span>h5ls<span class="w"> </span>dmft_bse.out.h5/bse
+info<span class="w">                     </span>Group
+output<span class="w">                   </span>Group
+
+$<span class="w"> </span>h5ls<span class="w"> </span>dmft_bse.out.h5/bse/output
+I_q<span class="w">                      </span>Group
+chi0_loc<span class="w">                 </span>Group
+chi0_q<span class="w">                   </span>Group
+chi_loc<span class="w">                  </span>Group
+chi_q<span class="w">                    </span>Group
+chi_q_rpa<span class="w">                </span>Group
+chi_q_rrpa<span class="w">               </span>Group
+</pre></div>
+</div>
+</section>
+</section>
+<section id="structure-of-data">
+<h2>Structure of data<a class="headerlink" href="#structure-of-data" title="Link to this heading">¶</a></h2>
+<p>The structure of the data is classified into the following three types.</p>
+<p><strong>dict A</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="p">{(</span><span class="n">block1</span><span class="p">,</span> <span class="n">block2</span><span class="p">):</span> <span class="n">ndarray</span><span class="o">.</span><span class="n">complex</span><span class="p">[</span><span class="n">N_in1</span><span class="p">,</span> <span class="n">N_in2</span><span class="p">,</span> <span class="n">N_w</span><span class="p">,</span> <span class="n">N_w</span><span class="p">]</span> <span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>dict B</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="p">{(</span><span class="n">block1</span><span class="p">,</span> <span class="n">block2</span><span class="p">):</span> <span class="n">ndarray</span><span class="o">.</span><span class="n">complex</span><span class="p">[</span><span class="n">N_in1</span><span class="p">,</span> <span class="n">N_in2</span><span class="p">,</span> <span class="n">N_w</span><span class="p">]</span> <span class="p">}</span>
+</pre></div>
+</div>
+<p><strong>dict C</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="p">{(</span><span class="n">block1</span><span class="p">,</span> <span class="n">block2</span><span class="p">):</span> <span class="n">ndarray</span><span class="o">.</span><span class="n">complex</span><span class="p">[</span><span class="n">N_in1</span><span class="p">,</span> <span class="n">N_in2</span><span class="p">]</span> <span class="p">}</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">block1</span></code>, <code class="docutils literal notranslate"><span class="pre">block2</span></code>: block index</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">N_in1</span></code>: number of inner_indices in <code class="docutils literal notranslate"><span class="pre">block1</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">N_in2</span></code>: number of inner_indices in <code class="docutils literal notranslate"><span class="pre">block2</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">N_w</span></code>: number of fermionic Matsubara frequencies</p></li>
+</ul>
+<p>dict A is used for two-particle Green’s function such as <span class="math notranslate nohighlight">\([X_\text{loc}(i\omega_n, i\omega_{n'})]_{12,34}\)</span>, where <span class="math notranslate nohighlight">\(1 \equiv (a_1, \sigma_1, m_1)\)</span>.
+The bosonic frequency has been omitted.
+This quantity is reformatted as
+<span class="math notranslate nohighlight">\(X_\text{loc}(a_1 \sigma_1 \sigma_2, m_1 m_2, n; a_3 \sigma_3 \sigma_4, m_3 m_4, n')\)</span>.
+Here, we used <span class="math notranslate nohighlight">\(a_1=a_2\)</span> and <span class="math notranslate nohighlight">\(a_3=a_4\)</span>.
+The indices before and after the semicolon represent row and column, respectively.
+Then, this is expressed as a block matrix as <code class="docutils literal notranslate"><span class="pre">X_loc[(block1,</span> <span class="pre">block2)][i1,</span> <span class="pre">i2,</span> <span class="pre">w1,</span> <span class="pre">w2]</span></code>, where <span class="math notranslate nohighlight">\(\mathtt{block1} = (a_1 \sigma_1 \sigma_2)\)</span>,
+<span class="math notranslate nohighlight">\(\mathtt{block2} = (a_3 \sigma_3 \sigma_4)\)</span>,
+<span class="math notranslate nohighlight">\(\mathtt{i1} = (m_1 m_2)\)</span>,
+<span class="math notranslate nohighlight">\(\mathtt{i2} = (m_3 m_4)\)</span>,
+<span class="math notranslate nohighlight">\(\mathtt{w1}=n\)</span>.
+and <span class="math notranslate nohighlight">\(\mathtt{w2}=n'\)</span>.</p>
+<p>dict B is used for bare two-particle Green’s function <span class="math notranslate nohighlight">\([X_\text{0,loc}(i\omega_n)]_{12,34}\)</span>.
+The corresponding block matrix is given by <code class="docutils literal notranslate"><span class="pre">X0_loc[(block1,</span> <span class="pre">block2)][i1,</span> <span class="pre">i2,</span> <span class="pre">w]</span></code>, where <span class="math notranslate nohighlight">\(\mathtt{w}=n\)</span>.</p>
+<p>dict C represents the structure of the susceptibility such as <span class="math notranslate nohighlight">\([\chi(\boldsymbol{q})]_{12,34}\)</span>. There is no fermionic Matsubara frequency.
+Therefore, the block matrix is given by <code class="docutils literal notranslate"><span class="pre">chi_q[(block1,</span> <span class="pre">block2)][i1,</span> <span class="pre">i2]</span></code>.</p>
+</section>
+<section id="list-of-data">
+<h2>List of Data<a class="headerlink" href="#list-of-data" title="Link to this heading">¶</a></h2>
+<section id="info-subgroup">
+<h3><strong>info</strong> subgroup<a class="headerlink" href="#info-subgroup" title="Link to this heading">¶</a></h3>
+<p>The table below shows the data in <strong>info</strong> subgroup.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>type</p></th>
+<th class="head"><p>dtype</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">beta</span></code></p></td>
+<td><p>float</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">block_name</span></code></p></td>
+<td><p>list[string]</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">inner_name</span></code></p></td>
+<td><p>list[string]</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="input-subgroup">
+<h3><strong>input</strong> subgroup<a class="headerlink" href="#input-subgroup" title="Link to this heading">¶</a></h3>
+<p>The table below shows the data in <strong>input</strong> subgroup.</p>
+<p>The columns from ‘bse’ to ‘scl’ indicate whether the data is referred to by <code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code> and <code class="docutils literal notranslate"><span class="pre">chiq_post.py</span></code> when the corresponding approximation scheme (selected by ‘type’ parameter) is specified. The last two columns indicate data access by <code class="docutils literal notranslate"><span class="pre">calc_Iq.py</span></code> and <code class="docutils literal notranslate"><span class="pre">calc_Iq_scl.py</span></code>.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>type</p></th>
+<th class="head"><p>w</p></th>
+<th class="head"><p>q</p></th>
+<th class="head"><p>dtype</p></th>
+<th class="head"><p>‘bse’</p></th>
+<th class="head"><p>‘chi0’</p></th>
+<th class="head"><p>‘rpa’</p></th>
+<th class="head"><p>‘rrpa’</p></th>
+<th class="head"><p>‘scl’</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">calc_Iq</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">calc_Iq_scl</span></code></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">X_loc</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>–</p></td>
+<td><p>dict A</p></td>
+<td><p>◇</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>(△*1)</p></td>
+<td><p>(△*1)</p></td>
+<td><p>(△*1)</p></td>
+<td><p>(△*1)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">X0_loc</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>–</p></td>
+<td><p>dict B</p></td>
+<td><p>◇</p></td>
+<td><p>◇</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>◇</p></td>
+<td><p>–</p></td>
+<td><p>◇</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">X0_q</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>dict B</p></td>
+<td><p>◇</p></td>
+<td><p>◇</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>◇</p></td>
+<td><p>–</p></td>
+<td><p>◇</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">chi_loc_in</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>–</p></td>
+<td><p>dict C</p></td>
+<td><p>△*1</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>△*1</p></td>
+<td><p>△*1</p></td>
+<td><p>△*1</p></td>
+<td><p>△*1</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chi0_loc_in</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>–</p></td>
+<td><p>dict C</p></td>
+<td><p>△*2</p></td>
+<td><p>△*2</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>△*2</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">gamma0</span></code></p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>dict C</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>◇</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">Phi</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>–</p></td>
+<td><p>dict B</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>◇</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p>✓: Indicates required elements to get/save the data by <code class="docutils literal notranslate"><span class="pre">h5BSE</span></code> class (see <a class="reference internal" href="h5bse.html#reference-h5bse"><span class="std std-ref">Access to HDF5 file</span></a>). For example, <code class="docutils literal notranslate"><span class="pre">X_loc</span></code> can be accessed with <code class="docutils literal notranslate"><span class="pre">key=('X_loc',</span> <span class="pre">w)</span></code>, whereas <code class="docutils literal notranslate"><span class="pre">X0_q</span></code> is accessed with <code class="docutils literal notranslate"><span class="pre">key=('X0_q',</span> <span class="pre">w,</span> <span class="pre">q)</span></code>.</p></li>
+<li><p>◇: Input (mandatory)</p></li>
+<li><p>△*1: Input (recommended). Generated from <code class="docutils literal notranslate"><span class="pre">X_loc</span></code> if data is not provided.</p></li>
+<li><p>(△*1): Used if <code class="docutils literal notranslate"><span class="pre">chi_loc_in</span></code> is not provided.</p></li>
+<li><p>△*2: Input (recommended). Generated from <code class="docutils literal notranslate"><span class="pre">X0_loc</span></code> if data is not provided.</p></li>
+</ul>
+</section>
+<section id="output-subgroup">
+<h3><strong>‘output’</strong> subgroup<a class="headerlink" href="#output-subgroup" title="Link to this heading">¶</a></h3>
+<p>The table below shows the data in <strong>output</strong> subgroup and which mode output them.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>type</p></th>
+<th class="head"><p>w</p></th>
+<th class="head"><p>q</p></th>
+<th class="head"><p>dtype</p></th>
+<th class="head"><p>‘bse’</p></th>
+<th class="head"><p>‘chi0’</p></th>
+<th class="head"><p>‘rpa’</p></th>
+<th class="head"><p>‘rrpa’</p></th>
+<th class="head"><p>‘scl’</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">calc_Iq</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">calc_Iq_scl</span></code></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chi0_loc</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>–</p></td>
+<td><p>dict C</p></td>
+<td><p>◆</p></td>
+<td><p>◆</p></td>
+<td><p>–</p></td>
+<td><p>◇*3</p></td>
+<td><p>◆</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">chi0_q</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>dict C</p></td>
+<td><p>◆</p></td>
+<td><p>◆</p></td>
+<td><p>◇*3</p></td>
+<td><p>◇*3</p></td>
+<td><p>◆</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chi_loc</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>–</p></td>
+<td><p>dict C</p></td>
+<td><p>◆</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>◆</p></td>
+<td><p>◆</p></td>
+<td><p>–</p></td>
+<td><p>◆</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">chi_q</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>dict C</p></td>
+<td><p>◆</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>◇*4</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chi_q_rpa</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>dict C</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>◆</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">chi_q_rrpa</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>dict C</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>◆</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">chi_q_scl</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>dict C</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>◆</p></td>
+<td><p>–</p></td>
+<td><p>◆</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">I_q</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>dict C</p></td>
+<td><p>◆</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>◆</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">I_r</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>✓*6</p></td>
+<td><p>dict C</p></td>
+<td><p>◆*5</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">I_q_scl</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>✓</p></td>
+<td><p>dict C</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>◆</p></td>
+<td><p>–</p></td>
+<td><p>◆</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">I_r_scl</span></code></p></td>
+<td><p>✓</p></td>
+<td><p>✓*6</p></td>
+<td><p>dict C</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+<td><p>◆*5</p></td>
+<td><p>–</p></td>
+<td><p>–</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p>◆: Output</p></li>
+<li><p>◇*3: Used as input. <code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code> with mode=’chi0’ should be run in advance.</p></li>
+<li><p>◇*4: Used as input. <code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code> with mode=’bse’ should be run in advance.</p></li>
+<li><p>◆*5: Output by <code class="docutils literal notranslate"><span class="pre">chiq_fft</span></code>.</p></li>
+<li><p>✓*6: <code class="docutils literal notranslate"><span class="pre">q</span></code> is used for the real space coordinate <code class="docutils literal notranslate"><span class="pre">r</span></code>.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="../index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About ChiQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorial.html">Tutorial</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../reference.html">Reference Manual</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="input.html">Input files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="output.html">Output files</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Structure of HDF5 file</a></li>
+<li class="toctree-l2"><a class="reference internal" href="h5bse.html">Access to HDF5 file</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../programs.html">Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="output.html"
+                          title="previous chapter">Output files</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="h5bse.html"
+                          title="next chapter">Access to HDF5 file</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="h5bse.html" title="Access to HDF5 file"
+             >next</a></li>
+        <li class="right" >
+          <a href="output.html" title="Output files"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../index.html">ChiQ  documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../reference.html" >Reference Manual</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Structure of HDF5 file</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>

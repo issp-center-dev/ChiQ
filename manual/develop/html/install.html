@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Installation &#8212; ChiQ  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5349f25f" />
+    <link rel="stylesheet" type="text/css" href="_static/wild.css?v=755527b2" />
+    <link rel="stylesheet" type="text/css" href="_static/chiq.css?v=a9ac29d5" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="author" title="About these documents" href="about.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Tutorial" href="tutorial.html" />
+    <link rel="prev" title="About ChiQ" href="about.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="tutorial.html" title="Tutorial"
+             accesskey="N">next</a></li>
+        <li class="right" >
+          <a href="about.html" title="About ChiQ"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">ChiQ  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Installation</a></li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <section id="installation">
+<span id="id1"></span><h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h1>
+<section id="prerequisites">
+<h2>Prerequisites<a class="headerlink" href="#prerequisites" title="Link to this heading">¶</a></h2>
+<p>Before beginning the installation, ensure that you have the following software installed on your system:</p>
+<ul class="simple">
+<li><p><strong>Git</strong>: Used for cloning the repositories.</p></li>
+<li><p><strong>Python</strong>: Required for using pybind11, which interfaces C++ with Python. Ensure Python is compatible with the required version of pybind11.</p></li>
+<li><p><strong>CMake</strong> (version 3 or higher): Required for building the software.</p></li>
+<li><p><strong>GNU Make</strong> or equivalent: Used for running make commands.</p></li>
+<li><p><strong>C++ Compiler</strong> (supporting C++11 standard): Necessary for compiling the source code.</p></li>
+<li><p><strong>Eigen3</strong> (version 3.1 or higher): C++ header-only library for linear algebra.</p></li>
+</ul>
+<p>Additionally, make sure that you have write access to the installation directory (<cite>$HOME/local</cite> in the example below) and that Python’s bin directory is in your system’s PATH.</p>
+</section>
+<section id="id2">
+<h2>Installation<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h2>
+<p>First, clone the repository from GitHub:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/issp-center-dev/ChiQ.git
+</pre></div>
+</div>
+<p>You also need to clone pybind11, which is linked from extern/pybind11 directory as a submodule. Type</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>submodule<span class="w"> </span>init
+git<span class="w"> </span>submodule<span class="w"> </span>update
+</pre></div>
+</div>
+<p>in the ChiQ directory. pybind11 is cloned into <code class="docutils literal notranslate"><span class="pre">extern/pybind11</span></code>.</p>
+<p>For build, make a new directory and go into it</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>ChiQ.build<span class="p">;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>ChiQ.build
+</pre></div>
+</div>
+<p>Then, execute the commands below</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cmake<span class="w"> </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>Release<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-DTesting<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>-DCMAKE_INSTALL_PREFIX<span class="o">=</span><span class="nv">$HOME</span>/local<span class="w"> </span><span class="se">\</span>
+<span class="w">      </span>../ChiQ
+</pre></div>
+</div>
+<p>to configure the build.
+If <code class="docutils literal notranslate"><span class="pre">cmake</span></code> is version 2, use <code class="docutils literal notranslate"><span class="pre">cmake3</span></code> instead.
+If Eigen3 is not found, tell CMake the path to Eigen3 by <code class="docutils literal notranslate"><span class="pre">-DEIGEN3_DIR=/path/to/eigen3</span></code>.
+For example, <code class="docutils literal notranslate"><span class="pre">$HOME/local/include/eigen3</span></code> is the path to Eigen3 headers, then add <code class="docutils literal notranslate"><span class="pre">-DEIGEN3_DIR=$HOME/local</span></code> to the above cmake command.</p>
+<p>Pybind11 may fail to detect the right python version.
+In this case, you can pass <code class="docutils literal notranslate"><span class="pre">-DPYBIND11_FINDPYTHON=ON</span></code> to the cmake command to use the new CMake FindPython instead of pybind11’s custom search.
+Or, you can pass <code class="docutils literal notranslate"><span class="pre">-DPYTHON_EXECUTABLE=/path/to/python</span></code> to the cmake command to specify the python executable.
+See <a class="reference external" href="https://pybind11.readthedocs.io/en/stable/faq.html#cmake-doesn-t-detect-the-right-python-version">pybind11 FAQ</a> for more details.</p>
+<p>After configuration, type the following to build, test, and install</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make
+make<span class="w"> </span><span class="nb">test</span><span class="w">  </span><span class="c1"># when -DTesting=ON is activated in cmake</span>
+make<span class="w"> </span>install
+</pre></div>
+</div>
+<p>Python scripts such as <code class="docutils literal notranslate"><span class="pre">chiq_main.py</span></code> are installed in <code class="docutils literal notranslate"><span class="pre">$HOME/local/bin</span></code>.
+A python package <code class="docutils literal notranslate"><span class="pre">chiq</span></code> and a shared library <code class="docutils literal notranslate"><span class="pre">bse_solver.cpython-XXX-YYY.so</span></code> (<code class="docutils literal notranslate"><span class="pre">XXX</span></code> is the python version, and <code class="docutils literal notranslate"><span class="pre">YYY</span></code> is the os info) is installed in <code class="docutils literal notranslate"><span class="pre">Home/local/lib/bse-python</span></code> (or <code class="docutils literal notranslate"><span class="pre">lib64/bse-python</span></code>).
+A configurations file <code class="docutils literal notranslate"><span class="pre">chiqvars.sh</span></code> is installed in <code class="docutils literal notranslate"><span class="pre">$HOME/local/share</span></code>, see the next section for details.</p>
+</section>
+<section id="environment-variables">
+<h2>Environment variables<a class="headerlink" href="#environment-variables" title="Link to this heading">¶</a></h2>
+<p>Before running any tests or Python scripts, you need to set up environment variables.
+Once you install the package, the configuration file <code class="docutils literal notranslate"><span class="pre">chiqvars.sh</span></code> is installed in <code class="docutils literal notranslate"><span class="pre">$HOME/local/share</span></code>.
+To set up the environment variables, type the following command in your terminal:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">source</span><span class="w"> </span><span class="nv">$HOME</span>/local/share/chiqvars.sh
+</pre></div>
+</div>
+</section>
+<section id="dependency-on-external-python-packages">
+<h2>Dependency on external python packages<a class="headerlink" href="#dependency-on-external-python-packages" title="Link to this heading">¶</a></h2>
+<p>Provided Python package and scripts depend on external Python packages. Before running the script and tests, install required packages using <code class="docutils literal notranslate"><span class="pre">pip</span></code> command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>numpy<span class="w"> </span>matplotlib<span class="w"> </span>scipy<span class="w"> </span>more-itertools
+</pre></div>
+</div>
+</section>
+<section id="test-of-python-package-scripts">
+<h2>Test of python package/scripts<a class="headerlink" href="#test-of-python-package-scripts" title="Link to this heading">¶</a></h2>
+<p>The standard <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">test</span></code> command only verifies the C++ components of the software.
+To test Python codes, which includes various scripts and packages, you should follow these additional steps after setting up the environment variables:</p>
+<p>First, install <code class="docutils literal notranslate"><span class="pre">pytest</span></code> python package via <code class="docutils literal notranslate"><span class="pre">pip</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>pytest
+</pre></div>
+</div>
+<p>Then, in the <strong>build</strong> directory, use the following command to run all Python tests. This includes any script whose name starts with <code class="docutils literal notranslate"><span class="pre">test_*.py</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>-m<span class="w"> </span>pytest
+</pre></div>
+</div>
+<p>If you prefer to run specific Python tests rather than all tests, you can specify the path to the test directory or file. For example, to run only the non-MPI tests or a specific test:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/python/non-mpi/
+python3<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>tests/python/non-mpi/bsetool_BSE/test_bsetool_BSE.py
+</pre></div>
+</div>
+<p>This targeted approach helps in debugging specific components without running the entire test suite.</p>
+</section>
+<section id="build-documentation">
+<h2>Build documentation<a class="headerlink" href="#build-documentation" title="Link to this heading">¶</a></h2>
+<p>To build the documentation, type the following command in the build directory:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>sphinx<span class="w"> </span>wild_sphinx_theme
+python3<span class="w"> </span>-m<span class="w"> </span>sphinx<span class="w"> </span>-b<span class="w"> </span>html<span class="w"> </span>../ChiQ/doc<span class="w"> </span>html
+</pre></div>
+</div>
+<p>The documentation is built in the <code class="docutils literal notranslate"><span class="pre">html</span></code> directory.
+<code class="docutils literal notranslate"><span class="pre">index.html</span></code> is the main page of the documentation.</p>
+<p>If you want to build the PDF documentation, type the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>-m<span class="w"> </span>sphinx<span class="w"> </span>-b<span class="w"> </span>latex<span class="w"> </span>../ChiQ/doc<span class="w"> </span>latex
+</pre></div>
+</div>
+<p>and then move into <code class="docutils literal notranslate"><span class="pre">latex</span></code> directory and use <code class="docutils literal notranslate"><span class="pre">make</span></code> to compile the PDF file.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>latex
+make
+</pre></div>
+</div>
+<p>The PDF file is <code class="docutils literal notranslate"><span class="pre">chiq.pdf</span></code>.</p>
+</section>
+</section>
+
+
+            <div class="clearer"></div>
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h3><a href="index.html">Table of Contents</a></h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="about.html">About ChiQ</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#id2">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#environment-variables">Environment variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dependency-on-external-python-packages">Dependency on external python packages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#test-of-python-package-scripts">Test of python package/scripts</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#build-documentation">Build documentation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tutorial.html">Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="reference.html">Reference Manual</a></li>
+<li class="toctree-l1"><a class="reference internal" href="programs.html">Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="algorithms.html">Algorithms</a></li>
+<li class="toctree-l1"><a class="reference internal" href="support.html">Support</a></li>
+</ul>
+
+  <div>
+    <h4>Previous topic</h4>
+    <p class="topless"><a href="about.html"
+                          title="previous chapter">About ChiQ</a></p>
+  </div>
+  <div>
+    <h4>Next topic</h4>
+    <p class="topless"><a href="tutorial.html"
+                          title="next chapter">Tutorial</a></p>
+  </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="Related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="tutorial.html" title="Tutorial"
+             >next</a></li>
+        <li class="right" >
+          <a href="about.html" title="About ChiQ"
+             >previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">ChiQ  documentation</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">Installation</a></li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+    &#169; Copyright 2025-, The University of Tokyo.
+    </div>
+  </body>
+</html>
