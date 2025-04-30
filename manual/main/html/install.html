@@ -78,6 +78,10 @@ git<span class="w"> </span>submodule<span class="w"> </span>update
 If <code class="docutils literal notranslate"><span class="pre">cmake</span></code> is version 2, use <code class="docutils literal notranslate"><span class="pre">cmake3</span></code> instead.
 If Eigen3 is not found, tell CMake the path to Eigen3 by <code class="docutils literal notranslate"><span class="pre">-DEIGEN3_DIR=/path/to/eigen3</span></code>.
 For example, <code class="docutils literal notranslate"><span class="pre">$HOME/local/include/eigen3</span></code> is the path to Eigen3 headers, then add <code class="docutils literal notranslate"><span class="pre">-DEIGEN3_DIR=$HOME/local</span></code> to the above cmake command.</p>
+<p>Pybind11 may fail to detect the right python version.
+In this case, you can pass <code class="docutils literal notranslate"><span class="pre">-DPYBIND11_FINDPYTHON=ON</span></code> to the cmake command to use the new CMake FindPython instead of pybind11’s custom search.
+Or, you can pass <code class="docutils literal notranslate"><span class="pre">-DPYTHON_EXECUTABLE=/path/to/python</span></code> to the cmake command to specify the python executable.
+See <a class="reference external" href="https://pybind11.readthedocs.io/en/stable/faq.html#cmake-doesn-t-detect-the-right-python-version">pybind11 FAQ</a> for more details.</p>
 <p>After configuration, type the following to build, test, and install</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make
 make<span class="w"> </span><span class="nb">test</span><span class="w">  </span><span class="c1"># when -DTesting=ON is activated in cmake</span>
