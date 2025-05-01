@@ -473,7 +473,7 @@ def main():
                 if str_list[0] == '#':
                     continue
                 # target_lists_all.append(tuple(str_list[:2]))
-                target_lists_all.append(str_list[1])
+                target_lists_all.append(str_list[0])
         # remove duplicate target
         target_lists_all = sorted(set(target_lists_all))
 
