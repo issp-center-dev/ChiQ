@@ -354,19 +354,23 @@ class h5BSE(object):
                 # list(~.keys()) to get all keys once
                 for _key in list(grp.keys()):  # 'X0_q', 'X_loc', etc
                     subgrp_key = grp[_key]
-                    if(_key != "gamma0"):
-                        for dir_w in list(subgrp_key.keys()):  # 'w0', 'w1', ...
-                            _bosonic_freq = int(dir_w.lstrip('w'))  # 'w0' -> 0
-                            subgrp_w = subgrp_key[dir_w]
-                            keyinfo = self._get_keyinfo(_key)
-                            if keyinfo[2] == "wq":
-                                for dir_q in list(subgrp_w.keys()):  # 'q_00.00.00', ...
-                                    _q = dir_q.lstrip('q_')  # 'q_00.00.00' -> '00.00.00'
-                                    key_list.append((_key, _bosonic_freq, _q))
-                            else:
-                                key_list.append((_key, _bosonic_freq))
-                    else:
+                    if _key == "gamma0":
                         key_list.append((_key,))
+                        continue
+
+                    w_list = list(subgrp_key.keys()) # 'w0', 'w1', ...
+                    ws = [int(w.lstrip('w')) for w in w_list]
+                    ws.sort()
+                    for _bosonic_freq in ws:
+                        dir_w = f"w{_bosonic_freq}"
+                        subgrp_w = subgrp_key[dir_w]
+                        keyinfo = self._get_keyinfo(_key)
+                        if keyinfo[2] == "wq":
+                            for dir_q in list(subgrp_w.keys()):  # 'q_00.00.00', ...
+                                _q = dir_q.lstrip('q_')  # 'q_00.00.00' -> '00.00.00'
+                                key_list.append((_key, _bosonic_freq, _q))
+                        else:
+                            key_list.append((_key, _bosonic_freq))
         return(key_list)
 
     def _get_info(self, key):
