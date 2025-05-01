@@ -5,11 +5,11 @@ plot_chiq_path
 
 .. code-block:: bash
 
-    plot_chiq_path.py [-h] [-d] [--mode {chi,chi0,rpa,scl,rrpa,Iq}]
+    plot_chiq_path.py [-h] [-d] [--mode {chi,chi0,rpa,scl,rrpa,Iq}] [-w W]
                       [--data_out DATA_OUT] [--format FORMAT]
                       [--label LABEL] [--label-fontsize FONT_SIZE]
-                      [--subfigures SUBFIGURES] [--ymin YMIN] [--ymax YMAX]
-                      [--sharey]
+                      [--subfigures SUBFIGURES]
+                      [--ymin YMIN] [--ymax YMAX] [--sharey]
                       file_qpath file_eigen
 
 Description
@@ -37,6 +37,9 @@ Options
 
 **--mode {chi,chi0,rpa,scl,rrpa,Iq}**
     Specify the mode for plotting. Default is ``chi``.
+
+**-w, --wb**
+    Specify the bosonic frequency to be plotted. Default is 0.
 
 **--data_out DATA_OUT**
     Specify the filename to export numerical data for the plot.
