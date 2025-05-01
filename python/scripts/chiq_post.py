@@ -35,18 +35,11 @@ class bse_post_base(object):
 
     def _output_header(self):
         # Make output file
-        for key, name in list(self.output_file_list_for_bsetool.items()):
+        for key, name in self.output_file_list_for_bsetool.items():
             self.outputfile[key] = open(name, "w")
             self.outputfile[key].write("#Temperature: {} \n".format(str(1.0 / self.beta)))
             self.last_omega[key] = 0
             print(f"    Save to '{name}'")
-
-    # def _output_eigen_value(self, outputfile, omegalabel, qlabel, outputdata):
-    #     strOutputLine = "{} {}".format(str(omegalabel), str(qlabel)) if qlabel is not None else "{}".format(str(omegalabel))
-    #     outputdata_sort = np.sort(outputdata)[::-1]
-    #     for _data in outputdata_sort:
-    #         strOutputLine += " {}".format(str(np.real(_data)))
-    #     outputfile.write("{}\n".format(strOutputLine))
 
     def _set_datalist(self):
         # Get Data List
@@ -430,9 +423,6 @@ def main():
                 if "chi_loc" in chi_post.solver_post.output_file_list_for_bsetool:
                     for _X0LocInfo in chi_post.solver_post.datalist["chi_loc"]:
                         omega = int(_X0LocInfo[1])
-                        # if flag_calc_all == False:
-                        #     if chiq_main.get_calc_flg(omega, target_lists_all) == False:
-                        #         continue
                         if omega >= num_wb:
                             continue
 
@@ -450,10 +440,10 @@ def main():
                 q = _X0qInfo[2]
                 if omega >= num_wb:
                     continue
-                if flag_calc_all is False:
+                if not flag_calc_all:
                     # if chiq_main.get_calc_flg(omega, target_lists_all) == False:
                     #     continue
-                    if chiq_main.get_calc_flg(q, target_lists_all, target="q") == False:
+                    if not chiq_main.get_calc_flg(q, target_lists_all):
                         continue
 
                 header_type = chi_post.solver_post.header_type

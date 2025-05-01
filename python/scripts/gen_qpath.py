@@ -24,7 +24,6 @@ class GenQPath:
         self.L = None
         self.bvec = np.identity(3, dtype=float)
         self.qpoints = None
-        self.wlist = None
 
     def set_L_from_config(self, _filein_config):
         """Set L (system size) from config file"""
@@ -129,14 +128,11 @@ class GenQPath:
         for q in self.qpoints:
             print("", q['int'], q['name'])
 
-    def set_wlist(self, _wlist):
-        self.wlist = _wlist
-
     def gen_qpath(self, _fileout):
         """Generate q-path. This function should be called after all member variables are set"""
 
         # check if necessary quantities have been set
-        for var in ['L', 'bvec', 'qpoints', 'wlist']:
+        for var in ['L', 'bvec', 'qpoints']:
             if self.__dict__[var] is None:
                 raise ValueError("'%s' has not been set" % var)
 
@@ -146,12 +142,6 @@ class GenQPath:
             q_reg = [regularize(q[i], self.L[i]) for i in range(3)]
             return "%02d.%02d.%02d" %(q_reg[0],q_reg[1],q_reg[2])
 
-        # output q-points
-        # with open(fileout_qpoints, 'w') as f:
-        #     for q in qpoints:
-        #         print >>f, qvec2str(q['int']), q['name']
-        # print "File '%s' generated" %fileout_qpoints
-
         def on_lattice(q_frac):
             for i in range(3):
                 if q_frac[i].denominator != 1:
@@ -160,36 +150,35 @@ class GenQPath:
 
         # output q-path
         with open(_fileout, 'w') as f:
-            for w in self.wlist:
-                # the first point
-                q0 = self.qpoints[0]
-                x = 0
-                q0['x'] = x
-                print("%s %s %9.5f" % (w, qvec2str(q0['int']), x), q0['name'], file=f)
+            # the first point
+            q0 = self.qpoints[0]
+            x = 0
+            q0['x'] = x
+            print("%s %9.5f" % (qvec2str(q0['int']), x), q0['name'], file=f)
 
-                # after the second point
-                for q in self.qpoints[1:]:
-                    dif = q['int'] - q0['int']
-                    div = max( abs(dif[0]), abs(dif[1]), abs(dif[2]) )
-                    dq = np.array([Fraction(dif[0],div), Fraction(dif[1],div), Fraction(dif[2],div)])
+            # after the second point
+            for q in self.qpoints[1:]:
+                dif = q['int'] - q0['int']
+                div = max( abs(dif[0]), abs(dif[1]), abs(dif[2]) )
+                dq = np.array([Fraction(dif[0],div), Fraction(dif[1],div), Fraction(dif[2],div)])
 
-                    # compute distance in cartesian coordinate
-                    dq_float = q['float'] - q0['float']
-                    dq_cart = np.dot(self.bvec, dq_float)  # from primitive to cartesian
-                    dx = np.linalg.norm(dq_cart) / div
+                # compute distance in cartesian coordinate
+                dq_float = q['float'] - q0['float']
+                dq_cart = np.dot(self.bvec, dq_float)  # from primitive to cartesian
+                dx = np.linalg.norm(dq_cart) / div
 
-                    qint = q0['int']
-                    for n in range(div-1):
-                        qint = qint + dq
-                        x += dx
-                        if on_lattice(qint):
-                            qvec = [qint[0].numerator, qint[1].numerator, qint[2].numerator]
-                            print("%s %s %9.5f" %(w, qvec2str(qvec), x), file=f)
-
+                qint = q0['int']
+                for n in range(div-1):
+                    qint = qint + dq
                     x += dx
-                    q['x'] = x
-                    print("%s %s %9.5f" %(w, qvec2str(q['int']), x), q['name'], file=f)
-                    q0 = q
+                    if on_lattice(qint):
+                        qvec = [qint[0].numerator, qint[1].numerator, qint[2].numerator]
+                        print("%s %9.5f" %(qvec2str(qvec), x), file=f)
+
+                x += dx
+                q['x'] = x
+                print("%s %9.5f" %(qvec2str(q['int']), x), q['name'], file=f)
+                q0 = q
 
         print("\nFile '%s' generated" %_fileout)
 
@@ -220,7 +209,6 @@ def main():
         Q.set_bvec_from_config(args.file_param)
 
     Q.set_qpoints(args.file_qpoints)
-    Q.set_wlist([0,])
     Q.gen_qpath(args.outfile)
 
 

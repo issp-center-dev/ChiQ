@@ -76,9 +76,16 @@ class ChiQEigenPath(object):
         with open(_file_qpath, "r") as f:
             for line in f:
                 array = line.split()
-                q = array[1]
-                x = float(array[2])
-                label = array[3] if len(array) >= 4 else ""
+
+                q = array[0]
+                ql = q.split(".")
+                if len(ql) != 3:
+                    raise Exception(f"ERROR: q={q} is not a valid q-point.")
+                if not all(map(lambda x: x.isdigit(), ql)):
+                    raise Exception(f"ERROR: q={q} is not a valid q-point.")
+
+                x = float(array[1])
+                label = array[2] if len(array) >= 3 else ""
                 # print array
                 self.__q_list.append(q)
                 self.__x_list.append(x)
