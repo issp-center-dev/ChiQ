@@ -311,8 +311,8 @@ class chi_base(object):
     #             datalist[datatype].append(key)
     #     return datalist
 
-    def _set_datalist(self):
         # Get Data List
+    def _set_datalist(self):
         datalist = {}
         keys = self.h5_in.get_keylist_data(input_output='input')
         if self.read_h5out_for_input:
@@ -429,6 +429,9 @@ def main():
     file_out = dict_common["output"]
     type_list = dict_common["type"]
     path_to_target_list  = dict_common["omega_q"]
+    num_wb = dict_common["num_wb"]
+    if num_wb < 0:
+        num_wb = sys.maxsize
     work_dir = dict_tool["work_dir"]
     n_iw = dict_tool["num_wf"]
 
@@ -541,11 +544,13 @@ def main():
         #     # _X0LocInfo = ('X0_loc', omega)
         #     omega = int(_X0LocInfo[1])
         for omega in sorted(omega_set):
+            if omega >= num_wb:
+                continue
             logger.info("  omega = {}".format(str(omega)))
 
-            if flag_calc_all == False :
-                if get_calc_flg(omega, target_lists) == False:
-                    continue
+            # if flag_calc_all == False :
+            #     if get_calc_flg(omega, target_lists) == False:
+            #         continue
 
             # BSE solver
             solver = bse_solver.BSESolver(chi_worker.beta, matinfo_A, matinfo_B, matinfo_C)

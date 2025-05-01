@@ -26,6 +26,7 @@ class bse_post_base(object):
         self.beta = self.h5.get("beta")
         self.output_file_list_for_bsetool = {}
         self.outputfile = {}
+        self.last_omega = {}
         self._output_header()
         # self._set_data_info()
         self.datalist = self._set_datalist()  # dict
@@ -37,6 +38,7 @@ class bse_post_base(object):
         for key, name in list(self.output_file_list_for_bsetool.items()):
             self.outputfile[key] = open(name, "w")
             self.outputfile[key].write("#Temperature: {} \n".format(str(1.0 / self.beta)))
+            self.last_omega[key] = 0
             print(f"    Save to '{name}'")
 
     # def _output_eigen_value(self, outputfile, omegalabel, qlabel, outputdata):
@@ -185,6 +187,11 @@ class chipost_base(object):
             SuscepList = self.data.reshape(-1)
             self._output_suscep(self.solver_post.outputfile[header], omega, q, SuscepList)
 
+    def _output_spacer(self, omega, header):
+        if omega > self.solver_post.last_omega[header]:
+            self.solver_post.outputfile[header].write(f"\n")
+            self.solver_post.last_omega[header] = omega
+
     def save_vec(self, header, q):
         pass
 
@@ -239,6 +246,7 @@ class chipost_eigen(chipost_base):
 
     def post(self, omega, q, data, header):
         super(chipost_eigen, self).post(omega, q, data)
+        self._output_spacer(omega, header)
         self.EigenValue, self.EigenVector = np.linalg.eigh(self.data)
         IndexList = self._calcIndexList()
         self._output_eigen_value_with_label(self.solver_post.outputfile[header], omega, q,
@@ -306,6 +314,7 @@ class chipost_linear_combination(chipost_base):
 
     def post(self, omega, q, data, header):
         super(chipost_linear_combination, self).post(omega, q, data)
+        self._output_spacer(omega, header)
 
         # compute susceptibilities and get a real 1d-array
         SuscepList = self._calc_suscep()
@@ -346,6 +355,10 @@ def main():
     file_out = dict_common["output"]
     type_list = dict_common["type"]
     path_to_target_list = dict_common["omega_q"]
+    num_wb = dict_common["num_wb"]
+    if num_wb < 0:
+        num_wb = sys.maxsize
+
     OutputVectorFlag = dict_post["vector"]
     order = dict_post["order"]
     order_file = dict_post["order_file"]
@@ -417,15 +430,17 @@ def main():
                 if "chi_loc" in chi_post.solver_post.output_file_list_for_bsetool:
                     for _X0LocInfo in chi_post.solver_post.datalist["chi_loc"]:
                         omega = int(_X0LocInfo[1])
-                        if flag_calc_all == False:
-                            if chiq_main.get_calc_flg(omega, target_lists_all) == False:
-                                continue
+                        # if flag_calc_all == False:
+                        #     if chiq_main.get_calc_flg(omega, target_lists_all) == False:
+                        #         continue
+                        if omega >= num_wb:
+                            continue
 
                         tmp_chi_loc = chi_post.get_matrix(("chi_loc", omega))
                         if tmp_chi_loc != False:
                             chi_post.post(omega, None, tmp_chi_loc, "chi_loc")
                             done_chi_loc = True
-                            if OutputVectorFlag:
+                            if OutputVectorFlag and omega == 0:
                                 chi_post.save_vec("chi_loc", None)
 
             # for _X0qInfo in chi_post.solver_post.datalist["chi0_q"]:
@@ -433,9 +448,11 @@ def main():
                 # Calculate chi_q_eigen
                 omega = _X0qInfo[1]
                 q = _X0qInfo[2]
+                if omega >= num_wb:
+                    continue
                 if flag_calc_all is False:
-                    if chiq_main.get_calc_flg(omega, target_lists_all) == False:
-                        continue
+                    # if chiq_main.get_calc_flg(omega, target_lists_all) == False:
+                    #     continue
                     if chiq_main.get_calc_flg(q, target_lists_all, target="q") == False:
                         continue
 

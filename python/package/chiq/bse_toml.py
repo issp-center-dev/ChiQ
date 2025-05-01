@@ -36,6 +36,7 @@ def load_params_from_toml(file_name, print_summary=True):
     dict_common["output"] = params.pop("output", "dmft_bse.out.h5")
     dict_common["type"] = params.pop("type", ["bse"])
     dict_common["omega_q"] = params.pop("omega_q", None)
+    dict_common["num_wb"] = params.pop("num_wb", -1)
     _check_if_dict_empty(params, block="chiq_common")
 
     #set tool parameters
