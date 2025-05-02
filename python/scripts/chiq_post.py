@@ -347,7 +347,7 @@ def main():
     file_in = dict_common["input"]
     file_out = dict_common["output"]
     type_list = dict_common["type"]
-    path_to_target_list = dict_common["omega_q"]
+    path_to_target_list = dict_common["q_points"]
     num_wb = dict_common["num_wb"]
     if num_wb < 0:
         num_wb = sys.maxsize
