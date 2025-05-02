@@ -130,7 +130,7 @@ An example is shown below.
 input = "dmft_bse.h5"
 output = "dmft_bse.out.h5"
 type = ['chi0', 'bse', 'rpa', 'rrpa']  # 'chi0', 'bse', 'scl', 'rpa', 'rrpa'
-omega_q = "q_path.dat"
+q_points = "q_path.dat"
 
 [chiq_main]
 work_dir = "work/chiq_main"
