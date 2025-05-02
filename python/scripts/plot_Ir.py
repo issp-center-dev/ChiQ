@@ -126,7 +126,7 @@ def main():
     P.add_argument("--xmax", default=5, type=float, help="Right bound of x axis")
     P.add_argument("--ymin", default=None, type=float, help="Upper bound of y axis")
     P.add_argument("--ymax", default=None, type=float, help="Lower bound of y axis")
-    P.add_argument("-w", default=0, type=int, help="bosonic frequency")
+    P.add_argument("-w", "--wb", default=0, type=int, help="bosonic frequency")
     P.add_argument(
         "--sharey",
         action="store_true",

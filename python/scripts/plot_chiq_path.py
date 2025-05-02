@@ -72,6 +72,7 @@ def main():
         action="store_true",
         help="share y-axis (all figures have the same y range)",
     )
+    P.add_argument("-w", "--wb", default=0, type=int, help="Index of Matsubara frequency to be plotted")
     args = P.parse_args()
 
     print("\nRunning", os.path.basename(__file__))
@@ -79,7 +80,7 @@ def main():
 
     # --------------------------------------------------------------------------
     # get data to plot
-    E = ChiQEigenPath(args.file_qpath)
+    E = ChiQEigenPath(args.file_qpath, wb=args.wb)
     xarray = E.get_x()
     yarray = E.get_y_on_path(args.file_eigen)
 

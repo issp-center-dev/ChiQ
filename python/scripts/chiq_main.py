@@ -17,7 +17,7 @@ from chiq.mpi import COMM_WORLD as comm
 import bse_solver  # shared library implemented with C++
 
 
-def get_calc_flg(w_or_q, target_lists, target="w"):
+def get_calc_flg(q, target_lists):
     """Return True if w_or_q is included in target_lists
 
     Args:
@@ -28,9 +28,8 @@ def get_calc_flg(w_or_q, target_lists, target="w"):
     Returns:
         bool:
     """
-    index = {"w": 0, "q": 1}[target]
     for _targetomega in target_lists:
-        if _targetomega[index] == str(w_or_q):
+        if _targetomega[0] == q:
             return True
     return False
 
@@ -311,8 +310,8 @@ class chi_base(object):
     #             datalist[datatype].append(key)
     #     return datalist
 
-    def _set_datalist(self):
         # Get Data List
+    def _set_datalist(self):
         datalist = {}
         keys = self.h5_in.get_keylist_data(input_output='input')
         if self.read_h5out_for_input:
@@ -428,7 +427,10 @@ def main():
     file_in = dict_common["input"]
     file_out = dict_common["output"]
     type_list = dict_common["type"]
-    path_to_target_list  = dict_common["omega_q"]
+    path_to_target_list  = dict_common["q_points"]
+    num_wb = dict_common["num_wb"]
+    if num_wb < 0:
+        num_wb = sys.maxsize
     work_dir = dict_tool["work_dir"]
     n_iw = dict_tool["num_wf"]
 
@@ -470,7 +472,8 @@ def main():
                     continue
                 if str_list[0] == '#':
                     continue
-                target_lists_all.append(tuple(str_list[:2]))
+                # target_lists_all.append(tuple(str_list[:2]))
+                target_lists_all.append(str_list[0])
         # remove duplicate target
         target_lists_all = sorted(set(target_lists_all))
 
@@ -481,9 +484,6 @@ def main():
     fmt = "%(asctime)s %(levelname)s %(name)s :%(message)s"
     # logging.basicConfig(level=logging.DEBUG, format=fmt)
     logging.basicConfig(level=logging.INFO, filename="chiq_main_{}.log".format(rank), format=fmt, filemode='w')
-
-    # omega list
-    omega_list = sorted(set([w for w, _ in target_lists_all]))
 
     # debug
     # if rank == 0:
@@ -541,11 +541,9 @@ def main():
         #     # _X0LocInfo = ('X0_loc', omega)
         #     omega = int(_X0LocInfo[1])
         for omega in sorted(omega_set):
+            if omega >= num_wb:
+                continue
             logger.info("  omega = {}".format(str(omega)))
-
-            if flag_calc_all == False :
-                if get_calc_flg(omega, target_lists) == False:
-                    continue
 
             # BSE solver
             solver = bse_solver.BSESolver(chi_worker.beta, matinfo_A, matinfo_B, matinfo_C)
@@ -567,9 +565,8 @@ def main():
                     continue
                 q = _X0qInfo[2]
                 #Skip if q is not selected
-                if flag_calc_all == False :
-                    if get_calc_flg(q, target_lists, target = "q") == False:
-                        continue
+                if q not in target_lists:
+                    continue
                 logger.info("      q = {}".format(q))
 
                 # Set X0_q or chi0_q

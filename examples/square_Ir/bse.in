@@ -2,7 +2,7 @@
 input = "dmft_bse.h5"
 output = "dmft_bse.out.h5"
 type = ["chi0", "bse"]  # "chi0", "bse", "scl", "rpa", "rrpa"
-omega_q = "q_fbz.dat"
+q_points = "q_fbz.dat"
 
 [chiq_main]
 work_dir = "work/chiq"

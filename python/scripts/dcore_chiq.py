@@ -432,7 +432,8 @@ class DMFTBSESolver(DMFTCoreSolver):
             q_points = []
             with open(self._params['bse']['X0q_qpoints_saved'], 'r') as f:
                 for line in f:
-                    q_str = line.split()[1]
+                    # q_str = line.split()[1]
+                    q_str = line.split()[0]
                     q_points.append(tuple(map(int, q_str.split('.'))))
             params['X0q_qpoints_saved'] = q_points
         params["h5_compression"] = self._params["bse"]["h5_compression"]

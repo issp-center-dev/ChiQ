@@ -18,10 +18,9 @@ class GenQfbz(GenQPath):
 
         # output all q
         with open(_fileout, 'w') as f:
-            for w in self.wlist:
-                for qx, qy, qz in product(list(range(self.L[0])), list(range(self.L[1])), list(range(self.L[2]))):
-                    qvec = [qx, qy, qz]
-                    print("%s %s" % (w, qvec2str(qvec)), file=f)
+            for qx, qy, qz in product(list(range(self.L[0])), list(range(self.L[1])), list(range(self.L[2]))):
+                qvec = [qx, qy, qz]
+                print("%s" % (qvec2str(qvec)), file=f)
 
         print("\nFile '%s' generated." %_fileout)
 
@@ -44,7 +43,6 @@ def main():
     else:
         Q.set_L_from_config(args.file_param)  # read config file
 
-    Q.set_wlist([0,])
     Q.gen_fbz(args.outfile)
 
 
