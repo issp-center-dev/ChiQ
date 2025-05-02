@@ -87,7 +87,7 @@ The following is :ref:`the input file of ChiQ bse.in <reference_bse_in>`:
 The ``input`` keyword specifies the HDF5 file including the Green's functions, which is the output file of ``dcore_chiq.py``.
 The ``output`` keyword specifies the HDF5 file to store the results of BSE calculation (e.g., the susceptibility).
 The ``type`` keyword specifies the approximation method in calculating the susceptibility.
-The ``omega_q`` keyword specifies the q-path file.
+The ``q_points`` keyword specifies the q-path file.
 
 The BSE calculation is performed by :ref:`chiq_main.py <program_chiq_main>`.
 The following command calculates the susceptibility :math:`\chi_{ijkl}(\boldsymbol{q}, i\Omega_m)` and writes the result to :ref:`the file dmft_bse.out.h5 <reference_hdf5_output>` :

@@ -17,7 +17,7 @@ Below is a template of the input file.
     input = "dmft_bse.h5"
     output = "dmft_bse.out.h5"
     type = ["chi0", "bse", "rpa", "rrpa"]  # "chi0", "bse", "scl", "rpa", "rrpa"
-    omega_q = "q_path.dat"
+    q_points = "q_path.dat"
 
     [chiq_main]
     work_dir = "work/chiq"
@@ -48,7 +48,7 @@ The ``[chiq_common]`` section contains general settings that apply to both progr
    "input", "string", ``"dmft_bse.h5"``, "Filename that contain input data in HDF5 format."
    "output", "string", ``"dmft_bse.out.h5"``, "Filename to store output data in HDF5 format. This can be the same as parameter ``input``."
    "type", "list", "``[""bse""]``", "List of calculation schemes. Specify one or more from ``""chi0"", ""bse"", ""scl"", ""rpa"", ""rrpa""``."
-   "omega_q", "string", "Not specified", "Filename storing the omega-q list to be computed. If not specified, omega-q list are generated from X0(q) in the input HDF5 file."
+   "q_points", "string", "Not specified", "Filename storing the omega-q list to be computed. If not specified, omega-q list are generated from X0(q) in the input HDF5 file."
 
 
 [chiq_main] section

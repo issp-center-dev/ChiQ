@@ -48,7 +48,7 @@ The input file of ChiQ tools, ``bse.in``, is also the same as in the previous tu
 .. literalinclude:: ../../examples/square_Ir/bse.in
   :language: toml
 
-The only difference is that the ``q_fbz.dat`` file is used instead of ``q_path.dat`` in ``omega_q`` parameter in the ``[chiq_common]`` section.
+The only difference is that the ``q_fbz.dat`` file is used instead of ``q_path.dat`` in ``q_points`` parameter in the ``[chiq_common]`` section.
 
 
 Calculation of intersite interactions :math:`I(q)` and :math:`I(r)`
