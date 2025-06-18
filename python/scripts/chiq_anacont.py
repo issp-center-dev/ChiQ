@@ -5,13 +5,9 @@ import sys
 import logging
 
 import numpy as np
-from more_itertools import divide
 
 from chiq import __version__ as version
 from chiq.pade import Pade
-# from chiq import bse_toml
-
-# from chiq.mpi import comm
 
 
 def read_qw(chi_q_file):
@@ -73,9 +69,6 @@ def read_chi_qw(chi_q_file):
 def main():
     import argparse
 
-    # rank = comm.Get_rank()
-    # size = comm.Get_size()
-
     parser = argparse.ArgumentParser(
         description='Analytic continuation of chi.',
         add_help=True,
@@ -84,49 +77,35 @@ def main():
     parser.add_argument('chi_q', type=str, help='Chi(w,q) file')
     _version_message = f'ChiQ version {version}'
     parser.add_argument('--version', action='version', version=_version_message)
+    parser.add_argument('--wmax', type=float, default=10.0, help='Maximum frequency')
+    parser.add_argument('--wmin', type=float, default=0.0, help='Minimum frequency')
+    parser.add_argument('--wnum', type=int, default=101, help='Number of frequencies')
+    parser.add_argument('--eta', type=float, default=1e-5, help='Imaginary shift')
 
     args = parser.parse_args()
 
-    # ws = np.linspace(0, 10, 101)
-    ws = np.array([0.5])
-    eta = 1e-5
-
-    # logger = logging.getLogger("bse")
-    # fmt = "%(asctime)s %(levelname)s %(name)s :%(message)s"
-    # # logging.basicConfig(level=logging.DEBUG, format=fmt)
-    # logging.basicConfig(level=logging.INFO, filename="chiq_anacont_{}.log".format(rank), format=fmt, filemode='w')
+    ws = np.linspace(args.wmin, args.wmax, args.wnum)
+    eta = args.eta
 
     chi_qw, omegas, T = read_chi_qw(args.chi_q)
     iwns = (np.pi * T * 1j) * np.array(omegas, dtype=np.complex128)
-    iwns_fit = iwns
-    # iwns_fit = np.linspace(0, iwns[-1], 101)
     for q in chi_qw:
         chi_iw = chi_qw[q]
+        # with open(f"chiq_iw_{q}.dat", "w") as file:
+        #     for iomega, omega in enumerate(iwns):
+        #         file.write(f"{np.imag(omega)}")
+        #         file.write(f" {np.real(chi_iw[0, iomega])}")
+        #         file.write(f" {np.imag(chi_iw[0, iomega])}")
+        #         file.write("\n")
+
         pade = Pade(iwns, chi_iw[0, :])
-        chi_iw_fit = pade.evaluate(iwns_fit)
         chi_w = pade.evaluate(ws + eta * 1j)
-
-        with open(f"chiq_iw_{q}.dat", "w") as file:
-            for iomega, omega in enumerate(iwns):
-                file.write(f"{np.imag(omega)}")
-                file.write(f" {np.real(chi_iw[0, iomega])}")
-                file.write(f" {np.imag(chi_iw[0, iomega])}")
-                file.write("\n")
-
-        with open(f"chiq_iw_fit_{q}.dat", "w") as file:
-            for iomega, omega in enumerate(iwns_fit):
-                file.write(f"{np.imag(omega)}")
-                file.write(f" {np.real(chi_iw_fit[iomega])}")
-                file.write(f" {np.imag(chi_iw_fit[iomega])}")
-                file.write("\n")
-
         with open(f"chiq_w_{q}.dat", "w") as file:
             for iomega, omega in enumerate(ws):
                 file.write(f"{omega}")
                 file.write(f" {np.real(chi_w[iomega])}")
                 file.write(f" {np.imag(chi_w[iomega])}")
                 file.write("\n")
-
 
 
 if __name__ == "__main__":

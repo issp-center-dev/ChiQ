@@ -46,8 +46,8 @@ class Pade:
         self.z = copy.copy(z)
         
         # Calculate coefficients
-        a = copy.copy(u)
-        self.re_shift = np.min(np.real(a)) + 1.0
+        a = np.array(u, dtype=np.complex128)
+        self.re_shift = 1.0 - np.min(np.real(a))
         a += self.re_shift
 
         if self._debug:
