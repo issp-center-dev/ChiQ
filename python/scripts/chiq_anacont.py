@@ -91,20 +91,18 @@ def main():
     iwns = (np.pi * T * 1j) * np.array(omegas, dtype=np.complex128)
     for q in chi_qw:
         chi_iw = chi_qw[q]
-        # with open(f"chiq_iw_{q}.dat", "w") as file:
-        #     for iomega, omega in enumerate(iwns):
-        #         file.write(f"{np.imag(omega)}")
-        #         file.write(f" {np.real(chi_iw[0, iomega])}")
-        #         file.write(f" {np.imag(chi_iw[0, iomega])}")
-        #         file.write("\n")
+        nelem = chi_iw.shape[0]
+        chi_w = np.zeros((nelem, len(ws)), dtype=np.complex128)
+        for ielem in range(nelem):
+            pade = Pade(iwns, chi_iw[ielem, :])
+            chi_w[ielem, :] = pade.evaluate(ws + eta * 1j)
 
-        pade = Pade(iwns, chi_iw[0, :])
-        chi_w = pade.evaluate(ws + eta * 1j)
         with open(f"chiq_w_{q}.dat", "w") as file:
             for iomega, omega in enumerate(ws):
                 file.write(f"{omega}")
-                file.write(f" {np.real(chi_w[iomega])}")
-                file.write(f" {np.imag(chi_w[iomega])}")
+                for ielem in range(nelem):
+                    file.write(f" {np.real(chi_w[ielem, iomega])}")
+                    file.write(f" {np.imag(chi_w[ielem, iomega])}")
                 file.write("\n")
 
 

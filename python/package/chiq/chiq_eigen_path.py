@@ -2,6 +2,7 @@ import numpy as np
 from collections import defaultdict
 import sys
 
+from .eigen_path import EigenPath
 
 def _str2latex(str):
     greek = ['Gamma', 'Sigma', 'Delta', 'Lambda']
@@ -52,7 +53,7 @@ def _load_eigen_dup(_file_eigen, wb=0):
     return suscep_dup
 
 
-class ChiQEigenPath(object):
+class ChiQEigenPath(EigenPath):
     """
     Generate list of (x,y) coodinates to be plotted
 
@@ -64,43 +65,9 @@ class ChiQEigenPath(object):
     """
 
     def __init__(self, _file_qpath, wb=0):
-        self.__set_qlabels(_file_qpath)
+        super().__init__(_file_qpath)
         self.wb = wb
 
-    def __set_qlabels(self, _file_qpath):
-        """Read q-points on the path"""
-
-        self.__qlabels = []  # __qlabels[i] = (x, name)
-        self.__q_list = []  # __q_list[i] = q
-        self.__x_list = []
-        with open(_file_qpath, "r") as f:
-            for line in f:
-                array = line.split()
-
-                q = array[0]
-                ql = q.split(".")
-                if len(ql) != 3:
-                    raise Exception(f"ERROR: q={q} is not a valid q-point.")
-                if not all(map(lambda x: x.isdigit(), ql)):
-                    raise Exception(f"ERROR: q={q} is not a valid q-point.")
-
-                x = float(array[1])
-                label = array[2] if len(array) >= 3 else ""
-                # print array
-                self.__q_list.append(q)
-                self.__x_list.append(x)
-                if label:  # pick up q-point having label
-                    self.__qlabels.append((float(x), label))
-        print("qlabels =", self.__qlabels)
-
-    def get_x(self):
-        """
-        Get array of x coordinate for plot
-
-        Return
-            x: np.ndarray(n_q)
-        """
-        return np.array(self.__x_list, dtype=float)
 
     def get_y_on_path(self, _file_eigen):
         """
@@ -142,18 +109,3 @@ class ChiQEigenPath(object):
         eigen_array = np.array(eigen_list, dtype=float)
         x_array = np.array(x_list, dtype=float)
         return np.hstack([x_array[:, None], eigen_array])
-
-    def get_xticks(self, latex=False):
-        """
-        Get lists x positions and names
-
-        Return
-            x_ticks: list(float)
-            x_labels: list(str)
-        """
-
-        # list of position/name of high-symmetry points
-        x_ticks = [x for x, _ in self.__qlabels]
-        x_labels = [_str2latex(label) if latex else label for _, label in self.__qlabels]
-
-        return x_ticks, x_labels
