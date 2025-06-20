@@ -206,12 +206,9 @@ class chipost_base(object):
         if qlabel is not None:
             strOutputLine += " " + str(qlabel)
 
-        if outputdata.dtype == float:
+        if outputdata.dtype == float or outputdata.dtype == complex:
             for suscep in outputdata:
-                strOutputLine += " " + str(suscep)
-        elif outputdata.dtype == complex:
-            for suscep in outputdata:
-                strOutputLine += " " + str(suscep.real) + " " + str(suscep.imag)
+                strOutputLine += " " + str(np.real(suscep)) + " " + str(np.imag(suscep))
         else:
             raise TypeError(f"outputdata.dtype={outputdata.dtype} is not supported. Only float or complex is supported.")
 
@@ -258,7 +255,7 @@ class chipost_eigen(chipost_base):
         strOutputLine = "{} {}".format(str(omegalabel), str(qlabel)) if qlabel is not None else "{}".format(
             str(omegalabel))
         for index in indexList:
-            strOutputLine += " " + str(np.real(outputdata[index]))
+            strOutputLine += " " + str(np.real(outputdata[index])) + " " + str(np.imag(outputdata[index]))
         outputfile.write(strOutputLine + "\n")
 
     def _calcIndexList(self):
@@ -320,15 +317,16 @@ class chipost_linear_combination(chipost_base):
         SuscepMatrix = self.WeightVector.conjugate().T @ self.data @ self.WeightVector
         SuscepList = np.diagonal(SuscepMatrix)
 
-        # check if susceptibilities are real
-        def isreal(array):
-            return np.allclose(np.imag(array), np.zeros(array.shape))
+        # # check if susceptibilities are real
+        # def isreal(array):
+        #     return np.allclose(np.imag(array), np.zeros(array.shape))
 
-        if not isreal(SuscepList):
-            # TODO: warning or error
-            print(f"Warning: Susceptibilities are not real. Imagnary part (maximum absolute value {np.abs(np.imag(SuscepList)).max():.1e}) is neglected.", file=sys.stderr)
+        # if not isreal(SuscepList):
+        #     # TODO: warning or error
+        #     print(f"Warning: Susceptibilities are not real. Imagnary part (maximum absolute value {np.abs(np.imag(SuscepList)).max():.1e}) is neglected.", file=sys.stderr)
 
-        return np.real(SuscepList)
+        # return np.real(SuscepList)
+        return SuscepList
 
 # ============================================================================
 

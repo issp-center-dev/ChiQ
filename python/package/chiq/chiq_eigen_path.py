@@ -30,7 +30,9 @@ def _load_eigen(_file_eigen, wb=0):
             q = array[1]
             if q in suscep:
                 raise Exception(f"ERROR: duplicate key q={q}")
-            suscep[q] = np.array(array[2:], dtype=float)
+            nelem = (len(array) - 2) // 2
+            # consider only real part
+            suscep[q] = np.array([array[2*i+2] for i in range(nelem)], dtype=float)
     return suscep
 
 
@@ -49,7 +51,9 @@ def _load_eigen_dup(_file_eigen, wb=0):
             if w != wb:
                 continue
             q = array[1]
-            suscep_dup[q].append(np.array(array[2:], dtype=float))
+            nelem = (len(array) - 2) // 2
+            # consider only real part
+            suscep_dup[q].append(np.array([array[2*i+2] for i in range(nelem)], dtype=float))
     return suscep_dup
 
 
