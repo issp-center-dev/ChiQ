@@ -4,6 +4,7 @@ import numpy as np
 
 from chiq import __version__ as version
 from chiq.pade import Pade
+from chiq.spm import SpM
 
 
 def read_qw(chi_q_file):
@@ -113,10 +114,32 @@ def main():
     parser.add_argument("chi_q", type=str, help="Chi(w,q) file")
     _version_message = f"ChiQ version {version}"
     parser.add_argument("--version", action="version", version=_version_message)
+
     parser.add_argument("--wmax", type=float, default=10.0, help="Maximum frequency")
     parser.add_argument("--wmin", type=float, default=0.0, help="Minimum frequency")
     parser.add_argument("--wnum", type=int, default=101, help="Number of frequencies")
+
+    parser.add_argument(
+        "--method",
+        type=str,
+        default="pade",
+        choices=["pade", "spm"],
+        help="Method to use for analytic continuation",
+    )
+
+    # for pade
     parser.add_argument("--eta", type=float, default=1e-5, help="Imaginary shift")
+
+    # for SpM
+    parser.add_argument(
+        "--loglambda", type=float, default=0.0, help="Log10 of L1 coefficient"
+    )
+    parser.add_argument(
+        "--maxiter", type=int, default=1000, help="Maximum number of iterations"
+    )
+    parser.add_argument(
+        "--initial_mu", type=float, default=1.0, help="Initial value of mu"
+    )
 
     args = parser.parse_args()
 
@@ -124,22 +147,37 @@ def main():
     eta = args.eta
 
     chi_qw, omegas, T = read_chi_qw(args.chi_q)
-    iwns = (np.pi * T * 1j) * np.array(omegas, dtype=np.complex128)
+    iwns = (2 * np.pi * T * 1j) * np.array(omegas, dtype=np.complex128)
     for q in chi_qw:
         chi_iw = chi_qw[q]
         nelem = chi_iw.shape[0]
         chi_w = np.zeros((nelem, len(ws)), dtype=np.complex128)
-        for ielem in range(nelem):
-            pade = Pade(iwns, chi_iw[ielem, :])
-            chi_w[ielem, :] = pade.evaluate(ws + eta * 1j)
+        if args.method == "pade":
+            for ielem in range(nelem):
+                pade = Pade(iwns, chi_iw[ielem, :])
+                chi_w[ielem, :] = pade.evaluate(ws + eta * 1j)
+        else:
+            for ielem in range(nelem):
+                spm = SpM(
+                    beta=1.0 / T,
+                    wmax=args.wmax*2,
+                    matsubara_points=2 * np.array(omegas),
+                    chi_iwn=chi_iw[ielem, :],
+                    l1_coeff=10**args.loglambda,
+                    max_iter=args.maxiter,
+                    initial_mu=args.initial_mu,
+                )
+                chi_w[ielem, :] = spm.evaluate(ws)
 
-        with open(f"chiq_w_{q}.dat", "w") as file:
+        out_file = f"chiq_w_{q}.dat"
+        with open(out_file, "w") as file:
             for iomega, omega in enumerate(ws):
                 file.write(f"{omega}")
                 for ielem in range(nelem):
                     file.write(f" {np.real(chi_w[ielem, iomega])}")
                     file.write(f" {np.imag(chi_w[ielem, iomega])}")
                 file.write("\n")
+        print(f"{out_file} is saved")
 
 
 if __name__ == "__main__":
