@@ -41,14 +41,16 @@ This file has three or more columns.
 The first column is the index :math:`m` of the Matsubara frequency :math:`\Omega_m`.
 The second column is the three integers ``X.Y.Z`` separated by a dot without any spaces, which specify the momentum :math:`\boldsymbol{q} = 2\pi/a \times [X, Y, Z]` where :math:`a` is the lattice constant.
 The third and subsequent columns are the susceptibilities, :math:`\chi_{0}(\boldsymbol{q}, i\Omega_m), \chi_{1}(\boldsymbol{q}, i\Omega_m), \cdots`.
+The susceptibilities are complex-valued, and the real part and the imaginary part are separated by a space as ``Re[chi_0] Im[chi_0] Re[chi_1] Im[chi_1] ...``.
+
 The following is the first few lines of an example.
 
 .. code-block:: text
 
   #Temperature: 0.5
-  0 00.00.00 0.5851252932088625 0.5851252932088622 0.5851252932088622 -0.010185534590226983
-  0 01.00.00 0.5871784814635085 0.587178481463508 0.5871784814635079 -0.010043078925395688
-  0 01.01.00 0.5892514011643883 0.5892514011643873 0.5892514011643873 -0.009901741925596026
+  0 00.00.00 0.5851252932088625 0.0 0.5851252932088622 0.0 0.5851252932088622 0.0 -0.010185534590226983 0.0
+  0 01.00.00 0.5871784814635085 0.0 0.587178481463508 0.0 0.5871784814635079 0.0 -0.010043078925395688 0.0
+  0 01.01.00 0.5892514011643883 0.0 0.5892514011643873 0.0 0.5892514011643873 0.0 -0.009901741925596026 0.0
 
 .. _output_eigenvec_dat:
 
