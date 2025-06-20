@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-import logging
-
 import numpy as np
 
 from chiq import __version__ as version
@@ -11,6 +7,22 @@ from chiq.pade import Pade
 
 
 def read_qw(chi_q_file):
+    """Read q-points and Matsubara frequencies from chi_q_eigen.dat file.
+
+    Parameters
+    ----------
+    chi_q_file : str
+        Path to chi_q_eigen.dat file containing eigenvalues of susceptibility.
+
+    Returns
+    -------
+    qs : list of str
+        List of q-points in format "XX.YY.ZZ".
+    omegas : list of int
+        List of Matsubara frequency indices.
+    nelems : int
+        Number of eigenvalues per (q,omega) point.
+    """
     omegas = []
     qs = []
     first_omega = None
@@ -26,10 +38,10 @@ def read_qw(chi_q_file):
                 continue
             omega = int(words[0])
             q = words[1]
-            if first_omega is None: # first record
+            if first_omega is None:  # first record
                 first_omega = omega
                 first_q = q
-                nelems = len(words) - 2
+                nelems = (len(words) - 2) // 2
 
             if omega == first_omega:
                 qs.append(q)
@@ -39,9 +51,27 @@ def read_qw(chi_q_file):
 
 
 def read_chi_qw(chi_q_file):
+    """Read chi(q,omega) from chi_q_eigen.dat file.
+
+    Parameters
+    ----------
+    chi_q_file : str
+        Path to chi_q_eigen.dat file containing eigenvalues of susceptibility.
+
+    Returns
+    -------
+    chi_qw : dict of numpy.ndarray
+        Dictionary of chi(q,omega) for each q-point.
+        Keys are q-points in format "XX.YY.ZZ".
+        Values are numpy.ndarray of shape (nelems, nomega) containing chi(q,omega) for each element.
+    omegas : list of int
+        List of Matsubara frequency indices.
+    T : float
+        Temperature.
+    """
     qs, omegas, nelems = read_qw(chi_q_file)
     nomega = len(omegas)
-    chi_qw = {q: np.zeros((nelems, nomega), dtype=np.float64) for q in qs}
+    chi_qw = {q: np.zeros((nelems, nomega), dtype=np.complex128) for q in qs}
 
     omega2index = {omega: i for i, omega in enumerate(omegas)}
 
@@ -60,27 +90,33 @@ def read_chi_qw(chi_q_file):
             words = line.split()
             omega = int(words[0])
             q = words[1]
-            chi_qw[q][:, omega2index[omega]] = np.array(words[2:], dtype=np.float64)
+            cqw = np.array(
+                [
+                    complex(float(words[2 * i + 2]), float(words[2 * i + 3]))
+                    for i in range(nelems)
+                ],
+                dtype=np.complex128,
+            )
+            chi_qw[q][:, omega2index[omega]] = cqw
 
     return chi_qw, omegas, T
-
 
 
 def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='Analytic continuation of chi.',
+        description="Analytic continuation of chi.",
         add_help=True,
     )
 
-    parser.add_argument('chi_q', type=str, help='Chi(w,q) file')
-    _version_message = f'ChiQ version {version}'
-    parser.add_argument('--version', action='version', version=_version_message)
-    parser.add_argument('--wmax', type=float, default=10.0, help='Maximum frequency')
-    parser.add_argument('--wmin', type=float, default=0.0, help='Minimum frequency')
-    parser.add_argument('--wnum', type=int, default=101, help='Number of frequencies')
-    parser.add_argument('--eta', type=float, default=1e-5, help='Imaginary shift')
+    parser.add_argument("chi_q", type=str, help="Chi(w,q) file")
+    _version_message = f"ChiQ version {version}"
+    parser.add_argument("--version", action="version", version=_version_message)
+    parser.add_argument("--wmax", type=float, default=10.0, help="Maximum frequency")
+    parser.add_argument("--wmin", type=float, default=0.0, help="Minimum frequency")
+    parser.add_argument("--wnum", type=int, default=101, help="Number of frequencies")
+    parser.add_argument("--eta", type=float, default=1e-5, help="Imaginary shift")
 
     args = parser.parse_args()
 
