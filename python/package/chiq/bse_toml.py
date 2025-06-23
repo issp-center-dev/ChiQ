@@ -64,7 +64,7 @@ def load_params_from_toml(file_name, print_summary=True):
     _check_if_dict_empty(params, block="chiq_post")
 
     #set anacont parameters
-    params = dict_toml["chiq_anacont"]
+    params = dict_toml.get("chiq_anacont", {})
     dict_anacont["input_file"] = params.pop("input_file", "chi_q_eigen.dat")
     dict_anacont["output_dir"] = params.pop("output_dir", os.path.join(dict_post["output_dir"], "anacont"))
     dict_anacont["output_prefix"] = params.pop("output_prefix", "chi_q_w")
