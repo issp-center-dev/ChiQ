@@ -341,7 +341,9 @@ def main():
     args = parser.parse_args()
 
     # Load parameters from toml file
-    dict_common, _, dict_post = bse_toml.load_params_from_toml(args.toml)
+    params = bse_toml.load_params_from_toml(args.toml)
+    dict_common = params["common"]
+    dict_post = params["post"]
     file_in = dict_common["input"]
     file_out = dict_common["output"]
     type_list = dict_common["type"]

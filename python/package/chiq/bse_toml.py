@@ -27,7 +27,7 @@ def load_params_from_toml(file_name, print_summary=True):
         sys.exit(1)
 
     dict_common = OrderedDict()
-    dict_tool = OrderedDict()
+    dict_main = OrderedDict()
     dict_post = OrderedDict()
 
     #set common parameters
@@ -36,7 +36,7 @@ def load_params_from_toml(file_name, print_summary=True):
     dict_common["output"] = params.pop("output", "dmft_bse.out.h5")
     dict_common["type"] = params.pop("type", ["bse"])
     if "omega_q" in params:
-        print(f"Error: chiq_common.omega_q is removed. Use chiq_common.q_points instead.")
+        print("Error: chiq_common.omega_q is removed. Use chiq_common.q_points instead.")
         sys.exit(1)
     dict_common["q_points"] = params.pop("q_points", None)
     dict_common["num_wb"] = params.pop("num_wb", -1)
@@ -44,8 +44,8 @@ def load_params_from_toml(file_name, print_summary=True):
 
     #set tool parameters
     params = dict_toml["chiq_main"]
-    dict_tool["work_dir"] = params.pop("work_dir", "")
-    dict_tool["num_wf"] = params.pop("num_wf", None)
+    dict_main["work_dir"] = params.pop("work_dir", "")
+    dict_main["num_wf"] = params.pop("num_wf", None)
     _obsolete_param(dict_toml, "chiq_main", "solver")
     _check_if_dict_empty(params, block="chiq_main")
 
@@ -64,21 +64,26 @@ def load_params_from_toml(file_name, print_summary=True):
     # Print summary
     if print_summary:
         print("=========================================")
-        print(f"Summary of parameters")
-        for block, params in [("chiq_common", dict_common), ("chiq_tool", dict_tool), ("chiq_post", dict_post)]:
+        print("Summary of parameters")
+        for block, params in [("chiq_common", dict_common), ("chiq_main", dict_main), ("chiq_post", dict_post)]:
             print(f"\n[{block}]")
             for key, val in params.items():
                 print(f"{key} = {val!r}")
         print("=========================================")
 
-    return dict_common, dict_tool, dict_post
+    result_dict = OrderedDict()
+    result_dict["common"] = dict_common
+    result_dict["main"] = dict_main
+    result_dict["post"] = dict_post
+
+    return result_dict
 
 
 if __name__ == "__main__":
     with open("test.toml", "w") as fw:
         fw.write("[chiq_common]\n")
         fw.write("input = \"test.in\"\n")
-        fw.write("[chiq_tool]\n")
+        fw.write("[chiq_main]\n")
         fw.write("num_wf = 10\n")
         fw.write("[chiq_post]\n")
         fw.write("output_dir = \"output/\"\n")

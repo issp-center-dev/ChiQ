@@ -423,7 +423,9 @@ def main():
         print(f"{_version_message}\n")
 
     # Load parameters from toml file
-    dict_common, dict_tool, _ = bse_toml.load_params_from_toml(args.toml, print_summary=(rank==0))
+    params = bse_toml.load_params_from_toml(args.toml, print_summary=(rank==0))
+    dict_common = params["common"]
+    dict_main = params["main"]
     file_in = dict_common["input"]
     file_out = dict_common["output"]
     type_list = dict_common["type"]
@@ -431,8 +433,8 @@ def main():
     num_wb = dict_common["num_wb"]
     if num_wb < 0:
         num_wb = sys.maxsize
-    work_dir = dict_tool["work_dir"]
-    n_iw = dict_tool["num_wf"]
+    work_dir = dict_main["work_dir"]
+    n_iw = dict_main["num_wf"]
 
     # Convert filename to absolute path
     file_in = os.path.abspath(file_in)
