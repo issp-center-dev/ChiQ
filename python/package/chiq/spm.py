@@ -4,7 +4,7 @@ import sparse_ir
 import admmsolver
 import admmsolver.optimizer
 import admmsolver.objectivefunc
-from admmsolver.objectivefunc import L1Regularizer, LeastSquares
+from admmsolver.objectivefunc import L1Regularizer, ConstrainedLeastSquares
 from admmsolver.matrix import identity
 from admmsolver.optimizer import SimpleOptimizer
 
@@ -29,7 +29,10 @@ class SpM:
         A = np.einsum("il,l->il", U, S)
         y = self.g_tau
 
-        lstsq_F = LeastSquares(0.5, A=A, y=y)
+        C = (A[0] + A[-1]).reshape(1, -1)
+        D = np.array([y[0] + y[-1]])
+
+        lstsq_F = ConstrainedLeastSquares(0.5, A=A, y=y, C=C, D=D)
         l1_F = L1Regularizer(l1_coeff, self.basis.size)
 
         objective_functions = [lstsq_F, l1_F]
