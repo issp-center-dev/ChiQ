@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
+import os
 import numpy as np
 
 from chiq import __version__ as version
 from chiq.pade import Pade
 from chiq.spm import SpM
+from chiq.bse_toml import load_params_from_toml
 
 
 def read_qw(chi_q_file):
@@ -107,52 +109,58 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Analytic continuation of chi.",
+        description="Analytic continuation of chi(q, iwn) to chi(q,w).",
         add_help=True,
     )
 
-    parser.add_argument("chi_q", type=str, help="Chi(w,q) file")
+    parser.add_argument("toml", type=str, help="TOML configuration file")
     _version_message = f"ChiQ version {version}"
     parser.add_argument("--version", action="version", version=_version_message)
 
-    parser.add_argument("--wmax", type=float, default=10.0, help="Maximum frequency")
-    parser.add_argument("--wmin", type=float, default=0.0, help="Minimum frequency")
-    parser.add_argument("--wnum", type=int, default=101, help="Number of frequencies")
-
-    parser.add_argument(
-        "--method",
-        type=str,
-        default="pade",
-        choices=["pade", "spm"],
-        help="Method to use for analytic continuation",
-    )
-
-    # for pade
-    parser.add_argument("--eta", type=float, default=1e-5, help="Imaginary shift")
-
-    # for SpM
-    parser.add_argument(
-        "--loglambda", type=float, default=0.0, help="Log10 of L1 coefficient"
-    )
-    parser.add_argument(
-        "--maxiter", type=int, default=1000, help="Maximum number of iterations"
-    )
-    parser.add_argument(
-        "--initial_mu", type=float, default=1.0, help="Initial value of mu"
-    )
-
     args = parser.parse_args()
 
-    ws = np.linspace(args.wmin, args.wmax, args.wnum)
-    eta = args.eta
+    params = load_params_from_toml(args.toml)
 
-    chi_qw, omegas, T = read_chi_qw(args.chi_q)
+    dict_post = params["post"]
+    post_output_dir = dict_post["output_dir"]
+
+    dict_anacont = params["anacont"]
+    input_file = os.path.join(post_output_dir, dict_anacont["input_file"])
+    output_dir = dict_anacont["output_dir"]
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    output_prefix = dict_anacont["output_prefix"]
+    wmax = dict_anacont["wmax"]
+    wmin = dict_anacont["wmin"]
+    wnum = dict_anacont["wnum"]
+    method = dict_anacont["method"]
+    eta = dict_anacont["eta"]
+    loglambda = dict_anacont["loglambda"]
+    maxiter = dict_anacont["maxiter"]
+    initial_mu = dict_anacont["initial_mu"]
+
+    ws = np.linspace(wmin, wmax, wnum)
+
+    chi_qw, omegas, T = read_chi_qw(input_file)
     iwns = (2 * np.pi * T * 1j) * np.array(omegas, dtype=np.complex128)
     for q in chi_qw:
         chi_iw = chi_qw[q]
+
+        if dict_anacont["print_chi_q_iw"]:
+            out_file = os.path.join(output_dir, f"{dict_anacont['output_prefix_chi_q_iw']}_{q}.dat")
+            with open(out_file, "w") as file:
+                for iomega, omega in enumerate(omegas):
+                    file.write(f"{omega}")
+                    for ielem in range(chi_iw.shape[0]):
+                        file.write(
+                            f" {np.real(chi_iw[ielem, iomega])} {np.imag(chi_iw[ielem, iomega])}"
+                        )
+                    file.write("\n")
+            print(f"{out_file} is saved")
+
         nelem = chi_iw.shape[0]
         chi_w = np.zeros((nelem, len(ws)), dtype=np.complex128)
-        if args.method == "pade":
+        if method == "pade":
             for ielem in range(nelem):
                 pade = Pade(iwns, chi_iw[ielem, :])
                 chi_w[ielem, :] = pade.evaluate(ws + eta * 1j)
@@ -160,16 +168,16 @@ def main():
             for ielem in range(nelem):
                 spm = SpM(
                     beta=1.0 / T,
-                    wmax=args.wmax*2,
+                    wmax=wmax * dict_anacont["wmax_factor"],
                     matsubara_points=2 * np.array(omegas),
                     chi_iwn=chi_iw[ielem, :],
-                    l1_coeff=10**args.loglambda,
-                    max_iter=args.maxiter,
-                    initial_mu=args.initial_mu,
+                    l1_coeff=10**loglambda,
+                    max_iter=maxiter,
+                    initial_mu=initial_mu,
                 )
                 chi_w[ielem, :] = spm.evaluate(ws)
 
-        out_file = f"chiq_w_{q}.dat"
+        out_file = os.path.join(output_dir, f"{output_prefix}_{q}.dat")
         with open(out_file, "w") as file:
             for iomega, omega in enumerate(ws):
                 file.write(f"{omega}")
