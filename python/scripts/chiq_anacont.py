@@ -7,6 +7,7 @@ from chiq import __version__ as version
 from chiq.pade import Pade
 from chiq.spm import SpM
 from chiq.bse_toml import load_params_from_toml
+from chiq.mpi import COMM_WORLD as comm
 
 
 def read_qw(chi_q_file):
@@ -108,6 +109,9 @@ def read_chi_qw(chi_q_file):
 def main():
     import argparse
 
+    mpisize = comm.Get_size()
+    mpirank = comm.Get_rank()
+
     parser = argparse.ArgumentParser(
         description="Analytic continuation of chi(q, iwn) to chi(q,w).",
         add_help=True,
@@ -141,9 +145,25 @@ def main():
 
     ws = np.linspace(wmin, wmax, wnum)
 
-    chi_qw, omegas, T = read_chi_qw(input_file)
+    if mpisize > 1:
+        if mpirank == 0:
+            chi_qw, omegas, T = read_chi_qw(input_file)
+        else:
+            chi_qw, omegas, T = None, None, None
+
+        chi_qw = comm.bcast(chi_qw, root=0)
+        omegas = comm.bcast(omegas, root=0)
+        T = comm.bcast(T, root=0)
+    else:
+        chi_qw, omegas, T = read_chi_qw(input_file)
+
     iwns = (2 * np.pi * T * 1j) * np.array(omegas, dtype=np.complex128)
-    for q in chi_qw:
+    qs = list(chi_qw.keys())
+    qs.sort()
+
+    local_qs = qs[mpirank::mpisize]
+
+    for q in local_qs:
         chi_iw = chi_qw[q]
 
         if dict_anacont["print_chi_q_iw"]:

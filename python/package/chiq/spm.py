@@ -48,7 +48,7 @@ class SpM:
         def A(w):
             V = self.basis.v(w).T
             rho = V @ self.opt.x[0]
-            return rho * np.tanh(0.5*self.beta*w)
+            return np.real(rho * np.tanh(0.5*self.beta*w))
 
         chi_imag = -np.pi * A(ws)
         chi_real = np.zeros_like(ws)
