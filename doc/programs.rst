@@ -28,6 +28,7 @@ All python scripts have help messages that can be displayed by running the scrip
    programs/gen_qpath
    programs/gen_allq
    programs/plot_chiq_path
+   programs/plot_chiq_spectrum
    programs/plot_Ir
    programs/eigenvec_viewer
 
