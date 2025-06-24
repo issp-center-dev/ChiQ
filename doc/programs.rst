@@ -21,6 +21,7 @@ All python scripts have help messages that can be displayed by running the scrip
    programs/dcore_chiq
    programs/chiq_main
    programs/chiq_post
+   programs/chiq_anacont
    programs/chiq_fft
    programs/calc_Iq
    programs/calc_Iq_scl

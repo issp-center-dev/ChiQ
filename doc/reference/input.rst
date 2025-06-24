@@ -35,6 +35,21 @@ Below is a template of the input file.
     # for mode="linear_combination"
     # coefs_file = "/path/to/coefs.in"
 
+    [chiq_anacont]
+    input_file = "chi_q_eigen.dat"
+    output_prefix = "chi_q_w"
+    wmax = 10.0
+    wmin = 0.0
+    wnum = 101
+    method = "pade"
+    eta = 1e-5
+    loglambda = 0.0
+    maxiter = 1000
+    initial_mu = 1.0
+    wmax_factor = 1.2
+    print_chi_q_iw = false
+    output_prefix_chi_q_iw = "chi_q_iw"
+
 
 The ``[chiq_common]`` section contains general settings that apply to both programs ``chiq_main.py`` and ``chiq_post.py``. In contrast, the ``[chiq_main]`` and ``[chiq_post]`` sections provide configurations that are specific to each program.
 
@@ -75,6 +90,28 @@ The ``[chiq_common]`` section contains general settings that apply to both progr
    "order", "string", ``"descend"``, "[When ``mode=""eigen""``] Sorting order of eigenvalues: ``""descend""``, ``""overlap""``, ``""file""``. For ``""descend""``, eigenvalues are sorted in descending order for eqch q. For ``""overlap""``, eigenvalues are sorted based on overlap with the eigenvectors for the previous q. For ``""file""``, the order is specified by an external file."
    "order_file", "string", ``"eigenvec.in"``, "[When ``mode=""eigen""`` and ``order=""file""``] Filename that contains sequence of vectors that specify the order of the eigenvalues."
    "coefs_file", "string", ``"coefs.in"``, "[When ``mode=""linear_combination""``] Filename that contains coefficients for the linear combination of eigenvectors."
+
+[chiq_anacont] section
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. csv-table::
+   :widths: 10, 10, 20, 60
+   :header: "Name", "Type", "Default", "Description"
+
+   "input_file", "string", ``"chi_q_eigen.dat"``, "Input file name (relative to post output directory) containing susceptibility eigenvalues in Matsubara frequencies."
+   "output_dir", "string", ``""``, "Output directory for analytic continuation results. The empty string (default value) means 'anacont' in the output directory of ``chiq_post.py``."
+   "output_prefix", "string", ``"chi_q_w"``, "Prefix for output file names."
+   "wmax", "float", ``10.0``, "Maximum real frequency for output."
+   "wmin", "float", ``0.0``, "Minimum real frequency for output."
+   "wnum", "int", ``101``, "Number of frequency points for output."
+   "method", "string", ``"pade"``, "Method for analytic continuation. Options are ``""pade""`` or ``""spm""``."
+   "eta", "float", ``1e-5``, "Small imaginary part added to real frequencies (used in Padé method)."
+   "loglambda", "float", ``0.0``, "Logarithm of the L1 regularization parameter (used in SpM method)."
+   "maxiter", "int", ``1000``, "Maximum number of iterations for SpM method."
+   "initial_mu", "float", ``1.0``, "Initial chemical potential for SpM method."
+   "wmax_factor", "float", ``1.2``, "Factor to multiply wmax for internal SpM calculations."
+   "print_chi_q_iw", "bool", ``false``, "Whether to print the input chi(q,iw) data."
+   "output_prefix_chi_q_iw", "string", ``"chi_q_iw"``, "Prefix for chi(q,iw) output files."
 
 .. _reference_qpath_in:
 

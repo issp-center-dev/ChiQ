@@ -46,7 +46,7 @@ def load_params_from_toml(file_name, print_summary=True):
 
     #set main parameters
     params = dict_toml["chiq_main"]
-    dict_main["work_dir"] = params.pop("work_dir", "")
+    dict_main["work_dir"] = params.pop("work_dir", ".")
     dict_main["num_wf"] = params.pop("num_wf", None)
     _obsolete_param(dict_toml, "chiq_main", "solver")
     _check_if_dict_empty(params, block="chiq_main")
@@ -55,7 +55,7 @@ def load_params_from_toml(file_name, print_summary=True):
     if "chiq_post" not in dict_toml:
         dict_toml["chiq_post"] = {}
     params = dict_toml["chiq_post"]
-    dict_post["output_dir"] = params.pop("output_dir", "")
+    dict_post["output_dir"] = params.pop("output_dir", ".")
     dict_post["mode"] = params.pop("mode", "eigen")
     dict_post["vector"] = params.pop("vector", False)
     dict_post["order"] = params.pop("order", "descend")
@@ -66,7 +66,10 @@ def load_params_from_toml(file_name, print_summary=True):
     #set anacont parameters
     params = dict_toml.get("chiq_anacont", {})
     dict_anacont["input_file"] = params.pop("input_file", "chi_q_eigen.dat")
-    dict_anacont["output_dir"] = params.pop("output_dir", os.path.join(dict_post["output_dir"], "anacont"))
+    dict_anacont["output_dir"] = params.pop("output_dir", "")
+    if dict_anacont["output_dir"] == "":
+        dict_anacont["output_dir"] = os.path.join(dict_post["output_dir"], "anacont")
+
     dict_anacont["output_prefix"] = params.pop("output_prefix", "chi_q_w")
     dict_anacont["output_prefix_chi_q_iw"] = params.pop("output_prefix_chi_q_iw", "chi_q_iw")
     dict_anacont["wmax"] = params.pop("wmax", 10.0)
