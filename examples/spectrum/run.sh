@@ -51,10 +51,10 @@ mpirun -np $NPROCS chiq_main.py bse.in 1>chiq_main.log 2>chiq_main.err
 # BSE post script
 chiq_post.py bse.in 1>chiq_post.log 2>chiq_post.err
 
-# Plot BSE results
-(
-	cd bse
-	plot_chiq_specgtrum.py ../q_path.dat chi_q_eigen.dat
-)
+# Analytic continuation
+chiq_anacont.py bse.in 1>chiq_anacont.log 2>chiq_anacont.err
+
+# Plot Chi(q, omega)
+plot_chiq_specgtrum.py q_path.dat bse/anacont
 
 echo "Finished successfully"

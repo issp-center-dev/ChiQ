@@ -74,15 +74,49 @@ The **ChiQ** calculation is performed by the same command as in the static susce
 .. code-block:: bash
 
   mpiexec -np 4 chiq_main.py bse.in
-  mpiexec -np 4 chiq_post.py bse.in
+  chiq_post.py bse.in
 
 The generated output file **chi_q_linear_combination.dat** contains the results for finite bosonic frequencies.
+In this file, the first column (integer) is the index :math:`m` of the bosonic frequency :math:`\Omega_m = 2\pi m T`.
 
-We perform an analytical continuation from the Matsubara frequency to real frequencies. This can be done by the script **plot_chiq_spectrum.py** as
+We perform an analytical continuation from the Matsubara frequency to real frequencies.
+This can be done by the script **chiq_anacont.py** as follows:
 
 .. code-block:: bash
 
-  plot_chiq_spectrum.py ../q_path.dat chi_q_linear_combination.dat
+  mpiexec -np 4 chiq_anacont.py bse.in
 
+The output files are saved in the directory specified by ``output_dir`` in the ``[chiq_anacont]`` section of the input file.
+If omitted, the output directory is ``anacont`` in the output directory of ``chiq_post.py`` specified by ``output_dir`` in the ``[chiq_post]`` section of the input file.
+In this example, therefore, the output directory is ``bse/anacont``.
 
+The method for the analytical continuation is specified by ``method`` parameter in the ``[chiq_anacont]`` section of the input file.
+The default method is the Padé approximant, ``method='pade'``.
+Alternatively, one can use the method of the sparse modeling (SpM), ``method='spm'`` (see `J. Otsuki et al., Phys. Rev. E 95, 061302(R) (2017) <https://doi.org/10.1103/PhysRevE.95.061302>`).
+The SpM method is more robust against the noise than the Padé approximant, but it is more time-consuming and has more hyperparameters to be tuned.
 
+``wmax``, ``wnum``, and ``wmin`` parameters in the ``[chiq_anacont]`` section specify the maximum, minimum, and number of frequencies to be computed, respectively.
+The default values are ``wmax=10.0``, ``wmin=0.0``, and ``wnum=101``.
+
+The other parameters are described in :ref:`reference manual of the input file <reference_bse_in>`.
+
+The results are saved in the output directory.
+Each q-point data is saved in a separate file as **chi_q_w_XX.YY.ZZ.dat**, where **XX.YY.ZZ** is the q-point index (the second column of the ``chi_q_linear_combination.dat``).
+The first column is the real frequency :math:`\omega`.
+The second and subsequent columns are the susceptibilities, :math:`\chi_{0}(\boldsymbol{q}, \omega), \chi_{1}(\boldsymbol{q}, \omega), \cdots`.
+The susceptibilities are complex-valued, and the real part and the imaginary part are separated by a space as ``Re[chi_0] Im[chi_0] Re[chi_1] Im[chi_1] ...``.
+
+The results can be plotted by the script **plot_chiq_spectrum.py** as
+
+.. code-block:: bash
+
+  plot_chiq_spectrum.py q_path.dat bse/anacont
+
+The first argument is the path to the q-path file. The second argument is the directory containing the output files of ``chiq_anacont.py``.
+By default, the script plots the real part of the susceptibility.
+To plot the imaginary part, one can specify ``--part imag`` option.
+
+.. figure:: spectrum/chi_q_w.*
+  :align: center
+
+  The spectrum of the two-body susceptibility calculated by the BSE.

@@ -75,7 +75,7 @@ The filename prefix ``chi_q_w`` can be changed by the ``output_prefix`` paramete
 
 These files have three or more columns.
 The first column is the real frequency :math:`\omega`.
-The second and subsequent columns are the susceptibilities, :math:`\chi_{0}(\boldsymbol{q}, \omega + i\eta), \chi_{1}(\boldsymbol{q}, \omega + i\eta), \cdots`.
+The second and subsequent columns are the susceptibilities, :math:`\chi_{0}(\boldsymbol{q}, \omega), \chi_{1}(\boldsymbol{q}, \omega), \cdots`.
 The susceptibilities are complex-valued, and the real part and the imaginary part are separated by a space as ``Re[chi_0] Im[chi_0] Re[chi_1] Im[chi_1] ...``.
 
 The following is the first few lines of an example.

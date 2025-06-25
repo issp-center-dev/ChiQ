@@ -95,7 +95,7 @@ The ``[chiq_common]`` section contains general settings that apply to both progr
 ~~~~~~~~~~~~~~~~~~~~~~
 
 .. csv-table::
-   :widths: 10, 10, 20, 60
+   :widths: 20, 10, 20, 50
    :header: "Name", "Type", "Default", "Description"
 
    "input_file", "string", ``"chi_q_eigen.dat"``, "Input file name (relative to post output directory) containing susceptibility eigenvalues in Matsubara frequencies."
@@ -105,13 +105,28 @@ The ``[chiq_common]`` section contains general settings that apply to both progr
    "wmin", "float", ``0.0``, "Minimum real frequency for output."
    "wnum", "int", ``101``, "Number of frequency points for output."
    "method", "string", ``"pade"``, "Method for analytic continuation. Options are ``""pade""`` or ``""spm""``."
-   "eta", "float", ``1e-5``, "Small imaginary part added to real frequencies (used in Padé method)."
-   "loglambda", "float", ``0.0``, "Logarithm of the L1 regularization parameter (used in SpM method)."
-   "maxiter", "int", ``1000``, "Maximum number of iterations for SpM method."
-   "initial_mu", "float", ``1.0``, "Initial chemical potential for SpM method."
-   "wmax_factor", "float", ``1.2``, "Factor to multiply wmax for internal SpM calculations."
    "print_chi_q_iw", "bool", ``false``, "Whether to print the input chi(q,iw) data."
    "output_prefix_chi_q_iw", "string", ``"chi_q_iw"``, "Prefix for chi(q,iw) output files."
+
+For the Padé method, the following parameters are used:
+
+.. csv-table::
+   :widths: 20, 10, 20, 50
+   :header: "Name", "Type", "Default", "Description"
+
+   "eta", "float", ``1e-5``, "Small imaginary part added to real frequencies to avoid singularities."
+
+For the SpM method, the following parameters are used:
+
+.. csv-table::
+   :widths: 20, 10, 20, 50
+   :header: "Name", "Type", "Default", "Description"
+
+   "loglambda", "float", ``0.0``, "Logarithm of the L1 regularization parameter."
+   "maxiter", "int", ``1000``, "Maximum number of iterations."
+   "initial_mu", "float", ``1.0``, "Initial chemical potential."
+   "wmax_factor", "float", ``1.2``, "Factor to multiply wmax for internal SpM calculations."
+
 
 .. _reference_qpath_in:
 
