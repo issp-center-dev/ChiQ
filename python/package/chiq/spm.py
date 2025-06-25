@@ -1,15 +1,43 @@
 import numpy as np
 from scipy.integrate import quad
-import sparse_ir
-import admmsolver
-import admmsolver.optimizer
-import admmsolver.objectivefunc
-from admmsolver.objectivefunc import L1Regularizer, ConstrainedLeastSquares
-from admmsolver.matrix import identity
-from admmsolver.optimizer import SimpleOptimizer
+import sys
+
+try:
+    import sparse_ir
+    SPARSE_IR_AVAILABLE = True
+except ImportError:
+    SPARSE_IR_AVAILABLE = False
+
+try:
+    import admmsolver
+    import admmsolver.optimizer
+    import admmsolver.objectivefunc
+    from admmsolver.objectivefunc import L1Regularizer, ConstrainedLeastSquares
+    from admmsolver.matrix import identity
+    from admmsolver.optimizer import SimpleOptimizer
+
+    ADMMSOLVER_AVAILABLE = True
+except ImportError:
+    ADMMSOLVER_AVAILABLE = False
+
+if SPARSE_IR_AVAILABLE and ADMMSOLVER_AVAILABLE:
+    SPM_AVAILABLE = True
+else:
+    SPM_AVAILABLE = False
 
 class SpM:
     def __init__(self, beta, wmax, matsubara_points, chi_iwn, l1_coeff, max_iter=1000, initial_mu=1.0):
+        can_use = True
+        if not SPARSE_IR_AVAILABLE:
+            print("ERROR: sparse_ir is not installed.")
+            can_use = False
+        if not ADMMSOLVER_AVAILABLE:
+            print("ERROR: admmsolver is not installed.")
+            can_use = False
+        if not can_use:
+            print("ERROR: SpM method is not available.")
+            sys.exit(1)
+
         self.beta = beta
         self.wmax = wmax
         self.basis = sparse_ir.FiniteTempBasis("B", beta, wmax)

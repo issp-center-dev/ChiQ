@@ -17,6 +17,11 @@ The script supports two methods for analytic continuation:
 1. **Padé approximation**: A simple and fast method that constructs a rational function to interpolate the data from imaginary to real frequencies.
 2. **Sparse Modeling (SpM)**: A more sophisticated method that uses sparse modeling techniques to perform analytic continuation with better accuracy, especially for noisy data.
 
+    - The SpM method requires ``sparse_ir`` and ``admmsolver`` python packages to be installed.
+
+    .. code-block:: bash
+        $ pip install 'sparse_ir[xprec]' admmsolver
+
 The script processes each q-point and eigenvalue separately, performing analytic continuation for each component of the susceptibility tensor.
 
 Positional Arguments

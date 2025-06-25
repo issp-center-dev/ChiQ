@@ -92,8 +92,8 @@ In this example, therefore, the output directory is ``bse/anacont``.
 
 The method for the analytical continuation is specified by ``method`` parameter in the ``[chiq_anacont]`` section of the input file.
 The default method is the Padé approximant, ``method='pade'``.
-Alternatively, one can use the method of the sparse modeling (SpM), ``method='spm'`` (see `J. Otsuki et al., Phys. Rev. E 95, 061302(R) (2017) <https://doi.org/10.1103/PhysRevE.95.061302>`).
-The SpM method is more robust against the noise than the Padé approximant, but it is more time-consuming and has more hyperparameters to be tuned.
+Alternatively, one can use the method of the sparse modeling (SpM), ``method='spm'``.
+The SpM method is more robust against the noise than the Padé approximant, but it is more time-consuming and has more hyperparameters to be tuned (For details, see `J. Otsuki et al., Phys. Rev. E 95, 061302(R) (2017) <https://doi.org/10.1103/PhysRevE.95.061302>`__).
 
 ``wmax``, ``wnum``, and ``wmin`` parameters in the ``[chiq_anacont]`` section specify the maximum, minimum, and number of frequencies to be computed, respectively.
 The default values are ``wmax=10.0``, ``wmin=0.0``, and ``wnum=101``.

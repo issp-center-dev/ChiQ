@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import numpy as np
 
 from chiq import __version__ as version
@@ -138,6 +139,10 @@ def main():
     wmin = dict_anacont["wmin"]
     wnum = dict_anacont["wnum"]
     method = dict_anacont["method"]
+    if method == "spm" and not SpM.SPM_AVAILABLE:
+        print("ERROR: SpM method is not available. Please install sparse_ir and admmsolver.")
+        sys.exit(1)
+
     eta = dict_anacont["eta"]
     loglambda = dict_anacont["loglambda"]
     maxiter = dict_anacont["maxiter"]
