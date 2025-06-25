@@ -22,6 +22,7 @@ def main():
     P.add_argument("--wmin", type=float, default=None, help="minimum frequency to plot")
     P.add_argument("--wmax", type=float, default=None, help="maximum frequency to plot")
     P.add_argument("--part", type=str, default="real", choices=["real", "imag"], help="part of susceptibility to plot")
+    P.add_argument( "--cmap", default="RdBu_r", help="color map to use")
     P.add_argument("--output_file_prefix", default="chi_q_w", help="base name of output file (e.g., 'chi_q_w' for 'chi_q_w.pdf')")
     P.add_argument(
         "--format",
@@ -83,7 +84,7 @@ def main():
                     f.write(f"{xarray[iq]} {ws[iw]} {chiqw_re[iq, iw]} {chiqw_im[iq, iw]}\n")
         print(f"Data written to {args.data_out}")
 
-    im = ax.pcolormesh(X, Y, to_be_plotted.T, shading='auto', cmap='RdBu_r', norm=colors.CenteredNorm())
+    im = ax.pcolormesh(X, Y, to_be_plotted.T, shading='auto', cmap=args.cmap, norm=colors.CenteredNorm())
     fig.colorbar(im, ax=ax, label=label_chiqw)
 
     # Set x-axis ticks and labels

@@ -49,6 +49,10 @@ Options
 **--part {real,imag}**
     Part of the susceptibility to plot. Choices are ``"real"`` or ``"imag"``. Default is ``"real"``.
 
+**--cmap CMAP**
+    Color map to use. Default is ``"RdBu_r"``.
+    See `matplotlib.pyplot.colormaps() <https://matplotlib.org/stable/tutorials/colors/colormaps.html>`_ for available color maps.
+
 **--output_file_prefix OUTPUT_FILE_PREFIX**
     Base name for output files. Default is ``"chi_q_w"``.
     The script generates files with extensions specified by the ``--format`` option.
