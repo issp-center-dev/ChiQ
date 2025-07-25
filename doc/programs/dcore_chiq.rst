@@ -61,7 +61,7 @@ See `DCore document <https://issp-center-dev.github.io/DCore/master/reference/in
    "num_wb", "Integer", "1", "Number of bosonic frequencies (>0)"
    "num_wf", "Integer", "10", "Number of fermionic frequencies (>0)"
    "h5_output_file", "String", "dmft_bse.h5", "Output HDF5 file for bse data"
-   "skip_X0q", "Bool", "False", "Skip X_0(q) calc"
+   "skip_X0q", "Bool", "False", "Skip X0_q calc"
    "skip_Xloc", "Bool", "False", "Skip X_loc calc (for RPA)"
    "calc_only_chiloc", "Bool", "False", "Calculate only chi_loc but no X_loc (for SCL, rRPA). Do not activate skip_Xloc when using this option."
    "use_temp_file", "Bool", "False", "Whether or not temporary file is used in computing X0_q. This option will reduce the memory footprints."
