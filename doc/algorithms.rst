@@ -11,7 +11,7 @@ Definition of the Hamiltonian
    \hat{H} = \sum_{\boldsymbol{r},\boldsymbol{r}'} \sum_{ij} t_{ij}(\boldsymbol{r},\boldsymbol{r}') \hat{c}_{i}^{\dagger}(\boldsymbol{r}) \hat{c}_{j}(\boldsymbol{r}')
    + \sum_{\boldsymbol{r}} \sum_{ijkl} U_{ijkl}(\boldsymbol{r}) \hat{c}_{i}^{\dagger}(\boldsymbol{r}) \hat{c}_{j}^{\dagger}(\boldsymbol{r}) \hat{c}_{k}(\boldsymbol{r}) \hat{c}_{l}(\boldsymbol{r}),
 
-where :math:`\hat{c}_{i}(\boldsymbol{r})` are the annhilation operator of the combined spin and orbital index :math:`i` at unit cell with the coordinate :math:`\boldsymbol{r}`.
+where :math:`\hat{c}_{i}(\boldsymbol{r})` are the annihilation operator of the combined spin and orbital index :math:`i` at unit cell with the coordinate :math:`\boldsymbol{r}`.
 Here, the term "orbit" includes the site within a unit cell, as defined in the tight-binding model in the Wannier90 format.
 
 Definition of the susceptibility
