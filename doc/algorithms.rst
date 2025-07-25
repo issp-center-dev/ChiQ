@@ -1,6 +1,19 @@
 Algorithms
 ==========
 
+Definition of the Hamiltonian
+-----------------------------
+
+**ChiQ** considers the following Hamiltonian:
+
+.. math::
+
+   \hat{H} = \sum_{\boldsymbol{r},\boldsymbol{r}'} \sum_{ij} t_{ij}(\boldsymbol{r},\boldsymbol{r}') \hat{c}_{i}^{\dagger}(\boldsymbol{r}) \hat{c}_{j}(\boldsymbol{r}')
+   + \sum_{\boldsymbol{r}} \sum_{ijkl} U_{ijkl}(\boldsymbol{r}) \hat{c}_{i}^{\dagger}(\boldsymbol{r}) \hat{c}_{j}^{\dagger}(\boldsymbol{r}) \hat{c}_{k}(\boldsymbol{r}) \hat{c}_{l}(\boldsymbol{r}),
+
+where :math:`\hat{c}_{i}(\boldsymbol{r})` are the annhilation operator of the combined spin and orbital index :math:`i` at unit cell with the coordinate :math:`\boldsymbol{r}`.
+Here, the term "orbit" includes the site within a unit cell, as defined in the tight-binding model in the Wannier90 format.
+
 Definition of the susceptibility
 --------------------------------
 
@@ -11,9 +24,7 @@ The momentum-dependent susceptibility computed by **ChiQ** is defined by
 
    \chi_{ij,kl}(\boldsymbol{q}, i\Omega_m) = \frac{1}{N} \sum_{\boldsymbol{r}} \int_{0}^{\beta} d\tau \langle O_{ij}(\boldsymbol{r}, \tau) O_{lk}(\boldsymbol{0}, 0) \rangle  e^{i\Omega_m \tau} e^{-i\boldsymbol{q} \cdot \boldsymbol{r}},
 
-where :math:`\boldsymbol{q}` represents the momentum, :math:`\Omega_m` represents the bosonic Matsubara frequency, :math:`\beta` is the inverse temperature, and
-:math:`\boldsymbol{r}` denotes the lattice positions (the origin of each unit cell) with :math:`N` being their total number.
-The superscript :math:`i, j, k, l` indicates the combined spin and orbital indices. Here, the term "orbital" includes the site within a unit cell, as defined in the tight-binding model in the Wannier90 format.
+where :math:`\boldsymbol{q}` represents the momentum, :math:`\Omega_m` represents the bosonic Matsubara frequency, :math:`\beta` is the inverse temperature, and :math:`N` is the number of unit cells.
 The angle brackets denote the thermal average.
 The operator :math:`O_{ij}(\boldsymbol{r}, \tau)` is defined by
 
@@ -21,7 +32,11 @@ The operator :math:`O_{ij}(\boldsymbol{r}, \tau)` is defined by
 
    O_{ij}(\boldsymbol{r}) = c_{i}^{\dagger}(\boldsymbol{r}) c_{j}(\boldsymbol{r}),
 
-and the argument :math:`\tau` indicates the time evolution in the Heisenberg picture.
+and the argument :math:`\tau` indicates the imaginary time evolution in the Heisenberg picture
+
+.. math::
+
+   \hat{O}_{ij}(\boldsymbol{r}, \tau) = e^{\tau\hat{H}} \hat{O}_{ij}(\boldsymbol{r}) e^{-\tau\hat{H}}.
 
 
 Calculation of the susceptibility
