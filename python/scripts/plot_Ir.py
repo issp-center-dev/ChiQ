@@ -49,7 +49,12 @@ class IrEigen4Plot(object):
             eigen = np.array(array[2:], dtype=float)
             self._data.append(Iq(w, qvec, eigen))
 
-    def get_x(self, w, avec=None):
+    def find_system_size(self):
+        qvecs = np.array([iq.q for iq in self._data])
+        size = np.array([qvecs[:, i].max() + 1 for i in range(3)])
+        return size
+
+    def get_x(self, w, avec=None, size=None):
         """
         Get array of radial coordinate r for plot
 
@@ -64,12 +69,22 @@ class IrEigen4Plot(object):
         assert isinstance(avec, np.ndarray)
         assert avec.shape == (3, 3)
 
-        x = []
-        for iq in self._data:
-            if iq.w == w:
-                # x.append(np.linalg.norm(iq.q))
-                x.append(np.linalg.norm(iq.q @ avec))  # q_i * A_{ij}
-        return np.array(x)
+        qvecs = np.array([iq.q for iq in self._data if iq.w == w])
+        # qvecs.shape == (n_q, 3)
+
+        # shift qvecs to the first Brillouin zone
+        if size is not None:
+            qvecs_shape = qvecs.shape
+            qvecs_shifted = []
+            for i in range(3):
+                qx = qvecs[:, i]
+                nx = size[i]
+                qvecs_shifted.append(np.where(qx >= nx/2, qx - nx, qx))
+            qvecs = np.array(qvecs_shifted).T  # shape (n_q, 3)
+            assert qvecs.shape == qvecs_shape
+
+        x = np.linalg.norm(qvecs @ avec, axis=1)  # q_{pi} * A_{ij}
+        return x
 
     def get_y(self, w):
         """
@@ -154,7 +169,11 @@ def main():
     # --------------------------------------------------------------------------
     # get data to plot
     E = IrEigen4Plot(args.file_eigen)
-    xarray = E.get_x(args.w, avec)
+
+    size = E.find_system_size()
+    print("System size:", size)
+
+    xarray = E.get_x(args.w, avec=avec, size=size)
     yarray = E.get_y(args.w)
 
     assert isinstance(xarray, np.ndarray)
