@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import argparse
 from itertools import product
 import copy
@@ -48,6 +49,9 @@ class BSEFFT(object):
             str_q = "%02d.%02d.%02d" % (qx, qy, qz)
             key = (input_dname, input_w, str_q)
             data = self.h5bse.get(key)
+            if data is False:
+                print(f"ERROR: data with key={key} not found.", file=sys.stderr)
+                sys.exit(1)
             self.data[(qx, qy, qz)] = data
 
         print("  done len=%d" % len(self.data))
