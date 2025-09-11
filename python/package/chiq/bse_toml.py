@@ -81,6 +81,10 @@ def load_params_from_toml(file_name, print_summary=True):
     dict_anacont["eta"] = params.pop("eta", 1e-5)
     # for SpM
     dict_anacont["loglambda"] = params.pop("loglambda", 0.0)
+    dict_anacont["loglambda_optimize"] = params.pop("loglambda_optimize", False)
+    dict_anacont["loglambda_min"] = params.pop("loglambda_min", -10.0)
+    dict_anacont["loglambda_max"] = params.pop("loglambda_max", 10.0)
+    dict_anacont["loglambda_num"] = params.pop("loglambda_num", 11)
     dict_anacont["maxiter"] = params.pop("maxiter", 1000)
     dict_anacont["initial_mu"] = params.pop("initial_mu", 1.0)
     dict_anacont["wmax_factor"] = params.pop("wmax_factor", 1.2)

@@ -2,11 +2,12 @@
 
 import os
 import sys
+from tkinter import W
 import numpy as np
 
 from chiq import __version__ as version
 from chiq.pade import Pade
-from chiq.spm import SpM
+from chiq.spm import SpM, SPM_AVAILABLE
 from chiq.bse_toml import load_params_from_toml
 from chiq.mpi import COMM_WORLD as comm
 
@@ -124,7 +125,12 @@ def main():
 
     args = parser.parse_args()
 
-    params = load_params_from_toml(args.toml)
+    if mpirank == 0:
+        params = load_params_from_toml(args.toml)
+    else:
+        params = None
+    if mpisize > 1:
+        params = comm.bcast(params, root=0)
 
     dict_post = params["post"]
     post_output_dir = dict_post["output_dir"]
@@ -139,12 +145,11 @@ def main():
     wmin = dict_anacont["wmin"]
     wnum = dict_anacont["wnum"]
     method = dict_anacont["method"]
-    if method == "spm" and not SpM.SPM_AVAILABLE:
+    if method == "spm" and not SPM_AVAILABLE:
         print("ERROR: SpM method is not available. Please install sparse_ir and admmsolver.")
         sys.exit(1)
 
     eta = dict_anacont["eta"]
-    loglambda = dict_anacont["loglambda"]
     maxiter = dict_anacont["maxiter"]
     initial_mu = dict_anacont["initial_mu"]
 
@@ -187,7 +192,7 @@ def main():
         chi_w = np.zeros((nelem, len(ws)), dtype=np.complex128)
         if method == "pade":
             for ielem in range(nelem):
-                pade = Pade(iwns, chi_iw[ielem, :])
+                pade = Pade(iwns[:], chi_iw[ielem, :])
                 chi_w[ielem, :] = pade.evaluate(ws + eta * 1j)
         else:
             for ielem in range(nelem):
@@ -196,10 +201,18 @@ def main():
                     wmax=wmax * dict_anacont["wmax_factor"],
                     matsubara_points=2 * np.array(omegas),
                     chi_iwn=chi_iw[ielem, :],
-                    l1_coeff=10**loglambda,
-                    max_iter=maxiter,
-                    initial_mu=initial_mu,
                 )
+                if dict_anacont["loglambda_optimize"]:
+                    loglambda = spm.optimize_lambda(
+                        loglambda_min=dict_anacont["loglambda_min"],
+                        loglambda_max=dict_anacont["loglambda_max"],
+                        loglambda_num=dict_anacont["loglambda_num"],
+                        max_iter=maxiter,
+                        initial_mu=initial_mu,
+                    )
+                else:
+                    loglambda = dict_anacont["loglambda"]
+                spm.fit(10**loglambda, max_iter=maxiter, initial_mu=initial_mu)
                 chi_w[ielem, :] = spm.evaluate(ws)
 
         out_file = os.path.join(output_dir, f"{output_prefix}_{q}.dat")
