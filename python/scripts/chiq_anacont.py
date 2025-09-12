@@ -138,7 +138,7 @@ def main():
     dict_anacont = params["anacont"]
     input_file = os.path.join(post_output_dir, dict_anacont["input_file"])
     output_dir = dict_anacont["output_dir"]
-    if not os.path.exists(output_dir):
+    if mpirank == 0 and not os.path.exists(output_dir):
         os.makedirs(output_dir)
     output_prefix = dict_anacont["output_prefix"]
     wmax = dict_anacont["wmax"]
@@ -152,6 +152,7 @@ def main():
     eta = dict_anacont["eta"]
     maxiter = dict_anacont["maxiter"]
     initial_mu = dict_anacont["initial_mu"]
+    pade_weight = dict_anacont["pade_weight"]
 
     ws = np.linspace(wmin, wmax, wnum)
 
@@ -201,6 +202,8 @@ def main():
                     wmax=wmax * dict_anacont["wmax_factor"],
                     matsubara_points=2 * np.array(omegas),
                     chi_iwn=chi_iw[ielem, :],
+                    pade_weight=pade_weight,
+                    w_shift=eta,
                 )
                 if dict_anacont["loglambda_optimize"]:
                     loglambda = spm.optimize_lambda(

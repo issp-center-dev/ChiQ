@@ -2,6 +2,8 @@ import numpy as np
 from scipy.integrate import quad
 import sys
 
+from chiq.pade import Pade
+
 try:
     import sparse_ir
     SPARSE_IR_AVAILABLE = True
@@ -26,7 +28,7 @@ else:
     SPM_AVAILABLE = False
 
 class SpM:
-    def __init__(self, beta, wmax, matsubara_points, chi_iwn):
+    def __init__(self, beta, wmax, matsubara_points, chi_iwn, pade_weight=0.0, w_shift=0.01):
         can_use = True
         if not SPARSE_IR_AVAILABLE:
             print("ERROR: sparse_ir is not installed.")
@@ -49,31 +51,66 @@ class SpM:
         self.g_l = sampler_iwn.fit(chi_iwn)
 
         sampling_tau = sparse_ir.TauSampling(self.basis)
-        self.g_tau = sampling_tau.evaluate(self.g_l)
+        self.g_tau = -sampling_tau.evaluate(self.g_l)
 
         ts = sampling_tau.sampling_points
         U = self.basis.u(ts)
         S = self.basis.s
         self.A = np.einsum("il,l->il", U, S)
-        y = self.g_tau
 
         C = (self.A[0] + self.A[-1]).reshape(1, -1)
-        D = np.array([y[0] + y[-1]])
+        D = np.array([self.g_tau[0] + self.g_tau[-1]])
 
-        self.lstsq_F = ConstrainedLeastSquares(0.5, A=self.A, y=y, C=C, D=D)
+        if pade_weight > 0.0:
+            nw = 101
+            ws = np.linspace(0.0, self.wmax, nw)
+            iwns = (np.pi*1j) * matsubara_points
+            num_pade = 30
+            pade_rhos = np.zeros(nw)
+            pade_vars = np.zeros(nw)
+            for _ in range(num_pade):
+                pade = Pade(iwns[:], chi_iwn[:] + np.random.randn(chi_iwn.size) * 1e-6)
+                pade_rho = -np.pi * np.imag(pade.evaluate(ws + w_shift * 1j))
+                pade_rhos[:] += pade_rho
+                pade_vars[:] += pade_rho ** 2
+            pade_rhos /= num_pade
+            pade_vars /= num_pade
+            pade_vars -= pade_rhos ** 2
+            pade_vars *= num_pade / (num_pade - 1)
+
+            pade_weights = pade_vars / (pade_rhos ** 2)
+            pade_weights = pade_weight / (1.0 + pade_weights)
+            pade_weights = np.sqrt(pade_weights)
+
+            self.pade_rhos = pade_rhos * pade_weights
+
+            V = self.basis.v(ws).T
+            self.pade_A = np.einsum("i,il->il", np.tanh(0.5*self.beta*ws)*pade_weights, V)
+        else:
+            self.pade_A = np.zeros((0, self.A.shape[1]), dtype=self.A.dtype)
+            self.pade_rhos = np.zeros(0, dtype=self.g_tau.dtype)
+
+        A = np.concatenate([self.A, self.pade_A], axis=0)
+        y = np.concatenate([self.g_tau, self.pade_rhos])
+
+        self.lstsq_F = ConstrainedLeastSquares(0.5, A=A, y=y, C=C, D=D)
 
 
     def fit(self, l1_coeff, max_iter=1000, initial_mu=1.0):
         nw = 101
         l1_F = L1Regularizer(l1_coeff, self.basis.size)
-        nonneg_F = NonNegativePenalty(nw)
-        ws = np.linspace(0.0, self.wmax, nw)
-        V = self.basis.v(ws).T
 
-        objective_functions = [self.lstsq_F, l1_F, nonneg_F]
-        equality_conditions = [(0, 1, identity(self.basis.size), identity(self.basis.size)),
-                               (0, 2, V, identity(nw)),
-                               ]
+        objective_functions = [self.lstsq_F, l1_F]
+        equality_conditions = [(0, 1, identity(self.basis.size), identity(self.basis.size))]
+
+        nonneg = False
+        if nonneg:
+            nonneg_F = NonNegativePenalty(nw)
+            ws = np.linspace(0.0, self.wmax, nw)
+            V = self.basis.v(ws).T
+            objective_functions.append(nonneg_F)
+            equality_conditions.append((0, 2, V, identity(nw)))
+
         p = admmsolver.optimizer.Problem(objective_functions, equality_conditions)
 
         self.opt = SimpleOptimizer(p, mu=initial_mu)

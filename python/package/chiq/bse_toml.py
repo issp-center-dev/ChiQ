@@ -88,6 +88,7 @@ def load_params_from_toml(file_name, print_summary=True):
     dict_anacont["maxiter"] = params.pop("maxiter", 1000)
     dict_anacont["initial_mu"] = params.pop("initial_mu", 1.0)
     dict_anacont["wmax_factor"] = params.pop("wmax_factor", 1.2)
+    dict_anacont["pade_weight"] = params.pop("pade_weight", 0.0)
     _check_if_dict_empty(params, block="chiq_anacont")
 
     # Print summary
