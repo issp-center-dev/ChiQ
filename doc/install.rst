@@ -58,6 +58,11 @@ If ``cmake`` is version 2, use ``cmake3`` instead.
 If Eigen3 is not found, tell CMake the path to Eigen3 by ``-DEIGEN3_DIR=/path/to/eigen3``.
 For example, ``$HOME/local/include/eigen3`` is the path to Eigen3 headers, then add ``-DEIGEN3_DIR=$HOME/local`` to the above cmake command.
 
+Pybind11 may fail to detect the right python version.
+In this case, you can pass ``-DPYBIND11_FINDPYTHON=ON`` to the cmake command to use the new CMake FindPython instead of pybind11's custom search.
+Or, you can pass ``-DPYTHON_EXECUTABLE=/path/to/python`` to the cmake command to specify the python executable.
+See `pybind11 FAQ <https://pybind11.readthedocs.io/en/stable/faq.html#cmake-doesn-t-detect-the-right-python-version>`_ for more details.
+
 After configuration, type the following to build, test, and install
 
 .. code-block:: bash
