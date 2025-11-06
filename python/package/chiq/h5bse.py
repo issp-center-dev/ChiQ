@@ -276,12 +276,16 @@ class h5BSE(object):
                         return False
         return True
 
-    def _make_dirname(self, key, keyinfo):
+    def _make_dirname(self, key, keyinfo, allow_short_key=False):
+        # key = (type, w, q)
         keytype = key[0]
         if self._groupname != "":
             dirname = "bse/" + self._groupname + "/" + keyinfo[0]
         else:
             dirname = "bse/" + keyinfo[0]
+
+        if allow_short_key and len(key) == 1:
+            keyinfo = keyinfo[:2]  # remove w or wq
 
         if len(keyinfo) == 2:
             subdir = "/" + key[0]
@@ -428,7 +432,28 @@ class h5BSE(object):
         pass
 
     def delete(self, key):
-        pass
+        if type(key) == type(""):
+            key = tuple([key])
+        try:
+            keyinfo = self._get_keyinfo(key)
+        except KeyError:
+            raise Exception(f"key={key!r} is not defined.")
+
+        if keyinfo[0] in ("info", "input", "output"):
+            self._del_data(key)
+        else:
+            return False
+        return True
+
+    def _del_data(self, key):
+        # key = (type, w, q)
+        keyinfo = self._get_keyinfo(key)
+        dirname = self._make_dirname(key, keyinfo, allow_short_key=True)
+
+        # delete data
+        with _h5py_File(self._filename, "a", self._h5file) as _h5file:
+            if dirname in _h5file:
+                del _h5file[dirname]
 
     def get_path(self, key):
         pass

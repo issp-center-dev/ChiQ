@@ -133,6 +133,7 @@ def calc_Iq(h5_file : str, wb : np.ndarray, retain : int, remove : int, verbose=
 
     print(f"\nStart q-loop")
     BS.open('a')  # Keep HDF5 file open to improve performance. Close manually.
+    BS.delete(key='I_q')  # delete existing 'I_q' data
     for key in keylist_chiq:
         if verbose:
             print(f"Load data: key={key}")
