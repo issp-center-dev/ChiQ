@@ -50,29 +50,37 @@ def convert_frac_to_cart(R, frac_coord, avecs):
     return (R + frac_coord) @ avecs
 
 
-def print_matrix(mat, **args):
+def print_matrix(mat, tol=1e-12, **args):
+    def chop(x, tol=tol):
+        return f" 0           " if abs(x) < tol else f"{x:>13.6e}"
     assert mat.ndim == 2
     ncol, nrow = mat.shape
     for i in range(ncol):
         row_str = ""
         for j in range(nrow):
-            row_str += f"{mat[i,j].real:>13.6e} {mat[i,j].imag:>13.6e} "
+            # row_str += f"{mat[i,j].real:>13.6e} {mat[i,j].imag:>13.6e} "
+            row_str += f"{chop(mat[i,j].real)} {chop(mat[i,j].imag)} "
         print(row_str, **args)
 
 
 def print_Ir(prms : dict):
 
     file_in = prms['input']
-    file_out = prms['output']
     verbose = prms['verbose']
-
     n_sites = prms['n_sites']
     n_bases = prms['n_bases']
+    sizes = prms['sizes']
+    chop = prms['chop']
+
+    output_dir = prms['output_dir']
+    os.makedirs(output_dir, exist_ok=True)
+
+    file_out = os.path.join(output_dir, prms['output'])
 
     # -------------------------------------------------------------
     # Load data from HDF5 file
 
-    print(f"\nLoad data from '{file_in!r}'")
+    print(f"\nLoad data from '{file_in}'")
     h5in = h5BSE(file_in)
     h5in.open('r')  # Keep HDF5 file open to improve performance. Close manually.
 
@@ -136,7 +144,6 @@ def print_Ir(prms : dict):
 
     wb = prms['wb']
     type = 'I_r_scl'
-    sizes = 'auto'
 
     # Get list of 'I_r' data
     keylist = h5in.get_keylist_data(input_output='output')
@@ -167,6 +174,7 @@ def print_Ir(prms : dict):
     for site in range(n_sites):
         filename = file_out + f".{site}"
         fs.append(open(filename, 'w'))
+        print(f"# I(R=0, r_{site}; R, r_site)", file=fs[-1])
 
     print(f"\nStart R-loop")
     R0 = np.zeros(3, dtype=int)
@@ -190,13 +198,12 @@ def print_Ir(prms : dict):
         for s1, s2 in product(range(n_sites), repeat=2):
             mat_sh = mat_I_r[np.ix_(site2idx[s1], site2idx[s2])]
 
-            # r_diff = convert_(R1, r1, R2, r2, avecs)
             r1 = coords[s1]
             r2 = coords[s2]
             r_diff = convert_frac_to_cart(Rvec, r2, avecs) - convert_frac_to_cart(R0, r1, avecs)
 
-            print(f"# R={Rvec} site1={s1} site2={s2} r_diff={r_diff} dist={np.linalg.norm(r_diff):.2f}", file=fs[s1])
-            print_matrix(mat_sh, file=fs[s1])
+            print(f"# R={Rvec} site={s2} r_diff={r_diff} dist={np.linalg.norm(r_diff):.3f}", file=fs[s1])
+            print_matrix(mat_sh, tol=chop, file=fs[s1])
 
     print("End R-loop")
 
@@ -217,19 +224,27 @@ def read_params(file):
         'Ir': {
             'input' : 'dmft_bse.out.h5',
             'output' : 'Ir.dat',
+            'output_dir' : './',
             'wb' : 0,
             'verbose' : False,
+            'sizes' : 'auto',
+            'chop' : 1e-12,
         },
     }
     config.read_dict(default_config)
     config.read(file)
 
     prms = OrderedDict()
+    # optional
     prms['input'] = config.get('Ir', 'input')
     prms['output'] = config.get('Ir', 'output')
+    prms['output_dir'] = config.get('Ir', 'output_dir')
     prms['wb'] = config.getint('Ir', 'wb')
     prms['verbose'] = config.getboolean('Ir', 'verbose')
+    prms['sizes'] = config.get('Ir', 'sizes')
+    prms['chop'] = config.getfloat('Ir', 'chop')
 
+    # mandatory
     prms['type'] = config.get('Ir', 'type')
     prms['n_bases'] = config.getint('Ir', 'n_bases')
     prms['n_sites'] = config.getint('Ir', 'n_sites')
