@@ -7,7 +7,7 @@ import os
 import argparse
 import configparser
 from itertools import product
-from collections import OrderedDict
+from collections import OrderedDict, Counter
 import matplotlib.pyplot as plt
 
 from chiq.h5bse import h5BSE
@@ -26,6 +26,13 @@ def _is_hermitian(mat, tol=1e-8):
 
 def _hermitianize(mat):
     return (mat + mat.conjugate().T) / 2
+
+
+def sort_by_abs(arr, ascending=True):
+    if ascending:
+        return arr[np.argsort(np.abs(arr))]  # ascending order
+    else:
+        return arr[np.argsort(-np.abs(arr))]  # descending order
 
 
 def _convert_to_matrix(block_matrix, n_block, n_inner):
@@ -209,10 +216,10 @@ def print_Ir(prms : dict):
     # -------------------------------------------------------------
     # R-loop
 
-    print(f"\nResults are saved to 'I_r_site*.dat' (*=0~{n_sites-1})")
+    print(f"\nResults are saved to 'Ir_site*.dat' (*=0~{n_sites-1})")
     fs = []
     for site in range(n_sites):
-        filename = f"I_r_site{site}.dat"
+        filename = f"Ir_site{site}.dat"
         fs.append(open(filename, 'w'))
         print(f"# I(R=0, r_{site}; R, r_site)", file=fs[-1])
 
@@ -265,7 +272,8 @@ def print_Ir(prms : dict):
     assert dists.shape[0] == data4plot.shape[0]
 
     # Analyze distances
-    dists_unique = np.unique(np.round(dists, decimals=10))  # sorted in lexicographic order
+    dists_round = np.round(dists, decimals=10)
+    dists_unique = np.unique(dists_round)  # sorted in lexicographic order
     print("\nDistances:")
     print(dists_unique[:10])
     print(f"  min: {dists_unique[1]:.6e}")
@@ -278,11 +286,18 @@ def print_Ir(prms : dict):
     max_imag = np.max(np.abs(np.imag(data4plot)))
     print(f"  max imag: {max_imag:.4e}")
 
-    data_unique = np.unique(np.round(np.real(data4plot), decimals=10))  # sorted in lexicographic order
-    print("\nLargest antiferroic (<0) values:")
-    print(data_unique[:10])  # print first 12 values
-    print("\nLargest ferroic (>0) values:")
-    print(data_unique[:-10:-1])  # print last 12 values
+    print("\nLargest absolute values:")
+    # Find largest absolute values in descending order
+    data_round = np.round(np.real(data4plot), decimals=10)
+    data_unique = np.unique(data_round)
+    data_sorted = sort_by_abs(data_unique, ascending=False)  # sort by absolute value in descending order
+
+    for val in data_sorted[:20]:
+        # print largest values and their distances
+        bools = np.any(data_round == val, axis=1)
+        # print(f"  {val:13.6e}  dist={np.unique(dists_round[bools])}")
+        c = Counter(dists_round[bools])
+        print(f"  {val:13.6e}  (dist, count)={list(c.items())}")
 
     # Plot
     print("\nPlot")
