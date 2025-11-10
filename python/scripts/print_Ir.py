@@ -17,6 +17,16 @@ from chiq.matrix_dict import MatrixDict
 def _is_zero(mat, tol=1e-8):
     return np.all(np.absolute(mat) < tol)
 
+def _is_real(mat, tol=1e-8):
+    return _is_zero(np.imag(mat), tol)
+
+def _is_hermitian(mat, tol=1e-8):
+    antihermite = (mat - mat.conjugate().T) / 2
+    return _is_zero(antihermite, tol)
+
+def _hermitianize(mat):
+    return (mat + mat.conjugate().T) / 2
+
 
 def _convert_to_matrix(block_matrix, n_block, n_inner):
     assert isinstance(block_matrix, dict)
@@ -26,18 +36,6 @@ def _convert_to_matrix(block_matrix, n_block, n_inner):
         i, j = block
         mat[i, :, j, :] = bmat
     return mat.reshape((dim, dim))
-
-
-def _is_real(mat, tol=1e-8):
-    return _is_zero(np.imag(mat), tol)
-
-def _is_hermitian(mat, tol=1e-8):
-    antihermite = (mat - mat.conjugate().T) / 2
-    return _is_zero(antihermite, tol)
-
-
-def _hermitianize(mat):
-    return (mat + mat.conjugate().T) / 2
 
 
 def convert_Rstr_to_Rvec(Rstr):
@@ -62,7 +60,6 @@ def print_matrix(mat, tol=1e-12, **args):
     for i in range(ncol):
         row_str = ""
         for j in range(nrow):
-            # row_str += f"{mat[i,j].real:>13.6e} {mat[i,j].imag:>13.6e} "
             row_str += f"{chop(mat[i,j].real)} {chop(mat[i,j].imag)} "
         print(row_str, **args)
 
@@ -75,16 +72,15 @@ def plot(x, y, basename, xmax):
     ax.set_ylim(None, None)
     ax.set_axisbelow(True)
     ax.axhline(y=0, color="k", zorder=-1)  # show yzero
-    # ax.set_xscale('log')
 
     # all range
-    figname1 = basename + "_1.pdf"
+    figname1 = basename + "_all.pdf"
     ax.set_xlim(0, None)
     fig.savefig(figname1)
     print(f"  '{figname1}'")
 
     # zoomed
-    figname2 = basename + "_2.pdf"
+    figname2 = basename + "_zoom.pdf"
     ax.set_xlim(0, xmax)
     fig.savefig(figname2)
     print(f"  '{figname2}'")
@@ -106,8 +102,6 @@ def print_Ir(prms : dict):
 
     output_dir = prms['output_dir']
     os.makedirs(output_dir, exist_ok=True)
-
-    file_out = os.path.join(output_dir, prms['output'])
 
     # -------------------------------------------------------------
     # Load data from HDF5 file
@@ -188,23 +182,20 @@ def print_Ir(prms : dict):
 
     # Get system size
     if sizes == 'auto':
-        # print(Rvecs)
         sizes = Rvecs.max(axis=0) + 1
         print(f" System size = {sizes}")
         assert sizes.shape == (3,)
 
     # Shift Rvecs into the first Brillouin zone
-    # print(Rvecs)
     Rvecs = np.where(Rvecs > sizes[None, :]/2, Rvecs - sizes[None, :], Rvecs)
-    # print(Rvecs)
 
     # -------------------------------------------------------------
     # R-loop
 
-    print(f"\nResults are saved to '{file_out}.*' (*=0~{n_sites-1})")
+    print(f"\nResults are saved to 'I_r_site*.dat' (*=0~{n_sites-1})")
     fs = []
     for site in range(n_sites):
-        filename = file_out + f".{site}"
+        filename = f"I_r_site{site}.dat"
         fs.append(open(filename, 'w'))
         print(f"# I(R=0, r_{site}; R, r_site)", file=fs[-1])
 
@@ -213,9 +204,9 @@ def print_Ir(prms : dict):
     dists = []
     data4plot = []
     for key, Rvec in zip(keylist_Ir, Rvecs):
+        # print(key, Rvec)
         if verbose:
             print(f"Load data: key={key}")
-        # print(key, Rvec)
 
         I_r = h5in.get(key=key)
         assert isinstance(I_r, dict)
@@ -237,7 +228,7 @@ def print_Ir(prms : dict):
             r_diff = convert_frac_to_cart(Rvec, r2, avecs) - convert_frac_to_cart(R0, r1, avecs)
             dist = np.linalg.norm(r_diff)
 
-            print(f"# R={Rvec} site={s2} r_diff={r_diff} dist={dist:.3f}", file=fs[s1])
+            print(f"# R={Rvec} site={s2} r_diff={r_diff} dist={dist:.4f}", file=fs[s1])
             print_matrix(mat_sh, tol=chop, file=fs[s1])
 
             dists.append(dist)
@@ -252,8 +243,8 @@ def print_Ir(prms : dict):
     # Convert to ndarray
     dists = np.array(dists)
     data4plot = np.array(data4plot)
-    print(dists.shape)
-    print(data4plot.shape)
+    # print(dists.shape)
+    # print(data4plot.shape)
     assert dists.shape[0] == data4plot.shape[0]
 
     # Analyze distances
@@ -269,11 +260,6 @@ def print_Ir(prms : dict):
     print(f"  is real: {_is_real(data4plot)}")
     max_imag = np.max(np.abs(np.imag(data4plot)))
     print(f"  max imag: {max_imag:.4e}")
-
-    # max_real = np.max(np.real(data4plot))
-    # min_real = np.min(np.real(data4plot))
-    # print(f"  max real (ferroic)    : {max_real:.6e}")
-    # print(f"  max real (antiferroic): {min_real:.6e}")
 
     data_unique = np.unique(np.round(np.real(data4plot), decimals=10))  # sorted in lexicographic order
     print("\nLargest antiferroic (<0) values:")
@@ -298,7 +284,6 @@ def read_params(file):
     default_config = {
         'Ir': {
             'input' : 'dmft_bse.out.h5',
-            'output' : 'Ir.dat',
             'output_dir' : './',
             'wb' : 0,
             'verbose' : False,
@@ -312,7 +297,6 @@ def read_params(file):
     prms = OrderedDict()
     # optional
     prms['input'] = config.get('Ir', 'input')
-    prms['output'] = config.get('Ir', 'output')
     prms['output_dir'] = config.get('Ir', 'output_dir')
     prms['wb'] = config.getint('Ir', 'wb')
     prms['verbose'] = config.getboolean('Ir', 'verbose')
