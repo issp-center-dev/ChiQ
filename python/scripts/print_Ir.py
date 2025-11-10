@@ -52,6 +52,23 @@ def convert_frac_to_cart(R, frac_coord, avecs):
     return (R + frac_coord) @ avecs
 
 
+# Convert list of lists with uneven lengths to np.ndarray
+def numpy_array_2d(list_of_lists, dtype, fill_value=0):
+    # Determine shape
+    n_rows = len(list_of_lists)
+    max_len = max(len(sublist) for sublist in list_of_lists)
+
+    # Create an array of zeros
+    # arr = np.zeros((n_rows, max_len), dtype=dtype)
+    arr = np.full((n_rows, max_len), fill_value, dtype=dtype)
+
+    # Fill each row up to its length
+    for i, row in enumerate(list_of_lists):
+        arr[i, :len(row)] = row
+
+    return arr
+
+
 def print_matrix(mat, tol=1e-12, **args):
     def chop(x, tol=tol):
         return f" 0           " if abs(x) < tol else f"{x:>13.6e}"
@@ -242,9 +259,9 @@ def print_Ir(prms : dict):
 
     # Convert to ndarray
     dists = np.array(dists)
-    data4plot = np.array(data4plot)
-    # print(dists.shape)
-    # print(data4plot.shape)
+    data4plot = numpy_array_2d(data4plot, dtype=np.complex128)
+    print(f"\nData array (number of bonds times max number of elements)")
+    print(data4plot.shape)
     assert dists.shape[0] == data4plot.shape[0]
 
     # Analyze distances
