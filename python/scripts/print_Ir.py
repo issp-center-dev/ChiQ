@@ -8,13 +8,14 @@ import argparse
 import configparser
 from itertools import product
 from collections import OrderedDict
+import matplotlib.pyplot as plt
 
 from chiq.h5bse import h5BSE
 from chiq.matrix_dict import MatrixDict
 
 
-def _is_zero(mat):
-    return np.all(np.absolute(mat) < 1e-8)
+def _is_zero(mat, tol=1e-8):
+    return np.all(np.absolute(mat) < tol)
 
 
 def _convert_to_matrix(block_matrix, n_block, n_inner):
@@ -27,9 +28,12 @@ def _convert_to_matrix(block_matrix, n_block, n_inner):
     return mat.reshape((dim, dim))
 
 
-def _is_hermitian(mat):
+def _is_real(mat, tol=1e-8):
+    return _is_zero(np.imag(mat), tol)
+
+def _is_hermitian(mat, tol=1e-8):
     antihermite = (mat - mat.conjugate().T) / 2
-    return _is_zero(antihermite)
+    return _is_zero(antihermite, tol)
 
 
 def _hermitianize(mat):
@@ -61,6 +65,34 @@ def print_matrix(mat, tol=1e-12, **args):
             # row_str += f"{mat[i,j].real:>13.6e} {mat[i,j].imag:>13.6e} "
             row_str += f"{chop(mat[i,j].real)} {chop(mat[i,j].imag)} "
         print(row_str, **args)
+
+
+def plot(x, y, basename, xmax):
+    fig, ax = plt.subplots()
+    ax.plot(x, y, '.')
+    ax.set_xlabel(r"$|r|$")
+    ax.set_ylabel(r"$I(r)$")
+    ax.set_ylim(None, None)
+    ax.set_axisbelow(True)
+    ax.axhline(y=0, color="k", zorder=-1)  # show yzero
+    # ax.set_xscale('log')
+
+    # all range
+    figname1 = basename + "_1.pdf"
+    ax.set_xlim(0, None)
+    fig.savefig(figname1)
+    print(f"  '{figname1}'")
+
+    # zoomed
+    figname2 = basename + "_2.pdf"
+    ax.set_xlim(0, xmax)
+    fig.savefig(figname2)
+    print(f"  '{figname2}'")
+
+    # save data
+    dat_name = basename + ".dat"
+    np.savetxt(dat_name, np.column_stack((x, y)))
+    print(f"  '{dat_name}'")
 
 
 def print_Ir(prms : dict):
@@ -178,6 +210,8 @@ def print_Ir(prms : dict):
 
     print(f"\nStart R-loop")
     R0 = np.zeros(3, dtype=int)
+    dists = []
+    data4plot = []
     for key, Rvec in zip(keylist_Ir, Rvecs):
         if verbose:
             print(f"Load data: key={key}")
@@ -201,15 +235,56 @@ def print_Ir(prms : dict):
             r1 = coords[s1]
             r2 = coords[s2]
             r_diff = convert_frac_to_cart(Rvec, r2, avecs) - convert_frac_to_cart(R0, r1, avecs)
+            dist = np.linalg.norm(r_diff)
 
-            print(f"# R={Rvec} site={s2} r_diff={r_diff} dist={np.linalg.norm(r_diff):.3f}", file=fs[s1])
+            print(f"# R={Rvec} site={s2} r_diff={r_diff} dist={dist:.3f}", file=fs[s1])
             print_matrix(mat_sh, tol=chop, file=fs[s1])
+
+            dists.append(dist)
+            data4plot.append(mat_sh.reshape(-1))
 
     print("End R-loop")
 
     for f in fs:
         f.close()
     h5in.close()
+
+    # Convert to ndarray
+    dists = np.array(dists)
+    data4plot = np.array(data4plot)
+    print(dists.shape)
+    print(data4plot.shape)
+    assert dists.shape[0] == data4plot.shape[0]
+
+    # Analyze distances
+    dists_unique = np.unique(np.round(dists, decimals=10))  # sorted in lexicographic order
+    print("\nDistances:")
+    print(dists_unique[:10])
+    print(f"  min: {dists_unique[1]:.6e}")
+    print(f"  max: {dists_unique[-1]:.6e}")
+    print(f"  number of different distances: {len(dists_unique)}:")
+
+    # Analyze I(r)
+    print("\nI(r):")
+    print(f"  is real: {_is_real(data4plot)}")
+    max_imag = np.max(np.abs(np.imag(data4plot)))
+    print(f"  max imag: {max_imag:.4e}")
+
+    # max_real = np.max(np.real(data4plot))
+    # min_real = np.min(np.real(data4plot))
+    # print(f"  max real (ferroic)    : {max_real:.6e}")
+    # print(f"  max real (antiferroic): {min_real:.6e}")
+
+    data_unique = np.unique(np.round(np.real(data4plot), decimals=10))  # sorted in lexicographic order
+    print("\nLargest antiferroic (<0) values:")
+    print(data_unique[:10])  # print first 12 values
+    print("\nLargest ferroic (>0) values:")
+    print(data_unique[:-10:-1])  # print last 12 values
+
+    # Plot
+    print("\nPlot")
+    # up to 9-th neighbor
+    plot(x=dists, y=np.real(data4plot), basename=os.path.join(output_dir, "Ir_dist"), xmax=dists_unique[10])
 
 
 def read_params(file):
