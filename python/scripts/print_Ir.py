@@ -6,7 +6,7 @@ import sys
 import os
 import argparse
 import configparser
-from itertools import product
+from itertools import product, islice
 from collections import OrderedDict, Counter
 import matplotlib.pyplot as plt
 
@@ -86,6 +86,12 @@ def print_matrix(mat, tol=1e-12, **args):
         for j in range(nrow):
             row_str += f"{chop(mat[i,j].real)} {chop(mat[i,j].imag)} "
         print(row_str, **args)
+
+
+def head(file_path, num_lines=10):
+    with open(file_path, 'r') as file:
+        for line in islice(file, num_lines):
+            print(line, end='')
 
 
 def plot(x, y, basename, xmax):
@@ -276,7 +282,13 @@ def print_Ir(prms : dict):
     dists_unique = np.unique(dists_round)  # sorted in lexicographic order
     print("\nDistances:")
     print(dists_unique[:10])
-    print(f"  min: {dists_unique[1]:.6e}")
+
+    # Save distances
+    filename = os.path.join(output_dir, "distances.dat")
+    np.savetxt(filename, dists_unique)
+    print(f"  Saved in '{filename}'")
+
+    print(f"\n  min: {dists_unique[1]:.6e}")
     print(f"  max: {dists_unique[-1]:.6e}")
     print(f"  number of different distances: {len(dists_unique)}:")
 
@@ -292,16 +304,20 @@ def print_Ir(prms : dict):
     data_unique = np.unique(data_round)
     data_sorted = sort_by_abs(data_unique, ascending=False)  # sort by absolute value in descending order
 
-    for val in data_sorted[:20]:
-        # print largest values and their distances
-        bools = np.any(data_round == val, axis=1)
-        # print(f"  {val:13.6e}  dist={np.unique(dists_round[bools])}")
-        c = Counter(dists_round[bools])
-        print(f"  {val:13.6e}  (dist, count)={list(c.items())}")
+    filename = os.path.join(output_dir, "Ir_largest.dat")
+    with open(filename, 'w') as f:
+        for val in data_sorted:
+            # print largest values and their distances
+            bools = np.any(data_round == val, axis=1)
+            # print(f"  {val:13.6e}  dist={np.unique(dists_round[bools])}")
+            c = Counter(dists_round[bools])
+            print(f"  {val:13.6e}  (dist, count)={list(c.items())}", file=f)
+    print(f"  Saved in '{filename}'\n")
+    head(filename, num_lines=10)
 
     # Plot
-    print("\nPlot")
-    # up to 9-th neighbor
+    print("\nPlot I(r) as a function of distance")
+    # xmax: up to 9-th neighbor
     plot(x=dists, y=np.real(data4plot), basename=os.path.join(output_dir, "Ir_dist"), xmax=dists_unique[10])
 
 
