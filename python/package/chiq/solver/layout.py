@@ -137,3 +137,24 @@ def block_inverse(bm, dims):
                 out[(a, b)] = inv[offsets[a]:offsets[a] + dims[a],
                                   offsets[b]:offsets[b] + dims[b]].copy()
     return out
+
+
+def matmul(a, b, dims):
+    """Block matrix product a @ b.
+
+    Emits key (i,j) iff there exists k with (i,k) in a and (k,j) in b
+    (structural rule, matching block_matrix.hpp operator*); the numerical
+    value never decides key presence.
+    """
+    nvert = len(dims)
+    out = {}
+    for i in range(nvert):
+        for j in range(nvert):
+            acc = None
+            for k in range(nvert):
+                if (i, k) in a and (k, j) in b:
+                    p = a[(i, k)] @ b[(k, j)]
+                    acc = p if acc is None else acc + p
+            if acc is not None:
+                out[(i, j)] = acc
+    return out
