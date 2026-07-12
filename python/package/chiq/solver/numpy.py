@@ -44,7 +44,7 @@ class NumpySolver(SolverBase):
         self._require(ct)
         fn = {
             "chi0": kernels.calc_chi0,
-            # bse/rpa/rrpa/scl added in later tasks
+            "bse": kernels.calc_bse,
         }[ct]
         result = fn(self._in, self.beta, self.nb, self.nw, self.n_in)
         self._out.update(result)
