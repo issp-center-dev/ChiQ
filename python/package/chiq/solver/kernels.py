@@ -54,3 +54,22 @@ def calc_rrpa(state, beta, nb, nw, n_in):
     m = L.sub(L.identity(info_C), L.matmul(chi0_q, Ueff, info_C))
     chi_q_rrpa = L.matmul(L.block_inverse(m, info_C), chi0_q, info_C)
     return {"chi_q_rrpa": chi_q_rrpa}
+
+
+def calc_scl(state, beta, nb, nw, n_in):
+    info_B = [n_in] * (nb * nw)
+    info_C = [n_in] * nb
+    X0_loc = state["X0_loc"]
+    X0_q = state["X0_q"]
+    Phi = state["Phi"]
+    Phi_sum = state["Phi_sum"]
+
+    Lambdaq = L.sub(L.block_inverse(X0_loc, info_B), L.block_inverse(X0_q, info_B))  # B
+    lambda_q = L.sumfreq_b(L.matmul(L.matmul(Phi, Lambdaq, info_B), Phi, info_B),
+                           nb, nw, n_in)                                            # C
+    m = L.sub(L.identity(info_C), lambda_q)
+    chi_q_scl = L.matmul(L.matmul(Phi_sum, L.block_inverse(m, info_C), info_C),
+                         Phi_sum, info_C)
+    phisum_inv = L.block_inverse(Phi_sum, info_C)
+    Iq = L.matmul(L.matmul(phisum_inv, lambda_q, info_C), phisum_inv, info_C)
+    return {"chi_q_scl": chi_q_scl, "I_q_scl": Iq}
