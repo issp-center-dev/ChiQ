@@ -34,3 +34,23 @@ def calc_bse(state, beta, nb, nw, n_in):
     Iq = L.sub(L.block_inverse(chi_loc, [n_in] * nb),
                L.block_inverse(chi_q, [n_in] * nb))                  # C-type
     return {"chi_q": chi_q, "I_q": Iq}
+
+
+def calc_rpa(state, beta, nb, nw, n_in):
+    info_C = [n_in] * nb
+    chi0_q = state["chi0_q"]
+    gamma0 = state["gamma0"]
+    m = L.sub(L.identity(info_C), L.matmul(chi0_q, gamma0, info_C))
+    chi_q_rpa = L.matmul(L.block_inverse(m, info_C), chi0_q, info_C)
+    return {"chi_q_rpa": chi_q_rpa}
+
+
+def calc_rrpa(state, beta, nb, nw, n_in):
+    info_C = [n_in] * nb
+    chi0_loc = state["chi0_loc"]
+    chi_loc = state["chi_loc"]
+    chi0_q = state["chi0_q"]
+    Ueff = L.sub(L.block_inverse(chi0_loc, info_C), L.block_inverse(chi_loc, info_C))
+    m = L.sub(L.identity(info_C), L.matmul(chi0_q, Ueff, info_C))
+    chi_q_rrpa = L.matmul(L.block_inverse(m, info_C), chi0_q, info_C)
+    return {"chi_q_rrpa": chi_q_rrpa}

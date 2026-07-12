@@ -45,6 +45,8 @@ class NumpySolver(SolverBase):
         fn = {
             "chi0": kernels.calc_chi0,
             "bse": kernels.calc_bse,
+            "rpa": kernels.calc_rpa,
+            "rrpa": kernels.calc_rrpa,
         }[ct]
         result = fn(self._in, self.beta, self.nb, self.nw, self.n_in)
         self._out.update(result)
