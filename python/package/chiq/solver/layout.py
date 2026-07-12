@@ -36,3 +36,39 @@ def parse_matrix_info(info_A, info_B, info_C):
     if len(info_A) != nb or any(int(x) != n_in * nw for x in info_A):
         raise ValueError("info_A inconsistent with n_in*nw")
     return nb, nw, n_in
+
+
+def add(a, b):
+    """Entrywise a + b over the union of present keys."""
+    out = {}
+    for k in set(a) | set(b):
+        if k in a and k in b:
+            out[k] = a[k] + b[k]
+        elif k in a:
+            out[k] = a[k].copy()
+        else:
+            out[k] = b[k].copy()
+    return out
+
+
+def sub(a, b):
+    """Entrywise a - b over the union of present keys."""
+    out = {}
+    for k in set(a) | set(b):
+        if k in a and k in b:
+            out[k] = a[k] - b[k]
+        elif k in a:
+            out[k] = a[k].copy()
+        else:
+            out[k] = -b[k]
+    return out
+
+
+def scale(s, bm):
+    """Scalar multiply every block by s."""
+    return {k: s * v for k, v in bm.items()}
+
+
+def identity(dims):
+    """Block-diagonal identity with the given per-vertex dimensions."""
+    return {(i, i): np.eye(int(d), dtype=complex) for i, d in enumerate(dims)}
