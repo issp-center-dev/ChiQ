@@ -40,3 +40,29 @@ def test_get_unknown_name_raises():
 def test_get_valid_uncomputed_name_returns_empty_dict():
     s = get_solver("numpy", 10.0, *_info(1, 2, 1))
     assert s.get("chi_q") == {}   # valid output name, not computed yet -> {}
+
+def test_set_copies_input_no_aliasing():
+    # mutating the caller's array after set() must not change the stored input / results
+    nb, nw, n_in, beta = 1, 1, 1, 4.0
+    s = get_solver("numpy", beta, [1], [1], [1])
+    chi0_loc = {(0, 0): np.array([[7.0]], complex)}
+    X0_loc = {(0, 0): np.array([[2.0]], complex)}
+    X0_q = {(0, 0): np.array([[10.0]], complex)}
+    s.set(chi0_loc, "chi0_loc"); s.set(X0_loc, "X0_loc"); s.set(X0_q, "X0_q")
+    X0_q[(0, 0)][0, 0] = 999.0   # mutate caller's array AFTER set
+    s.calc("chi0")
+    out = s.get("chi0_q")
+    # result uses the value at set() time (10.0), not the mutated 999.0
+    assert np.allclose(out[(0, 0)], [[7.0 + (10.0 - 2.0) / beta]])
+
+def test_get_returns_owned_copy_no_aliasing():
+    nb, nw, n_in, beta = 1, 1, 1, 4.0
+    s = get_solver("numpy", beta, [1], [1], [1])
+    s.set({(0, 0): np.array([[7.0]], complex)}, "chi0_loc")
+    s.set({(0, 0): np.array([[2.0]], complex)}, "X0_loc")
+    s.set({(0, 0): np.array([[10.0]], complex)}, "X0_q")
+    s.calc("chi0")
+    out1 = s.get("chi0_q")
+    out1[(0, 0)][0, 0] = -12345.0   # mutate the returned array
+    out2 = s.get("chi0_q")
+    assert np.allclose(out2[(0, 0)], [[7.0 + (10.0 - 2.0) / beta]])  # unchanged

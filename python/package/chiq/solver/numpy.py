@@ -29,7 +29,7 @@ class NumpySolver(SolverBase):
     def set(self, bm, name):
         if name not in SET_LAYOUT:
             raise RuntimeError(f"Invalid type '{name}'")
-        self._in[name] = {k: np.asarray(v, dtype=complex) for k, v in bm.items()}
+        self._in[name] = {k: np.array(v, dtype=np.complex128, copy=True) for k, v in bm.items()}
 
     def _require(self, calc_type):
         for name in _REQUIRED[calc_type]:
@@ -61,4 +61,4 @@ class NumpySolver(SolverBase):
     def get(self, name):
         if name not in GET_NAMES:
             raise RuntimeError(f"Invalid type '{name}'")
-        return self._out.get(name, {})
+        return {k: v.copy() for k, v in self._out.get(name, {}).items()}
