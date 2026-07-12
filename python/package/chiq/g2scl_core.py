@@ -6,12 +6,6 @@ import os
 from scipy.optimize import curve_fit, leastsq
 import inspect
 
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from mpl_toolkits.mplot3d import Axes3D
-
 
 def is_real(array):
     flag_real = True
@@ -96,6 +90,10 @@ def fit_asym(x, z):
 
 
 def plot_common(filename):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from matplotlib import cm
     plt.legend()
     # plt.xlim([-30,30])
     plt.xlabel("$\omega_n$")
@@ -106,6 +104,11 @@ def plot_common(filename):
 
 
 def plot_common_3d(xy, z, filename):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from matplotlib import cm
+    from mpl_toolkits.mplot3d import Axes3D
     x, y = np.meshgrid(xy, xy)
     fig = plt.figure()
     ax = Axes3D(fig)
@@ -439,6 +442,10 @@ class G2SCL_core:
     # plot functions
 
     def plot_u0(self, filename, fit=True, data_out=None):
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        from matplotlib import cm
         w=matsubara_mesh(self.u0.real, self.beta)
         plt.plot(w, self.u0.real, marker='.', label='Re u0')
         plt.plot(w, self.u0.imag, marker='.', label='Im u0')
@@ -488,6 +495,11 @@ class G2SCL_core:
     def plot_sv(self, _filename, xmax=30):
         if self.singular_values is None:
             return
+
+        import matplotlib
+        matplotlib.use('Agg')
+        import matplotlib.pyplot as plt
+        from matplotlib import cm
 
         basename, ext = os.path.splitext(_filename)
         # print basename, ext
