@@ -10,7 +10,11 @@ endif (${CMAKE_PROJECT_NAME} STREQUAL "Project")
 #
 # install(TARGETS BSE DESTINATION bin)
 
-pybind11_add_module(bse_solver bse_solver_pybind.cpp)
+pybind11_add_module(_bse_solver bse_solver_pybind.cpp)
 
-install(TARGETS bse_solver
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/bse-python)
+if(CHIQ_WHEEL_BUILD)
+  install(TARGETS _bse_solver LIBRARY DESTINATION chiq)
+else()
+  install(TARGETS _bse_solver
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/bse-python/chiq)
+endif()
