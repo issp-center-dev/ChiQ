@@ -27,3 +27,14 @@ def test_chiq_main_version_runs_on_core():
                        env=env, capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     assert "ChiQ version" in (r.stdout + r.stderr)
+
+def test_scripts_are_thin_wrappers():
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+    p = os.path.join(root, "python", "scripts", "chiq_main.py")
+    text = open(p).read()
+    assert "from chiq.cli.chiq_main import main" in text
+
+def test_deprecated_alias_prints_stderr(capfd):
+    from chiq.cli import _deprecated
+    assert hasattr(_deprecated, "chiq_main_py")
