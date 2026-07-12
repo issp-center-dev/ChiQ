@@ -1342,10 +1342,17 @@ def _assert_agree(a, b):
             va, vb = a[k], np.zeros_like(a[k])
         else:
             va, vb = np.zeros_like(b[k]), b[k]
-        # NaN / signed-inf position masks, then elementwise mixed tolerance
-        assert np.array_equal(np.isnan(va), np.isnan(vb))
-        assert np.array_equal(np.isposinf(va), np.isposinf(vb))
-        assert np.array_equal(np.isneginf(va), np.isneginf(vb))
+        # NaN / signed-inf position masks, then elementwise mixed tolerance.
+        # np.isposinf/np.isneginf reject complex dtype, so check real/imag parts
+        # separately (a test-harness detail, not a loosening of the metric).
+        va_r, va_i = np.real(va), np.imag(va)
+        vb_r, vb_i = np.real(vb), np.imag(vb)
+        assert np.array_equal(np.isnan(va_r), np.isnan(vb_r))
+        assert np.array_equal(np.isnan(va_i), np.isnan(vb_i))
+        assert np.array_equal(np.isposinf(va_r), np.isposinf(vb_r))
+        assert np.array_equal(np.isposinf(va_i), np.isposinf(vb_i))
+        assert np.array_equal(np.isneginf(va_r), np.isneginf(vb_r))
+        assert np.array_equal(np.isneginf(va_i), np.isneginf(vb_i))
         np.testing.assert_allclose(va, vb, rtol=1e-8, atol=1e-10, equal_nan=True)
 
 def _c_blocks(nb, n_in):
