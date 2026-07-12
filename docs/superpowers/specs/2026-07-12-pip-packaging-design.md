@@ -221,11 +221,11 @@ Confirmed by grep of the actual source:
   which builds a wheel) and assert it contains everything needed to configure+compile in a
   clean checkout-less environment — the required CMake files (`CMakeLists.txt`,
   `src/CMakeLists.txt`, `cmake/`), C++ sources/headers, all Python sources
-  (`chiq/`, `bse/`, `bse_solver.py`, `chiq/cli/`), `point_group_data`, test `.h5` fixtures,
+  (`chiq/`, `bse/`, `bse_solver/`, `chiq/cli/`), `point_group_data`, test `.h5` fixtures,
   and `LICENSE`/`README.md`. Additionally build the sdist in an environment **without the
   git submodule** to confirm the `find_package(pybind11)` path (§3.2) works. Assert the
   built **wheel** archive contains `chiq/` (with `chiq/_bse_solver.<ext>` + `point_group_data`),
-  `bse/`, `bse_solver.py`, and **no** test `.h5`, `lib/bse-python`, raw scripts, or
+  `bse/`, `bse_solver/__init__.py`, and **no** test `.h5`, `lib/bse-python`, raw scripts, or
   `chiqvars.sh`.
 - **Editable install:** `pip install -e .` then `import chiq._bse_solver` from a directory
   **outside** the repo (so in-tree `.so`/source can't mask a broken editable install);
