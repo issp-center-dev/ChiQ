@@ -64,12 +64,18 @@ def _import_dcore():
     """Lazily import the optional 'dcore' dependency and populate this
     module's globals (including building the DMFTBSESolver class).
 
+    Idempotent: if the globals are already populated (from a previous call),
+    returns immediately without re-importing or re-exiting.
+
     Exits with an actionable message via sys.exit() if 'dcore' is missing.
     """
     global HDFArchive, dyson, DMFTCoreSolver, create_parser, parse_parameters
     global print_parameters, delete_parameters, OptionStatus, impurity_solvers
     global run_sumkdft, raise_if_mpi_imported, make_empty_dir
     global launch_mpi_subprocesses, float_to_complex_array, DMFTBSESolver
+
+    if create_parser is not None:
+        return
 
     try:
         from dcore._dispatcher import HDFArchive as _HDFArchive, dyson as _dyson
@@ -710,6 +716,7 @@ def dcore_chiq(filename, np=1):
     filename : string
         Input-file name
     """
+    _import_dcore()
 
     print("\n############  Reading Input File  #################\n")
     print("  Input File Name : ", filename)

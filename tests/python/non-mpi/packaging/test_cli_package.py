@@ -28,12 +28,13 @@ def test_chiq_main_version_runs_on_core():
     assert r.returncode == 0, r.stderr
     assert "ChiQ version" in (r.stdout + r.stderr)
 
-def test_scripts_are_thin_wrappers():
+@pytest.mark.parametrize("name", CORE_COMMANDS + ["dcore_chiq"])
+def test_scripts_are_thin_wrappers(name):
     import os
     root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-    p = os.path.join(root, "python", "scripts", "chiq_main.py")
+    p = os.path.join(root, "python", "scripts", name + ".py")
     text = open(p).read()
-    assert "from chiq.cli.chiq_main import main" in text
+    assert f"from chiq.cli.{name} import main" in text
 
 def test_deprecated_alias_prints_stderr(capfd):
     from chiq.cli import _deprecated

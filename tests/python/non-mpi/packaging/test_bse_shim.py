@@ -30,8 +30,11 @@ def test_from_bse_import_public_submodule():
 def test_nested_point_group_data():
     import bse.point_group_data.C1
     import chiq.point_group_data.C1
-    # a public symbol is the same object
-    assert dir(bse.point_group_data.C1)
+    # a public symbol forwarded via `import *` must be the SAME object
+    public = [n for n in dir(chiq.point_group_data.C1) if not n.startswith("_")]
+    assert public, "chiq.point_group_data.C1 has no public names to compare"
+    name = public[0]
+    assert getattr(bse.point_group_data.C1, name) is getattr(chiq.point_group_data.C1, name)
 
 def test_all_allowlisted_modules_importable():
     for mod in ["h5bse", "bse_toml", "matrix_dict", "point_group", "tools", "index_pair", "mpi"]:
