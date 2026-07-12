@@ -72,3 +72,68 @@ def scale(s, bm):
 def identity(dims):
     """Block-diagonal identity with the given per-vertex dimensions."""
     return {(i, i): np.eye(int(d), dtype=complex) for i, d in enumerate(dims)}
+
+
+def connected_components(bm, nvert):
+    """Connected components of the block-sparsity graph.
+
+    Edge between i and j iff (i,j) or (j,i) is a present key (matches
+    block_matrix.hpp `connected`). Returns a list of components, each a
+    sorted list of vertices, components sorted by their first vertex.
+    """
+    adj = {i: set() for i in range(nvert)}
+    for (i, j) in bm:
+        adj[i].add(j)
+        adj[j].add(i)
+    seen = [False] * nvert
+    comps = []
+    for start in range(nvert):
+        if seen[start]:
+            continue
+        stack = [start]
+        seen[start] = True
+        comp = []
+        while stack:
+            v = stack.pop()
+            comp.append(v)
+            for w in adj[v]:
+                if not seen[w]:
+                    seen[w] = True
+                    stack.append(w)
+        comps.append(sorted(comp))
+    comps.sort(key=lambda c: c[0])
+    return comps
+
+
+def block_inverse(bm, dims):
+    """Per-connected-component dense inverse.
+
+    Assembles each component into a dense super-block, inverts it, and
+    scatters back every intra-component vertex pair (dense fill-in,
+    numerical zeros retained), matching block_matrix.hpp `inverse`.
+    """
+    dims = [int(d) for d in dims]
+    nvert = len(dims)
+    out = {}
+    for comp in connected_components(bm, nvert):
+        offsets = {}
+        size = 0
+        for v in comp:
+            offsets[v] = size
+            size += dims[v]
+        super_block = np.zeros((size, size), dtype=complex)
+        for a in comp:
+            for b in comp:
+                if (a, b) in bm:
+                    super_block[offsets[a]:offsets[a] + dims[a],
+                                offsets[b]:offsets[b] + dims[b]] = bm[(a, b)]
+        with np.errstate(divide="ignore", invalid="ignore"):
+            try:
+                inv = np.linalg.inv(super_block)
+            except np.linalg.LinAlgError:
+                inv = np.full((size, size), np.nan, dtype=complex)
+        for a in comp:
+            for b in comp:
+                out[(a, b)] = inv[offsets[a]:offsets[a] + dims[a],
+                                  offsets[b]:offsets[b] + dims[b]].copy()
+    return out
