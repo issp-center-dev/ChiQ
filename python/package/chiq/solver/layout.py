@@ -190,3 +190,44 @@ def sumfreq_b(bm, nb, nw, n_in):
                     m = m + bm[key]
             out[(i, j)] = m
     return out
+
+
+def convert_a2b(bm, nb, nw, n_in):
+    """A-type -> B-type. Emits (iw1*nb+b1, iw2*nb+b2) iff the extracted
+    block is not exactly zero (matches Convert_A2B isZero(0) pruning)."""
+    out = {}
+    for (b1, b2), mat in bm.items():
+        r = mat.reshape(n_in, nw, n_in, nw)
+        for iw1 in range(nw):
+            for iw2 in range(nw):
+                block = r[:, iw1, :, iw2]
+                if np.any(block != 0):
+                    out[(iw1 * nb + b1, iw2 * nb + b2)] = block.copy()
+    return out
+
+
+def convert_b2a(bm, nb, nw, n_in):
+    """B-type -> A-type. Emits (b1,b2) iff its assembled A block is not
+    exactly zero (matches Convert_B2A isZero(0) pruning)."""
+    out = {}
+    for b1 in range(nb):
+        for b2 in range(nb):
+            r = np.zeros((n_in, nw, n_in, nw), dtype=complex)
+            any_nonzero = False
+            for iw1 in range(nw):
+                for iw2 in range(nw):
+                    key = (iw1 * nb + b1, iw2 * nb + b2)
+                    if key in bm:
+                        r[:, iw1, :, iw2] = bm[key]
+                        any_nonzero = True
+            if any_nonzero:
+                out[(b1, b2)] = r.reshape(n_in * nw, n_in * nw)
+    return out
+
+
+def prod_ab(a_mat, b_mat, nb, nw, n_in):
+    """A-type * B-type -> A-type, via convert to B, multiply, convert back
+    (reproduces bse.hpp Prod_A_B)."""
+    a_in_b = convert_a2b(a_mat, nb, nw, n_in)
+    ab_in_b = matmul(a_in_b, b_mat, [n_in] * (nb * nw))
+    return convert_b2a(ab_in_b, nb, nw, n_in)
