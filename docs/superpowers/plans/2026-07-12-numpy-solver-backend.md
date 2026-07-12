@@ -814,11 +814,11 @@ add a `backend` key:
 
 ```python
 # in the chiq_main section parsing of bse_toml.load_params_from_toml
-dict_tool["backend"] = dict_main.get("backend", "cpp")
+dict_tool["backend"] = params.pop("backend", "cpp")  # pop before _check_if_dict_empty
 if str(dict_tool["backend"]).lower() not in ("cpp", "numpy", "cupy"):
-    raise ValueError(
-        f"[chiq_main] backend must be 'cpp', 'numpy', or 'cupy', got "
-        f"{dict_tool['backend']!r}"
+    sys.exit(  # clean CLI exit, matching _check_if_dict_empty convention
+        f"ERROR: [chiq_main] backend must be 'cpp', 'numpy', or 'cupy', "
+        f"got {dict_tool['backend']!r}"
     )
 ```
 

@@ -135,6 +135,7 @@ omega_q = "q_path.dat"
 [chiq_main]
 work_dir = "work/chiq_main"
 # num_wf = 20  # If not specified, the value is determined from X_loc
+# backend = "cpp"  # solver backend: "cpp" (default), "numpy", or "cupy" (not yet enabled)
 
 [chiq_post]
 output_dir = ""

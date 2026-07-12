@@ -44,9 +44,9 @@ def load_params_from_toml(file_name, print_summary=True):
     dict_tool["num_wf"] = params.pop("num_wf", None)
     dict_tool["backend"] = params.pop("backend", "cpp")
     if str(dict_tool["backend"]).lower() not in ("cpp", "numpy", "cupy"):
-        raise ValueError(
-            f"[chiq_main] backend must be 'cpp', 'numpy', or 'cupy', got "
-            f"{dict_tool['backend']!r}"
+        sys.exit(
+            f"ERROR: [chiq_main] backend must be 'cpp', 'numpy', or 'cupy', "
+            f"got {dict_tool['backend']!r}"
         )
     _obsolete_param(dict_toml, "chiq_main", "solver")
     _check_if_dict_empty(params, block="chiq_main")
