@@ -158,3 +158,35 @@ def matmul(a, b, dims):
             if acc is not None:
                 out[(i, j)] = acc
     return out
+
+
+def sumfreq_a(bm, nb, nw, n_in):
+    """A-type -> C-type by summing over both frequency indices.
+
+    out[(i,j)][a,c] = sum_{iw1,iw2} A[(i,j)][a*nw+iw1, c*nw+iw2].
+    Only keys present in bm are emitted (matches Sumfreq_A which skips
+    absent A blocks).
+    """
+    out = {}
+    for (i, j), mat in bm.items():
+        r = mat.reshape(n_in, nw, n_in, nw)
+        out[(i, j)] = r.sum(axis=(1, 3))
+    return out
+
+
+def sumfreq_b(bm, nb, nw, n_in):
+    """B-type -> C-type by summing over the (diagonal) frequency index.
+
+    out[(i,j)] = sum_iw B[(iw*nb+i, iw*nb+j)] over present keys. Every
+    nb*nb key is emitted (matches Sumfreq_B, which assigns all blocks).
+    """
+    out = {}
+    for i in range(nb):
+        for j in range(nb):
+            m = np.zeros((n_in, n_in), dtype=complex)
+            for iw in range(nw):
+                key = (iw * nb + i, iw * nb + j)
+                if key in bm:
+                    m = m + bm[key]
+            out[(i, j)] = m
+    return out
