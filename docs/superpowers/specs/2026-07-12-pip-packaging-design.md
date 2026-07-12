@@ -255,14 +255,26 @@ Confirmed by grep of the actual source:
   (`from chiq import _bse_solver`).
 - Edit: `python/scripts/*.py` → thin wrappers delegating to `chiq.cli.*`.
 - Edit: `.github/workflows/main.yml` (pip job + install/sdist/editable tests + 3.11 smoke).
-- Edit docs: `README.md` — add a "Quick install (pip)" subsection (`pip install .`) above the
-  CMake instructions; update the "How to use" examples from `chiq_main.py`/`chiq_post.py` to
-  the entry-point names `chiq_main`/`chiq_post`; fix the stale doc-build path
-  `sphinx-build -b html ../bse/doc html` → `../ChiQ/doc`. `doc/install.rst` — pip vs CMake
-  decision matrix (§9), offline `--no-build-isolation` path (§9), cluster `mpi4py` build
-  (§9), editable-install C++ rebuild caveat, and a **warning to unset a stale `PYTHONPATH`**
-  from a prior `chiqvars.sh` when switching to the pip install (else the old tree masks the
-  pip package / a stale `bse_solver` shadows the shim).
+- Edit docs (Antigravity design-review inventory — the `.py` command names in tutorials are
+  the deprecated form and must become bare entry-point names):
+  - `README.md` — add a "Quick install (pip)" subsection (`pip install .`) above the CMake
+    instructions; `chiq_main.py`/`chiq_post.py` (lines ~79, 119-120) → `chiq_main`/`chiq_post`;
+    fix the stale doc-build path `sphinx-build -b html ../bse/doc html` → `../ChiQ/doc`
+    (line ~87).
+  - `doc/install.rst` — `chiq_main.py` → `chiq_main` (line ~74); pip vs CMake decision matrix
+    (§9); offline `--no-build-isolation` path (§9); cluster `mpi4py` build (§9); editable
+    C++-rebuild caveat; **warning to unset a stale `PYTHONPATH`** from a prior `chiqvars.sh`
+    when switching to pip (else the old tree masks the pip package / a stale `bse_solver`
+    shadows the shim).
+  - `doc/tutorial/multiple_orb.rst`, `doc/tutorial/intersite_interactions.rst`,
+    `doc/tutorial/single_orb.rst` — strip `.py` from every command example
+    (`gen_qpath.py`, `dcore_chiq.py`, `chiq_main.py`, `chiq_post.py`, `gen_allq.py`,
+    `calc_Iq.py`, `chiq_fft.py`, `plot_Ir.py`, `plot_chiq_path.py`, `eigenvec_viewer.py`),
+    and fix the typo `chi_main.py` → `chiq_main` in `single_orb.rst` (~line 169).
+- **CMake `bse` symlink (workflow risk from Plan A review):** `python/CMakeLists.txt` still
+  does `create_symlink chiq bse` at install, which would shadow the new static `bse` shim in
+  the legacy layout (no FutureWarning, no allowlist). §3.3's `file(REMOVE)` + install-the-real-
+  `bse/`-package rule replaces this — must be done in this plan (Plan B), not left as a symlink.
 
 ## 9. HPC / offline build (ohtaka)
 
