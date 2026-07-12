@@ -727,6 +727,8 @@ SET_LAYOUT = {
     "chi_loc": "C", "chi0_loc": "C", "chi0_q": "C", "gamma0": "C", "Phi_sum": "C",
 }
 CALC_TYPES = {"chi0", "bse", "rpa", "rrpa", "scl"}
+# valid get() output names (from bse_solver_pybind.cpp getMatrix)
+GET_NAMES = {"chi0_q", "chi_q", "chi_q_rpa", "chi_q_rrpa", "chi_q_scl", "I_q", "I_q_scl"}
 
 
 class SolverBase(abc.ABC):
@@ -952,7 +954,7 @@ def calc_chi0(state, beta, nb, nw, n_in):
 import numpy as np
 
 from . import kernels
-from .base import SolverBase, SET_LAYOUT, CALC_TYPES
+from .base import SolverBase, SET_LAYOUT, CALC_TYPES, GET_NAMES
 from .layout import parse_matrix_info
 
 # internal require-names used in the C++ error strings (bse.hpp)
@@ -1005,6 +1007,10 @@ class NumpySolver(SolverBase):
             self._out["I_q"] = result["I_q_scl"]
 
     def get(self, name):
+        # unknown output name -> RuntimeError (match C++ getMatrix); valid but
+        # not-yet-computed -> {}
+        if name not in GET_NAMES:
+            raise RuntimeError(f"Invalid type '{name}'")
         return self._out.get(name, {})
 ```
 
