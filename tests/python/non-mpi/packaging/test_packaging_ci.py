@@ -8,6 +8,7 @@ def test_ci_runs_packaging_verification_scripts():
     workflow = (ROOT / ".github/workflows/main.yml").read_text()
     assert "verify_legacy_install.sh" in workflow
     assert "verify_pip_install.sh" in workflow
+    assert "submodules: recursive" in workflow
 
 
 def test_packaging_verification_scripts_support_linux():

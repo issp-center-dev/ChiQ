@@ -4,9 +4,17 @@ The compiled module is now `chiq._bse_solver`. This shim re-exports it so the
 legacy `import bse_solver; bse_solver.BSESolver` keeps working. Deprecated;
 removed in ChiQ 2.0 -- use `chiq.solver.get_solver` instead.
 """
+import importlib
 import warnings
 
-from chiq._bse_solver import BSESolver
+try:
+    _impl = importlib.import_module("chiq._bse_solver")
+except ModuleNotFoundError as exc:
+    if exc.name != "chiq._bse_solver":
+        raise
+    _impl = importlib.import_module("_bse_solver")
+
+BSESolver = _impl.BSESolver
 
 __all__ = ["BSESolver"]
 

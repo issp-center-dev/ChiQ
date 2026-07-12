@@ -1,12 +1,16 @@
 """C++ backend: thin wrapper over the pybind module `chiq._bse_solver`."""
 
+import importlib
+
 import numpy as np
 
 try:
-    from chiq import _bse_solver
-except ImportError:
+    _bse_solver = importlib.import_module("chiq._bse_solver")
+except ModuleNotFoundError as exc:
+    if exc.name != "chiq._bse_solver":
+        raise
     # Legacy uninstalled builds expose the extension through build/src.
-    import _bse_solver
+    _bse_solver = importlib.import_module("_bse_solver")
 
 from .base import SolverBase
 

@@ -48,7 +48,7 @@ SOURCE_PACKAGE=$(mktemp -d)
 cp -R "$REPO/python/package" "$SOURCE_PACKAGE/package"
 find "$SOURCE_PACKAGE/package" -name '_bse_solver*.so' -delete
 PYTHONPATH="$SOURCE_PACKAGE/package:$REPO/build_legacy/src" "$PYTHON" -c \
-  "from chiq.solver import get_solver; get_solver('cpp', 1.0, [1], [1], [1]); print('legacy build tree OK')"
+  "import _bse_solver, bse_solver; from chiq.solver import get_solver; assert bse_solver.BSESolver is _bse_solver.BSESolver; get_solver('cpp', 1.0, [1], [1], [1]); print('legacy build tree OK')"
 
 make install
 cd "$REPO"
