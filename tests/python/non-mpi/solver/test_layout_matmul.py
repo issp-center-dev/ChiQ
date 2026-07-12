@@ -19,3 +19,11 @@ def test_matmul_noncommuting():
     b = {(0, 0): y}
     assert np.allclose(layout.matmul(a, b, [2])[(0, 0)], x @ y)
     assert not np.allclose(x @ y, y @ x)
+
+def test_matmul_emits_key_with_cancelled_zero_value():
+    # (0,0) = a[0,0]@b[0,0] + a[0,1]@b[1,0] = 1*1 + 1*(-1) = 0, but structurally present.
+    a = {(0, 0): np.array([[1.0]], dtype=complex), (0, 1): np.array([[1.0]], dtype=complex)}
+    b = {(0, 0): np.array([[1.0]], dtype=complex), (1, 0): np.array([[-1.0]], dtype=complex)}
+    r = layout.matmul(a, b, dims=[1, 1])
+    assert (0, 0) in r                      # emitted despite value == 0
+    assert np.allclose(r[(0, 0)], [[0.0]])  # value is a genuine zero
