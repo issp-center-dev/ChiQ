@@ -29,3 +29,22 @@ def test_block_inverse_keeps_components_separate():
     assert set(inv) == {(0, 0), (1, 1)}
     assert np.allclose(inv[(0, 0)], [[0.5]])
     assert np.allclose(inv[(1, 1)], [[0.25]])
+
+def test_block_inverse_singular_gives_nan():
+    bm = {(0, 0): np.zeros((2, 2), dtype=complex)}
+    inv = layout.block_inverse(bm, dims=[2])
+    assert set(inv) == {(0, 0)}
+    assert np.isnan(inv[(0, 0)]).all()
+
+def test_block_inverse_fills_absent_intra_component_key():
+    a = np.array([[2.0]], dtype=complex)
+    c = np.array([[1.0]], dtype=complex)   # (1,0) present -> vertices 0,1 connected
+    d = np.array([[3.0]], dtype=complex)
+    bm = {(0, 0): a, (1, 0): c, (1, 1): d}   # (0,1) ABSENT in input
+    inv = layout.block_inverse(bm, dims=[1, 1])
+    assert (0, 1) in inv   # fill-in added the absent key
+    # compare to dense inverse treating missing (0,1) as zero
+    big = np.block([[a, np.zeros((1, 1), complex)], [c, d]])
+    big_inv = np.linalg.inv(big)
+    got = np.block([[inv[(0, 0)], inv[(0, 1)]], [inv[(1, 0)], inv[(1, 1)]]])
+    assert np.allclose(got, big_inv)
