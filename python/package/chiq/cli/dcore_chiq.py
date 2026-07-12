@@ -26,6 +26,7 @@ import numpy
 import h5py
 import ast
 import time
+from itertools import product
 
 # from BSE repo
 from chiq.h5bse import h5BSE
