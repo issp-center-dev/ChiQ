@@ -26,3 +26,10 @@ def test_prod_ab_matches_dense():
     # dense: convert A to B (full 2x2 in freq), multiply by diag(2,5), convert back
     Bdense = np.diag([2.0, 5.0]).astype(complex)
     assert np.allclose(got[(0, 0)], A @ Bdense)
+
+def test_convert_b2a_prunes_present_but_zero_block():
+    # a B key that is present but exactly zero must NOT produce an A block
+    # (C++ Convert_B2A prunes on the assembled value via isZero(0), not on key presence)
+    B = {(0, 0): np.zeros((1, 1), dtype=complex)}
+    out = layout.convert_b2a(B, nb=1, nw=2, n_in=1)
+    assert out == {}
