@@ -3,7 +3,7 @@
 import numpy as np
 
 from . import kernels
-from .base import SolverBase, SET_LAYOUT, CALC_TYPES
+from .base import SolverBase, SET_LAYOUT, CALC_TYPES, GET_NAMES
 from .layout import parse_matrix_info
 
 # internal require-names used in the C++ error strings (bse.hpp)
@@ -56,4 +56,6 @@ class NumpySolver(SolverBase):
             self._out["I_q"] = result["I_q_scl"]
 
     def get(self, name):
+        if name not in GET_NAMES:
+            raise RuntimeError(f"Invalid type '{name}'")
         return self._out.get(name, {})

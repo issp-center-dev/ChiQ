@@ -8,6 +8,8 @@ SET_LAYOUT = {
     "chi_loc": "C", "chi0_loc": "C", "chi0_q": "C", "gamma0": "C", "Phi_sum": "C",
 }
 CALC_TYPES = {"chi0", "bse", "rpa", "rrpa", "scl"}
+# valid get() output names (from bse_solver_pybind.cpp getMatrix)
+GET_NAMES = {"chi0_q", "chi_q", "chi_q_rpa", "chi_q_rrpa", "chi_q_scl", "I_q", "I_q_scl"}
 
 
 class SolverBase(abc.ABC):
