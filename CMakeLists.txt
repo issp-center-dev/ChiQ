@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(ChiQ)
 
+option(CHIQ_WHEEL_BUILD "Install layout for a pip/scikit-build-core wheel" OFF)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -32,11 +34,17 @@ if(OPENMP_FOUND)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif(OPENMP_FOUND)
 
-add_subdirectory(extern/pybind11)  # require cmake 3.4
+if(CHIQ_WHEEL_BUILD)
+  find_package(pybind11 CONFIG REQUIRED)
+else()
+  add_subdirectory(extern/pybind11)  # require cmake 3.4
+endif()
 add_subdirectory(src)
 add_subdirectory(python)
 
 # Configuration files for ChiQ
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/chiqvars.sh.build.in ${CMAKE_CURRENT_BINARY_DIR}/chiqvars.sh @ONLY)
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/chiqvars.sh.installed.in ${CMAKE_CURRENT_BINARY_DIR}/share/chiqvars.sh @ONLY)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/chiqvars.sh DESTINATION share)
+if(NOT CHIQ_WHEEL_BUILD)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/chiqvars.sh.build.in ${CMAKE_CURRENT_BINARY_DIR}/chiqvars.sh @ONLY)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/chiqvars.sh.installed.in ${CMAKE_CURRENT_BINARY_DIR}/share/chiqvars.sh @ONLY)
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/share/chiqvars.sh DESTINATION share)
+endif()
