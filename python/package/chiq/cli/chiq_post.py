@@ -15,7 +15,7 @@ import os
 
 from chiq import h5bse
 from chiq import bse_toml
-import chiq_main # in the same directory
+from chiq.cli import chiq_main
 
 
 # ============================================================================

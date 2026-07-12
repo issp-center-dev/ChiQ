@@ -5,7 +5,7 @@ import sys
 import argparse
 from itertools import product
 
-from gen_qpath import GenQPath # in the same directory
+from chiq.cli.gen_qpath import GenQPath
 
 
 class GenQfbz(GenQPath):

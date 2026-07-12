@@ -1,98 +1,40 @@
 #!/usr/bin/env python3
 
 import numpy as np
-import os
 import sys
+import os
 import argparse
 import ast
-from collections import namedtuple
 
-import matplotlib
+from chiq.chiq_eigen_path import ChiQEigenPath
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+# matplotlib is an optional dependency (the 'plot' extra); it is imported
+# lazily inside main() so this module stays importable on a core install.
+_cmap = None  # default color map, set by main() once matplotlib is imported
 
 
 def marker(i):
-    markers = ["o", "v", "^", "*", "<", ">", "D", "d", "h", "p"]
+    markers = ["-o", "-v", "-^", "-*", "-<", "->", "-D", "-d", "-h", "-p"]
     return markers[(i // 10) % len(markers)]
-
-
-_cmap = plt.get_cmap("tab10")  # default color map
 
 
 def cmap(i):
     return _cmap(i % _cmap.N)
 
 
-class IrEigen4Plot(object):
-    """
-    Generate list of (x,y) coodinates to be plotted
-
-    How to use:
-        E = IrEigen4Plot(file_eigen)
-        xarray = E.get_x()
-        yarray = E.get_y()
-    """
-
-    def __init__(self, _file_eigen):
-        self.__set_suscep(_file_eigen)
-
-    def __set_suscep(self, _file_eigen):
-        """Read I(q) data"""
-        Iq = namedtuple("Iq", ["w", "q", "eigen"])
-
-        self._data = []  # suscep[(w,q)] = [suscep1, suscep2, ...]
-        for array in np.loadtxt(_file_eigen, dtype=str, comments="#", ndmin=2):
-            w = int(array[0])
-            qvec = np.array(array[1].split("."), dtype=int)
-            eigen = np.array(array[2:], dtype=float)
-            self._data.append(Iq(w, qvec, eigen))
-
-    def get_x(self, w, avec=None):
-        """
-        Get array of radial coordinate r for plot
-
-        w: int, bosonic frequency
-        avec: np.ndarray(3,3), lattice vectors (row vectors)
-
-        Return
-            x: np.ndarray(n_r)
-        """
-        if avec is None:
-            avec = np.identity(3)
-        assert isinstance(avec, np.ndarray)
-        assert avec.shape == (3, 3)
-
-        x = []
-        for iq in self._data:
-            if iq.w == w:
-                # x.append(np.linalg.norm(iq.q))
-                x.append(np.linalg.norm(iq.q @ avec))  # q_i * A_{ij}
-        return np.array(x)
-
-    def get_y(self, w):
-        """
-        Get array of y values
-
-        Return
-            y: np.ndarray(n_r, n_mode)
-        """
-        y = []
-        for iq in self._data:
-            if iq.w == w:
-                y.append(iq.eigen)
-        return np.array(y)
-
-
-# =============================================================================
-
-
 def main():
-
     P = argparse.ArgumentParser()
+    P.add_argument("file_qpath")
     P.add_argument("file_eigen")
-    # P.add_argument('--mode', default='I_r', choices=['I_r',], help="default: I_r")
+    P.add_argument(
+        "-d", action="store_true", help="replace \chi with \Delta\chi in y-label"
+    )
+    P.add_argument(
+        "--mode",
+        default="chi",
+        choices=["chi", "chi0", "rpa", "scl", "rrpa", "Iq"],
+        help="default: chi",
+    )
     P.add_argument(
         "--data_out", default=None, help="set filename to get numerical data for plot"
     )
@@ -102,6 +44,8 @@ def main():
         type=lambda s: s.split(","),
         help="output format. multiple formats can be specified by comma-separated string, e.g., 'pdf,png'.",
     )
+    # P.add_argument('-i', action='store_true', help="plot inverse susceptibility")
+    # P.add_argument('-f', '--file', const="suscep", nargs="?", help="Base filename of pdf")
     P.add_argument(
         "--label",
         "-l",
@@ -112,21 +56,13 @@ def main():
         "--label-fontsize", default=8, type=int, help="set fontsize of labels"
     )
     P.add_argument(
-        "--avec",
-        default=None,
-        help="set filename to get the lattice vectors. The file should contain a real 3x3 matrix with row vectors a1, a2, a3. Default is a unit matrix.",
-    )
-    P.add_argument(
         "--subfigures",
         "--subfigure",
         default=None,
         help="set filename to define optional figures that show a part of data. One line in the file defines one figure. Each line should contain space-separated integers, which specify columns plotted in the figure.",
     )
-    P.add_argument("--xmin", default=0, type=float, help="Left bound of x axis")
-    P.add_argument("--xmax", default=5, type=float, help="Right bound of x axis")
-    P.add_argument("--ymin", default=None, type=float, help="Upper bound of y axis")
-    P.add_argument("--ymax", default=None, type=float, help="Lower bound of y axis")
-    P.add_argument("-w", default=0, type=int, help="bosonic frequency")
+    P.add_argument("--ymin", default=None, type=float, help="Lower bound of y axis")
+    P.add_argument("--ymax", default=None, type=float, help="Upper bound of y axis")
     P.add_argument(
         "--sharey",
         action="store_true",
@@ -134,51 +70,64 @@ def main():
     )
     args = P.parse_args()
 
+    global _cmap
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError as e:
+        sys.exit("plot_chiq_path requires the 'plot' extra: pip install chiq[plot]  (%s)" % e)
+    _cmap = plt.get_cmap("tab10")
+
     print("\nRunning", os.path.basename(__file__))
     print(args)
 
     # --------------------------------------------------------------------------
-    # lattice vectors
-    if args.avec is None:
-        avec = np.identity(3)
-    else:
-        try:
-            print(f"Loading avec from '{args.avec}'")
-            avec = np.loadtxt(args.avec)
-            assert avec.shape == (3, 3), f"avec.shape={avec.shape} must be (3, 3)"
-        except Exception as e:
-            print("Error:", e, file=sys.stderr)
-            exit(1)
-    print(f"avec = {avec.tolist()}")  # print in one line
-
-    # --------------------------------------------------------------------------
     # get data to plot
-    E = IrEigen4Plot(args.file_eigen)
-    xarray = E.get_x(args.w, avec)
-    yarray = E.get_y(args.w)
+    E = ChiQEigenPath(args.file_qpath)
+    xarray = E.get_x()
+    yarray = E.get_y_on_path(args.file_eigen)
 
     assert isinstance(xarray, np.ndarray)
     assert isinstance(yarray, np.ndarray)
-    n_r, n_col = yarray.shape
-    print("# of r points", n_r)
+    n_q, n_col = yarray.shape
+    print("# of q points", n_q)
     print("# of columns", n_col)
-    assert xarray.shape == (n_r,)
-    assert yarray.shape == (n_r, n_col)
+    assert xarray.shape == (n_q,)
+    assert yarray.shape == (n_q, n_col)
 
     # --------------------------------------------------------------------------
     # mode dependent variables
-    # dict_prefix = {'I_r': 'I_r'}
+    dict_flag_inv = {
+        "chi": True,
+        "chi0": False,
+        "rpa": True,
+        "scl": True,
+        "rrpa": True,
+        "Iq": False,
+    }
+    # dict_prefix = {'chi': 'chi_q', 'chi0': 'chi0_q', 'rpa': 'chi_q_rpa', 'scl': 'chi_q_scl', 'rrpa': 'chi_q_rrpa', 'Iq': 'I_q'}
 
+    flag_inv = dict_flag_inv[args.mode]
     # prefix = dict_prefix[args.mode]
+
     filein_base = os.path.splitext(args.file_eigen)[0]
 
     # --------------------------------------------------------------------------
     # save data
     file_data = args.data_out
     if file_data is not None:
+        xticks, xlabels = E.get_xticks(latex=False)
+
+        # information of symmetric point
+        header = ""
+        for _x, _label in zip(xticks, xlabels):
+            header += f'"{_label}" {str(_x)}, '
+
         # xarray [N_k]
         # yarray [N_k, N_mode]
-        np.savetxt(file_data, np.hstack((xarray[:, None], yarray)))
+        np.savetxt(file_data, np.hstack((xarray[:, None], yarray)), header=header)
         print("'%s'" % file_data)
 
     # --------------------------------------------------------------------------
@@ -194,7 +143,7 @@ def main():
             assert isinstance(mode_labels, dict)
         print("mode_labels =")
         for key, label in list(mode_labels.items()):
-            print(" ", key, ":", label)
+            print(f"  {key} : {label}")
 
     # --------------------------------------------------------------------------
     # configuration of subfigures
@@ -215,17 +164,23 @@ def main():
     # --------------------------------------------------------------------------
     # plot
 
+    xticks, xlabels = E.get_xticks(latex=True)
+
+    str_chi = r"\chi(q)"
+    bgcolor = "lightyellow"
+    if args.d:
+        str_chi = r"\Delta" + str_chi
+    if args.mode == "Iq":
+        str_chi = r"I(q)"
+        bgcolor = "oldlace"
+
     def plot_common(_ax, _fig, _filefig, _bgcolor="none"):
         # x ticks
-        # _ax.set_xticks(xticks)
-        # _ax.set_xticklabels(xlabels)
+        _ax.set_xticks(xticks)
+        _ax.set_xticklabels(xlabels)
         _ax.grid(axis="x")
-        _ax.set_xlabel(r"$|r|$")
-        _ax.set_ylabel(r"$I(r)$")
-        _ax.set_xlim(args.xmin, args.xmax)
-        _ax.set_ylim(args.ymin, args.ymax)
         _ax.set_axisbelow(True)
-        # _ax.margins(x=0)
+        _ax.margins(x=0)
         _ax.axhline(y=0, color="k", zorder=-1)  # show yzero
         _ax.legend(
             prop={"size": args.label_fontsize},
@@ -239,9 +194,7 @@ def main():
         _fig.savefig(_filefig)
         print(f"{_filefig!r}")
 
-    bgcolor = "lightcyan"
-
-    # plot I(r)
+    # plot all
     fig, ax_all = plt.subplots()
     for i in range(n_col):
         # skip column i if label is not given
@@ -254,8 +207,27 @@ def main():
                 label=mode_labels[i],
                 zorder=5,
             )
+    ax_all.set_ylabel(rf"${str_chi}$")
+    ax_all.set_ylim(args.ymin, args.ymax)
     for fmt in args.format:
-        plot_common(ax_all, fig, f"{filein_base}_distance.{fmt}", _bgcolor=bgcolor)
+        plot_common(ax_all, fig, f"{filein_base}_path.{fmt}", _bgcolor=bgcolor)
+
+    # plot 1/chi
+    if flag_inv:
+        fig, ax = plt.subplots()
+        for i in range(n_col):
+            if i in mode_labels:
+                ax.plot(
+                    xarray,
+                    1.0 / yarray[:, i],
+                    marker(i),
+                    color=cmap(i),
+                    label=mode_labels[i],
+                )
+        ax.set_ylabel(rf"$1 / {str_chi}$")
+        ax.set_ylim(-0.4, 1)
+        for fmt in args.format:
+            plot_common(ax, fig, f"{filein_base}_path_inv.{fmt}", _bgcolor="lightgray")
 
     # plot parts (optional)
     for j, cols in enumerate(cols_list):
@@ -271,10 +243,12 @@ def main():
                     label=mode_labels[i],
                     zorder=5,
                 )
+        ax.set_ylabel(rf"${str_chi}$")
+        ax.set_ylim(args.ymin, args.ymax)
         if args.sharey:
             ax.sharey(ax_all)
         for fmt in args.format:
-            plot_common(ax, fig, f"{filein_base}_distance_{j}.{fmt}", _bgcolor=bgcolor)
+            plot_common(ax, fig, f"{filein_base}_path_{j}.{fmt}", _bgcolor=bgcolor)
 
 
 if __name__ == "__main__":

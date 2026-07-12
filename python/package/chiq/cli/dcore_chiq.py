@@ -27,15 +27,87 @@ import h5py
 import ast
 import time
 
-from dcore._dispatcher import HDFArchive, dyson
-from dcore.dmft_core import DMFTCoreSolver
-from dcore.program_options import create_parser, parse_parameters, print_parameters, delete_parameters, OptionStatus
-from dcore.tools import *
-from dcore import impurity_solvers
-from dcore.sumkdft_workers.launcher import run_sumkdft
-
 # from BSE repo
 from chiq.h5bse import h5BSE
+
+# ---------------------------------------------------------------------------
+# Optional 'dcore' dependency.
+#
+# dcore_chiq is a post-processing script for DCore and needs the (optional)
+# 'dcore' extra to actually run. To keep `chiq.cli.dcore_chiq` importable --
+# and --help/--version usable -- on a core (non-dcore) install, none of the
+# dcore symbols are imported at module scope. Instead, _import_dcore() is
+# called from main() (after argument parsing) to populate the module-level
+# names below and to build the DMFTBSESolver class, which must subclass
+# dcore's DMFTCoreSolver and therefore cannot be defined until dcore is
+# available.
+# ---------------------------------------------------------------------------
+HDFArchive = None
+dyson = None
+DMFTCoreSolver = None
+create_parser = None
+parse_parameters = None
+print_parameters = None
+delete_parameters = None
+OptionStatus = None
+impurity_solvers = None
+run_sumkdft = None
+raise_if_mpi_imported = None
+make_empty_dir = None
+launch_mpi_subprocesses = None
+float_to_complex_array = None
+DMFTBSESolver = None
+
+
+def _import_dcore():
+    """Lazily import the optional 'dcore' dependency and populate this
+    module's globals (including building the DMFTBSESolver class).
+
+    Exits with an actionable message via sys.exit() if 'dcore' is missing.
+    """
+    global HDFArchive, dyson, DMFTCoreSolver, create_parser, parse_parameters
+    global print_parameters, delete_parameters, OptionStatus, impurity_solvers
+    global run_sumkdft, raise_if_mpi_imported, make_empty_dir
+    global launch_mpi_subprocesses, float_to_complex_array, DMFTBSESolver
+
+    try:
+        from dcore._dispatcher import HDFArchive as _HDFArchive, dyson as _dyson
+        from dcore.dmft_core import DMFTCoreSolver as _DMFTCoreSolver
+        from dcore.program_options import (
+            create_parser as _create_parser,
+            parse_parameters as _parse_parameters,
+            print_parameters as _print_parameters,
+            delete_parameters as _delete_parameters,
+            OptionStatus as _OptionStatus,
+        )
+        from dcore.tools import (
+            raise_if_mpi_imported as _raise_if_mpi_imported,
+            make_empty_dir as _make_empty_dir,
+            launch_mpi_subprocesses as _launch_mpi_subprocesses,
+            float_to_complex_array as _float_to_complex_array,
+        )
+        from dcore import impurity_solvers as _impurity_solvers
+        from dcore.sumkdft_workers.launcher import run_sumkdft as _run_sumkdft
+    except ImportError as e:
+        sys.exit("dcore_chiq requires the 'dcore' extra: pip install chiq[dcore]  (%s)" % e)
+
+    HDFArchive = _HDFArchive
+    dyson = _dyson
+    DMFTCoreSolver = _DMFTCoreSolver
+    create_parser = _create_parser
+    parse_parameters = _parse_parameters
+    print_parameters = _print_parameters
+    delete_parameters = _delete_parameters
+    OptionStatus = _OptionStatus
+    impurity_solvers = _impurity_solvers
+    run_sumkdft = _run_sumkdft
+    raise_if_mpi_imported = _raise_if_mpi_imported
+    make_empty_dir = _make_empty_dir
+    launch_mpi_subprocesses = _launch_mpi_subprocesses
+    float_to_complex_array = _float_to_complex_array
+
+    if DMFTBSESolver is None:
+        DMFTBSESolver = _build_dmft_bse_solver_class(_DMFTCoreSolver)
 
 
 def to_str(x):
@@ -401,224 +473,231 @@ class SaveBSE:
 
 
 
-class DMFTBSESolver(DMFTCoreSolver):
-    def __init__(self, seedname, params, output_file='', output_group='dmft_out'):
-        super(DMFTBSESolver, self).__init__(seedname, params, output_file, output_group, read_only=True, restart=True)
+def _build_dmft_bse_solver_class(_DMFTCoreSolver):
+    """Build the DMFTBSESolver class, deferred until dcore is importable
+    (it must subclass dcore's DMFTCoreSolver).
+    """
+    class DMFTBSESolver(_DMFTCoreSolver):
+        def __init__(self, seedname, params, output_file='', output_group='dmft_out'):
+            super(DMFTBSESolver, self).__init__(seedname, params, output_file, output_group, read_only=True, restart=True)
 
-    def _calc_bse_x0q(self):
-        """
-        Calc X_0(q)
-        """
-        print("\n--- dcore_chiq - X_0(q)")
-        if self._params['bse']['skip_X0q']:
-            print(" skip")
-            return
+        def _calc_bse_x0q(self):
+            """
+            Calc X_0(q)
+            """
+            print("\n--- dcore_chiq - X_0(q)")
+            if self._params['bse']['skip_X0q']:
+                print(" skip")
+                return
 
-        from dcore.lattice_models import create_lattice_model
+            from dcore.lattice_models import create_lattice_model
 
-        lattice_model = create_lattice_model(self._params)
+            lattice_model = create_lattice_model(self._params)
 
-        params = self._make_sumkdft_params()
-        params['calc_mode'] = 'bse'
-        params['mu'] = self._chemical_potential
-        params['list_wb'] = numpy.arange(self._params['bse']['num_wb']).tolist()
-        params['n_wf_G2'] = self._params['bse']['num_wf']
-        params['div'] = lattice_model.nkdiv()
-        params['bse_h5_out_file'] = os.path.abspath(self._params['bse']['h5_output_file'])
-        params['use_temp_file'] = self._params['bse']['use_temp_file']
-        if self._params['bse']['X0q_qpoints_saved'] == 'quadrant':
-            params['X0q_qpoints_saved'] = 'quadrant'
-        else:
-            q_points = []
-            with open(self._params['bse']['X0q_qpoints_saved'], 'r') as f:
-                for line in f:
-                    q_str = line.split()[1]
-                    q_points.append(tuple(map(int, q_str.split('.'))))
-            params['X0q_qpoints_saved'] = q_points
-        params["h5_compression"] = self._params["bse"]["h5_compression"]
-        if params["h5_compression"] in ("gzip", "lzf"):
-            params["h5_compression_opts"] = self._params["bse"]["h5_compression_opts"]
-        else:
-            params["h5_compression_opts"] = self._params["bse.compression_options"]
-        r = run_sumkdft(
-            'chiq.dcore_chiq_worker.SumkDFTWorkerBSE',
-            os.path.abspath(self._seedname+'.h5'), './work/sumkdft_bse', self._mpirun_command, params)
+            params = self._make_sumkdft_params()
+            params['calc_mode'] = 'bse'
+            params['mu'] = self._chemical_potential
+            params['list_wb'] = numpy.arange(self._params['bse']['num_wb']).tolist()
+            params['n_wf_G2'] = self._params['bse']['num_wf']
+            params['div'] = lattice_model.nkdiv()
+            params['bse_h5_out_file'] = os.path.abspath(self._params['bse']['h5_output_file'])
+            params['use_temp_file'] = self._params['bse']['use_temp_file']
+            if self._params['bse']['X0q_qpoints_saved'] == 'quadrant':
+                params['X0q_qpoints_saved'] = 'quadrant'
+            else:
+                q_points = []
+                with open(self._params['bse']['X0q_qpoints_saved'], 'r') as f:
+                    for line in f:
+                        q_str = line.split()[1]
+                        q_points.append(tuple(map(int, q_str.split('.'))))
+                params['X0q_qpoints_saved'] = q_points
+            params["h5_compression"] = self._params["bse"]["h5_compression"]
+            if params["h5_compression"] in ("gzip", "lzf"):
+                params["h5_compression_opts"] = self._params["bse"]["h5_compression_opts"]
+            else:
+                params["h5_compression_opts"] = self._params["bse.compression_options"]
+            r = run_sumkdft(
+                'chiq.dcore_chiq_worker.SumkDFTWorkerBSE',
+                os.path.abspath(self._seedname+'.h5'), './work/sumkdft_bse', self._mpirun_command, params)
 
-    def _calc_bse_xloc(self):
-        """
-        Calc X_loc and U matrix
-        """
+        def _calc_bse_xloc(self):
+            """
+            Calc X_loc and U matrix
+            """
 
-        # NOTE:
-        #   n_flavors may depend on ish, but present ChiQ code does not support it
-        def calc_num_flavors(_ish):
-            return numpy.sum([len(indices) for indices in list(self._gf_struct[_ish].values())])
-        n_flavors = calc_num_flavors(0)
-        for ish in range(self._n_inequiv_shells):
-            assert n_flavors == calc_num_flavors(ish)
+            # NOTE:
+            #   n_flavors may depend on ish, but present ChiQ code does not support it
+            def calc_num_flavors(_ish):
+                return numpy.sum([len(indices) for indices in list(self._gf_struct[_ish].values())])
+            n_flavors = calc_num_flavors(0)
+            for ish in range(self._n_inequiv_shells):
+                assert n_flavors == calc_num_flavors(ish)
 
-        #
-        # init for saving data into HDF5
-        #
-        print("\n--- dcore_chiq - invoking h5BSE...")
+            #
+            # init for saving data into HDF5
+            #
+            print("\n--- dcore_chiq - invoking h5BSE...")
 
-        if os.path.isfile(self._params['bse']['h5_output_file']):
-            bse_info = 'check'
-        else:
-            bse_info = 'save'
+            if os.path.isfile(self._params['bse']['h5_output_file']):
+                bse_info = 'check'
+            else:
+                bse_info = 'save'
 
-        bse = SaveBSE(
-            n_corr_shells=self._n_corr_shells,
-            h5_file=os.path.abspath(self._params['bse']['h5_output_file']),
-            bse_info=bse_info,
-            nonlocal_order_parameter=False,
-            use_spin_orbit=self._use_spin_orbit,
-            beta=self._beta,
-            n_flavors=n_flavors,
-            spin_names=self.spin_block_names)
+            bse = SaveBSE(
+                n_corr_shells=self._n_corr_shells,
+                h5_file=os.path.abspath(self._params['bse']['h5_output_file']),
+                bse_info=bse_info,
+                nonlocal_order_parameter=False,
+                use_spin_orbit=self._use_spin_orbit,
+                beta=self._beta,
+                n_flavors=n_flavors,
+                spin_names=self.spin_block_names)
 
-        #
-        # save U matrix for RPA
-        #
-        print("\n--- dcore_chiq - U matrix")
-        for ish in range(self._n_inequiv_shells):
-            bse.save_gamma0(self._Umat[ish], icrsh=self._sk.inequiv_to_corr[ish])
+            #
+            # save U matrix for RPA
+            #
+            print("\n--- dcore_chiq - U matrix")
+            for ish in range(self._n_inequiv_shells):
+                bse.save_gamma0(self._Umat[ish], icrsh=self._sk.inequiv_to_corr[ish])
 
-        # FIXME:
-        #     Saving data should be done for all **correlated_shells** (not for inequiv_shells)
-        #     Namely, we need a loop for correlated shells when n_inequiv_shells < n_corr_shells
-        #assert self._n_inequiv_shells == self._n_corr_shells
+            # FIXME:
+            #     Saving data should be done for all **correlated_shells** (not for inequiv_shells)
+            #     Namely, we need a loop for correlated shells when n_inequiv_shells < n_corr_shells
+            #assert self._n_inequiv_shells == self._n_corr_shells
 
-        #
-        # X_loc
-        #
-        print("\n--- dcore_chiq - X_loc")
-        if self._params['bse']['skip_Xloc']:
-            print(" skip")
-            return
+            #
+            # X_loc
+            #
+            print("\n--- dcore_chiq - X_loc")
+            if self._params['bse']['skip_Xloc']:
+                print(" skip")
+                return
 
-        Gloc_iw_sh, _, _ = self.calc_Gloc()
-        solver_name = self._params['impurity_solver']['name']
+            Gloc_iw_sh, _, _ = self.calc_Gloc()
+            solver_name = self._params['impurity_solver']['name']
 
-        # generate sampling points of Matsubara frequencies
-        print("\nFrequency sampling: box")
-        freqs = None
+            # generate sampling points of Matsubara frequencies
+            print("\nFrequency sampling: box")
+            freqs = None
 
-        for ish in range(self._n_inequiv_shells):
-            print("\nSolving impurity model for inequivalent shell " + str(ish) + " ...")
-            sys.stdout.flush()
-            x_loc, chi_loc, g_imp = calc_g2_in_impurity_model(solver_name, self._solver_params, self._mpirun_command,
-                                                              self._params["impurity_solver"]["basis_rotation"],
-                                                              self._Umat[ish], self._gf_struct[ish],
-                                                              self._beta, self._n_iw,
-                                                              self._sh_quant[ish].Sigma_iw, Gloc_iw_sh[ish],
-                                                              self._params['bse']['num_wb'],
-                                                              self._params['bse']['num_wf'],
-                                                              self._params['bse']['calc_only_chiloc'],
-                                                              ish, freqs=freqs)
+            for ish in range(self._n_inequiv_shells):
+                print("\nSolving impurity model for inequivalent shell " + str(ish) + " ...")
+                sys.stdout.flush()
+                x_loc, chi_loc, g_imp = calc_g2_in_impurity_model(solver_name, self._solver_params, self._mpirun_command,
+                                                                  self._params["impurity_solver"]["basis_rotation"],
+                                                                  self._Umat[ish], self._gf_struct[ish],
+                                                                  self._beta, self._n_iw,
+                                                                  self._sh_quant[ish].Sigma_iw, Gloc_iw_sh[ish],
+                                                                  self._params['bse']['num_wb'],
+                                                                  self._params['bse']['num_wf'],
+                                                                  self._params['bse']['calc_only_chiloc'],
+                                                                  ish, freqs=freqs)
 
-            if x_loc is not None:
-                subtract_disconnected(x_loc, g_imp, self.spin_block_names, freqs=freqs)
+                if x_loc is not None:
+                    subtract_disconnected(x_loc, g_imp, self.spin_block_names, freqs=freqs)
 
-            # Open HDF5 file to improve performance. Close manually.
-            bse.h5bse.open('a')
+                # Open HDF5 file to improve performance. Close manually.
+                bse.h5bse.open('a')
 
-            # save X_loc, chi_loc
-            for icrsh in range(self._n_corr_shells):
-                if ish == self._sk.corr_to_inequiv[icrsh]:
-                    # X_loc
-                    if x_loc is not None:
+                # save X_loc, chi_loc
+                for icrsh in range(self._n_corr_shells):
+                    if ish == self._sk.corr_to_inequiv[icrsh]:
+                        # X_loc
+                        if x_loc is not None:
+                            bse.save_xloc(x_loc, icrsh=icrsh)
+                        # chi_loc
+                        if chi_loc is not None:
+                            bse.save_chiloc(chi_loc, icrsh=icrsh)
+
+                bse.h5bse.close()
+
+        def calc_bse(self):
+            """
+            Compute data for ChiQ
+            """
+            self._calc_bse_x0q()
+            self._calc_bse_xloc()
+
+
+        def fit_Xloc(self, save_only):
+            """
+            Fit sparse data of Xloc
+            """
+
+            # Prepare input files
+            print('')
+            print('Fitting Xloc...')
+            h5_path = os.path.abspath(self._params['bse']['h5_output_file'])
+            work_dir = './work/sparse_fit-D{}'.format(self._params['bse']['sparse_D'])
+
+            if not save_only:
+                make_empty_dir(work_dir)
+
+            cwd_org = os.getcwd()
+            os.chdir(work_dir)
+
+            if not save_only:
+                t1 = time.time()
+                for b in range(self._params['bse']['num_wb']):
+                    print('  wb={}...'.format(b))
+                    sys.stdout.flush()
+                    with open('./output-wb{}.txt'.format(b), 'w') as fout:
+                        commands = [sys.executable, "-m", "dcore.sparse_sampling.ph"]
+                        commands.extend(['--Lambda', self._params['bse']['sparse_Lambda']])
+                        commands.extend(['--svcutoff', self._params['bse']['sparse_sv_cutoff']])
+                        commands.extend(['--D', self._params['bse']['sparse_D']])
+                        commands.extend(['--niter', self._params['bse']['sparse_niter']])
+                        commands.extend(['--bfreq', b])
+                        commands.extend(['--num_wf', self._params['bse']['num_wf']])
+                        commands.extend(['--rtol', self._params['bse']['sparse_rtol']])
+                        commands.extend(['--alpha', self._params['bse']['sparse_alpha']])
+                        commands.append(h5_path)
+                        commands = list(map(str, commands))
+                        launch_mpi_subprocesses(self._mpirun_command, commands, fout)
+                    sys.stdout.flush()
+                t2 = time.time()
+                print('Fit ran for {} seconds'.format(t2-t1))
+                sys.stdout.flush()
+
+            # save interpolated data for ChiQ
+            print('\n saving Xloc for ChiQ...')
+            bse_args = SaveBSE.get_sparse_info(h5_path)
+            bse = SaveBSE(**bse_args)
+
+            for ish in range(self._n_inequiv_shells):
+                # print('  ish={}...'.format(ish))
+
+                x_loc = {}
+                num_wb = self._params['bse']['num_wb']
+                num_wf = self._params['bse']['num_wf']
+
+                # get X_loc
+                with h5py.File(h5_path, 'r') as f:
+                    for b in range(num_wb):
+                    # print('  wb={}...'.format(b))
+                        prefix = '/bse_sparse/interpolated/{}/wb{}/D{}'.format(ish, b, self._params['bse']['sparse_D'])
+                        assert prefix in f
+                        for key in list(f[prefix].keys()):
+                            # print(key)
+                            key_tuple = ast.literal_eval(key)  # convert string to tuple
+                            assert isinstance(key_tuple, tuple)
+
+                            if key_tuple not in x_loc:
+                                x_loc[key_tuple] = numpy.zeros((num_wb, 2*num_wf, 2*num_wf), dtype=complex)
+
+                            x_wb_fix = float_to_complex_array(f[prefix + '/' + key][()])
+                            assert x_wb_fix.shape == (2*num_wf, 2*num_wf)
+                            x_loc[key_tuple][b, :, :] = x_wb_fix
+
+                # save X_loc
+                for icrsh in range(self._n_corr_shells):
+                    if ish == self._sk.corr_to_inequiv[icrsh]:
                         bse.save_xloc(x_loc, icrsh=icrsh)
-                    # chi_loc
-                    if chi_loc is not None:
-                        bse.save_chiloc(chi_loc, icrsh=icrsh)
 
-            bse.h5bse.close()
-
-    def calc_bse(self):
-        """
-        Compute data for ChiQ
-        """
-        self._calc_bse_x0q()
-        self._calc_bse_xloc()
+            os.chdir(cwd_org)
 
 
-    def fit_Xloc(self, save_only):
-        """
-        Fit sparse data of Xloc
-        """
-
-        # Prepare input files
-        print('')
-        print('Fitting Xloc...')
-        h5_path = os.path.abspath(self._params['bse']['h5_output_file'])
-        work_dir = './work/sparse_fit-D{}'.format(self._params['bse']['sparse_D'])
-
-        if not save_only:
-            make_empty_dir(work_dir)
-
-        cwd_org = os.getcwd()
-        os.chdir(work_dir)
-
-        if not save_only:
-            t1 = time.time()
-            for b in range(self._params['bse']['num_wb']):
-                print('  wb={}...'.format(b))
-                sys.stdout.flush()
-                with open('./output-wb{}.txt'.format(b), 'w') as fout:
-                    commands = [sys.executable, "-m", "dcore.sparse_sampling.ph"]
-                    commands.extend(['--Lambda', self._params['bse']['sparse_Lambda']])
-                    commands.extend(['--svcutoff', self._params['bse']['sparse_sv_cutoff']])
-                    commands.extend(['--D', self._params['bse']['sparse_D']])
-                    commands.extend(['--niter', self._params['bse']['sparse_niter']])
-                    commands.extend(['--bfreq', b])
-                    commands.extend(['--num_wf', self._params['bse']['num_wf']])
-                    commands.extend(['--rtol', self._params['bse']['sparse_rtol']])
-                    commands.extend(['--alpha', self._params['bse']['sparse_alpha']])
-                    commands.append(h5_path)
-                    commands = list(map(str, commands))
-                    launch_mpi_subprocesses(self._mpirun_command, commands, fout)
-                sys.stdout.flush()
-            t2 = time.time()
-            print('Fit ran for {} seconds'.format(t2-t1))
-            sys.stdout.flush()
-
-        # save interpolated data for ChiQ
-        print('\n saving Xloc for ChiQ...')
-        bse_args = SaveBSE.get_sparse_info(h5_path)
-        bse = SaveBSE(**bse_args)
-
-        for ish in range(self._n_inequiv_shells):
-            # print('  ish={}...'.format(ish))
-
-            x_loc = {}
-            num_wb = self._params['bse']['num_wb']
-            num_wf = self._params['bse']['num_wf']
-
-            # get X_loc
-            with h5py.File(h5_path, 'r') as f:
-                for b in range(num_wb):
-                # print('  wb={}...'.format(b))
-                    prefix = '/bse_sparse/interpolated/{}/wb{}/D{}'.format(ish, b, self._params['bse']['sparse_D'])
-                    assert prefix in f
-                    for key in list(f[prefix].keys()):
-                        # print(key)
-                        key_tuple = ast.literal_eval(key)  # convert string to tuple
-                        assert isinstance(key_tuple, tuple)
-
-                        if key_tuple not in x_loc:
-                            x_loc[key_tuple] = numpy.zeros((num_wb, 2*num_wf, 2*num_wf), dtype=complex)
-
-                        x_wb_fix = float_to_complex_array(f[prefix + '/' + key][()])
-                        assert x_wb_fix.shape == (2*num_wf, 2*num_wf)
-                        x_loc[key_tuple][b, :, :] = x_wb_fix
-
-            # save X_loc
-            for icrsh in range(self._n_corr_shells):
-                if ish == self._sk.corr_to_inequiv[icrsh]:
-                    bse.save_xloc(x_loc, icrsh=icrsh)
-
-        os.chdir(cwd_org)
+    return DMFTBSESolver
 
 
 def dcore_chiq(filename, np=1):
@@ -691,19 +770,29 @@ def dcore_chiq(filename, np=1):
     print("\n#################  Done  #####################\n")
 
 
-def run():
+def main():
     import argparse
-    from dcore.option_tables import generate_all_description
     from chiq import __version__ as version
 
     _version_message = f'ChiQ version {version}'
+
+    # The full per-option epilog text comes from dcore itself. Build it best-
+    # effort so that --help/--version still work on a core (non-dcore)
+    # install; the real 'dcore' extra is only required once we get past
+    # argument parsing (see _import_dcore() below).
+    try:
+        from dcore.option_tables import generate_all_description
+        _epilog = generate_all_description()
+    except ImportError:
+        _epilog = ("(Full option list unavailable: the 'dcore' extra is not installed.\n"
+                    " Install it with: pip install chiq[dcore])")
 
     parser = argparse.ArgumentParser(
         prog='dcore_chiq.py',
         description='Post-processing script in DCore (bse)',
         # usage='$ dcore_chiq input --np 4',
         formatter_class=argparse.RawTextHelpFormatter,
-        epilog=generate_all_description(),
+        epilog=_epilog,
         add_help=True)
     parser.add_argument('path_input_files',
                         action='store',
@@ -716,6 +805,10 @@ def run():
     parser.add_argument('--version', action='version', version=_version_message)
 
     args = parser.parse_args()
+
+    # --help/--version already exited above; only now do we need dcore itself.
+    _import_dcore()
+
     for path_input_file in args.path_input_files:
         if os.path.isfile(path_input_file) is False:
             sys.exit(f"Input file '{path_input_file}' does not exist.")
@@ -725,4 +818,4 @@ def run():
     dcore_chiq(args.path_input_files, int(args.np))
 
 if __name__ == '__main__':
-    run()
+    main()

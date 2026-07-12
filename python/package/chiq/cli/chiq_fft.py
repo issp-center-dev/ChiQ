@@ -8,7 +8,7 @@ import numpy as np
 from scipy import fftpack
 
 from chiq.h5bse import h5BSE
-from gen_qpath import GenQPath # in the same directory
+from chiq.cli.gen_qpath import GenQPath
 
 
 def isnonzero(array):
