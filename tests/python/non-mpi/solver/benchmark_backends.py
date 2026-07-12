@@ -7,10 +7,11 @@ Not a pytest test (no ``test_`` prefix) -- run it directly:
         python3 tests/python/non-mpi/solver/benchmark_backends.py
 
 For each calc type it builds well-conditioned random inputs of a representative
-size and reports the per-call wall time of each backend and the numpy/cpp ratio.
-The cpp backend uses the compiled (optionally OpenMP-threaded) C++ solver; the
-numpy backend is a single-threaded pure-Python reimplementation, so it is
-expected to be slower -- this script quantifies by how much.
+size ONCE and times both backends on the *same* inputs, reporting the per-call
+wall time of each backend and the numpy/cpp ratio. The cpp backend uses the
+compiled (optionally OpenMP-threaded) C++ solver; the numpy backend is a
+single-threaded pure-Python reimplementation, so it is expected to be slower --
+this script quantifies by how much.
 """
 
 import sys
@@ -30,8 +31,16 @@ def _rand_c(shape):
     return RNG.standard_normal(shape) + 1j * RNG.standard_normal(shape)
 
 
-def _wc(n):  # well-conditioned (diagonally dominant) -> invertible
-    return _rand_c((n, n)) + n * np.eye(n)
+def _wc(n):
+    """A strictly diagonally-dominant (hence invertible) complex matrix.
+
+    Setting each diagonal entry's magnitude above that row's off-diagonal
+    absolute sum guarantees invertibility for any n / seed (Levy-Desplanques).
+    """
+    m = _rand_c((n, n))
+    off = np.abs(m).sum(axis=1) - np.abs(np.diag(m))
+    np.fill_diagonal(m, off + 1.0)
+    return m
 
 
 def _c_full(nb, n_in):
@@ -43,14 +52,16 @@ def _c_wc(nb, n_in):
 
 
 def _b_wc(nb, nw, n_in):
+    # B-type: each same-iw super-block is block-diagonally dominant (invertible)
+    # -- strong diagonal blocks, small off-diagonal blocks.
     out = {}
     for iw in range(nw):
         for b in range(nb):
             for b2 in range(nb):
-                m = _rand_c((n_in, n_in))
                 if b == b2:
-                    m = m + (nb * n_in) * np.eye(n_in)
-                out[(iw * nb + b, iw * nb + b2)] = m
+                    out[(iw * nb + b, iw * nb + b2)] = _wc(n_in) + n_in * np.eye(n_in)
+                else:
+                    out[(iw * nb + b, iw * nb + b2)] = 0.1 * _rand_c((n_in, n_in))
     return out
 
 
@@ -84,17 +95,25 @@ def _inputs(calc, nb, nw, n_in):
     raise ValueError(calc)
 
 
-def _time_one(backend, calc, nb, nw, n_in, repeat):
-    iA, iB, iC = _info(nb, nw, n_in)
-    inputs = _inputs(calc, nb, nw, n_in)
+def _time_calc(backend, calc, inputs, info, repeat):
+    """Best-of-`repeat` wall time of one calc() on the *given* inputs.
+
+    A warm-up call precedes the timed runs so first-use initialization is not
+    charged to either backend. set() is excluded from the timed region.
+    (set() copies its inputs, so the same `inputs` dict is reused for every
+    backend/run without cross-contamination.)
+    """
+    iA, iB, iC = info
     best = float("inf")
-    for _ in range(repeat):
+    for r in range(repeat + 1):  # r == 0 is an untimed warm-up
         s = get_solver(backend, 12.0, iA, iB, iC)
         for name, bm in inputs.items():
             s.set(bm, name)
         t0 = time.perf_counter()
         s.calc(calc)
-        best = min(best, time.perf_counter() - t0)
+        dt = time.perf_counter() - t0
+        if r > 0:
+            best = min(best, dt)
     return best
 
 
@@ -103,14 +122,17 @@ def main():
     sizes = [(1, 20, 2), (2, 20, 2), (2, 40, 2)]
     calcs = ["chi0", "rpa", "rrpa", "bse", "scl"]
     repeat = 3
-    print(f"per-call best-of-{repeat} wall time (one (omega,q) solve), seconds\n")
+    print(f"per-call best-of-{repeat} wall time (one (omega,q) solve), seconds")
+    print("both backends timed on identical inputs; warm-up excluded\n")
     header = f"{'calc':6} {'nb,nw,n_in':>12}  {'cpp [s]':>10} {'numpy [s]':>10} {'numpy/cpp':>10}"
     print(header)
     print("-" * len(header))
     for nb, nw, n_in in sizes:
+        info = _info(nb, nw, n_in)
         for calc in calcs:
-            t_cpp = _time_one("cpp", calc, nb, nw, n_in, repeat)
-            t_np = _time_one("numpy", calc, nb, nw, n_in, repeat)
+            inputs = _inputs(calc, nb, nw, n_in)  # built ONCE, shared by both backends
+            t_cpp = _time_calc("cpp", calc, inputs, info, repeat)
+            t_np = _time_calc("numpy", calc, inputs, info, repeat)
             ratio = t_np / t_cpp if t_cpp > 0 else float("inf")
             print(f"{calc:6} {f'{nb},{nw},{n_in}':>12}  "
                   f"{t_cpp:10.4g} {t_np:10.4g} {ratio:9.1f}x")
