@@ -1,7 +1,7 @@
 # Design: NumPy solver backend + backend-switch + pip packaging (Phase 0)
 
 **Date:** 2026-07-12
-**Status:** Draft for review (round 3 — incorporates Codex design review rounds 1–3)
+**Status:** Ready for human review (incorporates Codex design review rounds 1–4)
 **Repo:** ChiQ (Bethe-Salpeter / DMFT momentum-dependent susceptibility solver)
 
 ## 1. Context and goal
@@ -242,14 +242,18 @@ existing NaN guard in `chiq_main.output2hdf5` exactly as a C++ inf/nan result wo
   and inline solver construction; drop `_reformat_data`/reshapes now in `layout`),
   `python/package/chiq/bse_toml.py` (parse+validate `backend`).
 - Edit (packaging): `src/bse_solver_pybind.cpp` — rename the module declaration
-  `PYBIND11_MODULE(bse_solver, m)` → `PYBIND11_MODULE(_bse_solver, m)` so the compiled
-  binary exports `PyInit__bse_solver` and is importable as `chiq._bse_solver`. (Only
-  the module name changes; the `BSESolver` class and its bindings are identical.)
-  `src/CMakeLists.txt` / `python/CMakeLists.txt` install the extension into the `chiq`
-  package directory. Both the pip (scikit-build-core) and direct-CMake paths install to
-  the same package-relative location, so `import chiq._bse_solver` works identically
-  (§5.3, verified by §4.5 tests). The top-level name `bse_solver` survives as a
-  pure-Python shim (§5.2).
+  `PYBIND11_MODULE(bse_solver, m)` → `PYBIND11_MODULE(_bse_solver, m)` so the binary
+  exports `PyInit__bse_solver`. **Both must agree:** `src/CMakeLists.txt` currently does
+  `pybind11_add_module(bse_solver ...)`, which names the `.so` `bse_solver.*`. The
+  target is renamed to `_bse_solver` (or given `set_target_properties(... OUTPUT_NAME
+  _bse_solver)`), so the artifact basename is `_bse_solver.<ext>` and exports
+  `PyInit__bse_solver` — the two match and `import chiq._bse_solver` works. (Only the
+  module/target name changes; the `BSESolver` class and bindings are identical.) The
+  extension installs into the `chiq` package directory; both the pip
+  (scikit-build-core) and direct-CMake paths install to the same package-relative
+  location (§5.3, verified by §4.5 tests, which cover installed-tree imports). The
+  top-level name `bse_solver` survives only as a pure-Python shim (§5.2), never as the
+  native artifact.
 
 ## 4. Testing / numerical verification
 
@@ -260,10 +264,14 @@ Layers:
    assert `numpy` == `cpp` on identical input. Two fixed, non-discretionary metrics,
    aggregated as the max over all present blocks (a NaN/Inf in one backend but not the
    other, at the same position, is an immediate failure):
-   - **mixed-tolerance absolute error** (standard `numpy.allclose` convention):
-     `max|cpp - numpy| <= atol + rtol*max|cpp|`, with `atol=1e-10`, `rtol=1e-8`. This
-     permits ~`atol` absolute error where the reference is zero/near-zero; the earlier
-     `Δ/(scale+atol)` form was wrong (it forced ~`1e-18` at zero) and is replaced.
+   - **elementwise mixed tolerance** — the exact `numpy.allclose` rule applied
+     *per element* (not a global scale): assert
+     `np.all(np.abs(numpy - cpp) <= atol + rtol*np.abs(cpp))` per block, with
+     `atol=1e-10`, `rtol=1e-8` (implemented via `np.testing.assert_allclose`, which also
+     reports the worst offending element). The scale is `|cpp|` at each position, so a
+     large entry cannot mask an error at a zero/small entry. **NaN/Inf policy:** a
+     position passes only if both backends are non-finite *and equal in the IEEE sense
+     for that kind* (NaN↔NaN, +Inf↔+Inf); any finite-vs-non-finite mismatch fails.
    - **relative backward error** of each internal solve,
      `||(I-M)x - b||_inf / (||b||_inf + atol) <= 1e-8`, evaluated at a
      **kernel/linalg-adapter test seam** — not through the public facade, so no debug
@@ -452,9 +460,29 @@ per-script dependency audit (§5.4).
   backend-identical. Codex's premise (value-based) was mistaken; the corrected rule is
   strictly structural.
 
-Round-3 `should_fix`/questions of note: `Convert_A2B/B2A` full index equations, exact
-exception class for get-before-compute, negative/empty-dimension validation, and upper
-dependency bounds are **deferred to TDD implementation** (they are concrete enough that
-tests will pin them; carrying them as failing tests is more reliable than more prose).
-The layout module's validation and the analytical unit tests (§4.3) are where these
-become executable.
+**Round-4 `must_fix_design` — both resolved:**
+- agreement metric used a global scale → *resolved*: switched to the **elementwise**
+  `np.allclose` rule (`|Δ| ≤ atol + rtol·|cpp|` per element) with an explicit NaN/Inf
+  policy (§4.1).
+- native artifact filename → *resolved*: rename the CMake target (or set `OUTPUT_NAME`)
+  to `_bse_solver` so the `.so` basename and `PyInit__bse_solver` agree; §4.5 install
+  tests cover installed-tree imports (§3.6).
+
+**Deferred to TDD implementation (should-fix / open questions, by decision):**
+`Convert_A2B/B2A` full index equations; exact exception class+message for
+get-before-compute; empty/zero/negative/non-integer dimension and malformed-key
+validation; the precise `solve(A,B)` block-structure predicate; PEP 621 extras strings
+(`mpi4py`, `matplotlib`, `cupy`, …); the `bse_solver` shim's `DeprecationWarning`
+details; upper dependency bounds; and singular-policy scoping to the numpy/cupy kernels
+(the C++ backend keeps its own native singular behavior — the all-NaN policy is a
+*kernel* policy, not a cross-backend promise). These are concrete enough that the
+layout-module validation and the analytical unit tests (§4.3) pin them as executable
+assertions during implementation; carrying them as failing tests is more reliable than
+further prose. Performance (per-(ω,q) component assembly overhead) is measured by a
+benchmark in the NumpySolver step, not asserted in the spec.
+
+**Convergence note.** Codex must-fix count fell 5→4→4→2 across rounds 1–4; every
+must-fix was addressed in-doc. The C++-oracle risk is mitigated by independent
+analytical tests (§4.3); remaining reviewer items are should-fix precision deferred to
+TDD. Antigravity's user/workflow lens was unavailable (environment defect, §8 top), so
+the human review gate substitutes for it.
