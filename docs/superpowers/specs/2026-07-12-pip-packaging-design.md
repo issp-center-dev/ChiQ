@@ -1,7 +1,7 @@
 # Design: pip packaging via scikit-build-core (coexisting with the CMake workflow)
 
 **Date:** 2026-07-12
-**Status:** Ready for review (round 2 — incorporates Codex + Antigravity design review)
+**Status:** Ready for review (round 3 — incorporates Codex + Antigravity design review rounds 1-2)
 **Repo:** ChiQ (Bethe-Salpeter / DMFT momentum-dependent susceptibility solver)
 **Branch:** `design/pip-packaging` (stacked on `design/numpy-backend-packaging` / PR #6,
 which adds the `chiq.solver` subpackage this design references)
@@ -48,19 +48,27 @@ subpackage (§4) so entry points are possible.
 
 - Add `pyproject.toml` with **scikit-build-core** as the build backend, driving the existing
   top-level `CMakeLists.txt`.
-- `[tool.scikit-build]` config:
-  - `wheel.packages = ["python/package/chiq"]` — the `chiq` package is the wheel's importable
-    tree (plus the shims, §3.3).
-  - `cmake.args = ["-DCHIQ_WHEEL_BUILD=ON", "-DTesting=OFF"]` — a **new CMake option
-    `CHIQ_WHEEL_BUILD`** (default `OFF`) selects wheel install destinations. When `ON`,
-    `install(TARGETS _bse_solver)` targets the `chiq/` package dir (so the extension lands
-    at `chiq/_bse_solver.<ext>`); the scripts/`chiqvars.sh`/`bse-python` install rules are
-    skipped (the wheel gets its CLI from entry points, §4). When `OFF` (the legacy default),
-    the current destinations are used **plus** the two new shims are installed into
-    `lib/bse-python` (§3.3) so both layouts expose the same import surface.
-  - `wheel.exclude`/package-data configured so the wheel contains only `chiq/` (incl.
-    `chiq/point_group_data/` and `chiq/_bse_solver`), never `lib/bse-python/`, raw scripts,
-    or `share/chiqvars.sh` (§7 artifact policy).
+- `[tool.scikit-build]` config (exact):
+  - **Pure-Python payload** (the `chiq` package, the `bse` shim package, and the top-level
+    `bse_solver.py` module) is included via scikit-build-core file selection from
+    `python/package/` — `wheel.packages = ["python/package/chiq", "python/package/bse"]`
+    plus the single-module `bse_solver.py` (listed so it lands at the wheel top level). The
+    §7 wheel test asserts the exact archive paths `chiq/__init__.py`, `bse/__init__.py`,
+    `bse_solver.py`.
+  - **`wheel.install-dir` is left UNSET** (default = wheel root). The extension is the only
+    CMake-installed artifact in wheel mode and is installed with `install(TARGETS
+    _bse_solver ... DESTINATION chiq)`, landing at `chiq/_bse_solver.<ext>` (no `chiq/chiq`
+    duplication — the pure-Python `chiq/` comes from `wheel.packages`, the `.so` from this
+    single CMake install rule). The §7 wheel test asserts `chiq/_bse_solver.<ext>` exists.
+  - `cmake.args = ["-DCHIQ_WHEEL_BUILD=ON", "-DTesting=OFF", "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"]`
+    — a **new CMake option `CHIQ_WHEEL_BUILD`** (default `OFF`) selects wheel behavior: it
+    installs *only* the `_bse_solver` target to `DESTINATION chiq` and **skips** the legacy
+    scripts/`chiqvars.sh`/`bse-python`/symlink install rules (the wheel gets its CLI from
+    entry points, §4; its pure-Python files from `wheel.packages`). When `OFF` (the legacy
+    default) the current destinations are used, the extension installs to
+    `lib/bse-python/chiq/`, and the two shims are installed into `lib/bse-python` (§3.3) so
+    both layouts expose the same import surface. (The `CMAKE_POLICY_VERSION_MINIMUM=3.5` arg
+    lets CMake 4.x configure the project, avoiding a build-dep upper bound on `cmake`.)
 - Because the two layouts are chosen by one explicit option, `ordinary` CMake users are
   unaffected and the wheel layout is testable in isolation.
 
@@ -89,20 +97,35 @@ sdist has no `extern/pybind11`. Resolution:
   Installed in **both** layouts (wheel: top-level module; legacy CMake: into `lib/bse-python`,
   a new install rule — this closes the gap that the legacy path previously installed only
   `chiq`). Emits a visible deprecation notice on import (§10).
-- **`bse` package — lazy alias, not eager import** (`python/package/bse/__init__.py`):
-  the previous "register every submodule in `sys.modules`" plan is unsound because it would
-  eagerly import `chiq.sumk_dft_chi` (which imports `mpi4py` and `dcore`) and
-  `chiq.g2scl_core` (matplotlib), breaking a core install. Instead the shim installs a
-  **`MetaPathFinder`** that, on demand, resolves any `bse` or `bse.<dotted.path>` import to
-  the corresponding `chiq.<dotted.path>` module and registers the *same module object* under
-  the `bse.*` name (guaranteeing identity, incl. nested `bse.point_group_data.C1`). Nothing
-  is imported until the user actually imports it, so optional deps are pulled only when the
-  corresponding functionality is used. Supported forms (all tested, §7): `import bse`,
-  `import bse.h5bse`, `from bse import h5bse`, `import bse.point_group_data.C1`,
-  `importlib.import_module('bse.<name>')`, and mixed `chiq`/`bse` import order. Replaces the
-  filesystem symlink (unreliable in wheels); the legacy CMake path installs this real shim
-  package too (no more `bse -> chiq` symlink), so both layouts share one deprecation behavior.
-  Emits one visible deprecation notice per process on first `bse` import.
+- **`bse` package — static forwarding shims, not a dynamic finder** (`python/package/bse/`):
+  the previous "eager `sys.modules` registration" plan broke core installs (it would import
+  `chiq.sumk_dft_chi`/`chiq.g2scl_core` and their optional deps), and a dynamic
+  `MetaPathFinder` promising strict module-object identity is unsound (importlib can
+  overwrite the canonical module's `__spec__`/`__path__`; reload/concurrency/cleanup are
+  fragile) and breaks IDEs/linters/mypy. Instead, `bse/` is a **real package of thin static
+  forwarding modules**, one per public submodule on an explicit **allowlist**
+  (`h5bse`, `bse_toml`, `matrix_dict`, `point_group`, `sumk_dft_chi`, `g2scl_core`, `tools`,
+  `index_pair`, `mpi`, and the `point_group_data` subpackage): each `bse/<mod>.py` does
+  `from chiq.<mod> import *` (and `from chiq.<mod> import <mod> as ...` is not needed).
+  - **Lazy by construction:** `import bse` runs only `bse/__init__.py` (which emits the
+    deprecation notice and imports nothing heavy); `from bse import sumk_dft_chi` imports
+    `bse/sumk_dft_chi.py` → `chiq.sumk_dft_chi` only then, so optional deps (`dcore`,
+    `mpi4py`) are pulled only when that specific legacy submodule is used — never on a plain
+    `import bse`.
+  - **Identity contract (weakened, honest):** re-exported *classes/functions* are the same
+    objects (`bse.h5bse.h5BSE is chiq.h5bse.h5BSE`), which is what legacy `from bse import
+    h5bse; h5bse.h5BSE(...)` code needs; the *module objects* differ (`bse.h5bse is not
+    chiq.h5bse`). This is deterministic, tooling-friendly, and needs no import hook.
+  - `point_group_data` is mirrored as a real subpackage `bse/point_group_data/` with thin
+    forwarding modules so `import bse.point_group_data.C1` works.
+  - Supported/tested forms (§7): `import bse`, `import bse.h5bse`, `from bse import h5bse`,
+    `import bse.point_group_data.C1`, mixed `chiq`/`bse` order.
+  - Replaces the filesystem symlink (unreliable in wheels). **Legacy CMake install must first
+    remove any existing `bse` symlink at the destination** (`rm -f` the old
+    `lib/bse-python/bse` symlink) *before* installing the real `bse/` package — otherwise
+    `make install` on an upgrade could follow the old `bse -> chiq` symlink and overwrite
+    `chiq/__init__.py`. Both layouts then ship the same real shim and one deprecation
+    behavior.
 
 ## 4. CLI restructure into `chiq.cli` (required for entry points)
 
@@ -118,18 +141,21 @@ GenQPath`), which cannot be expressed as entry points. Resolution:
   - `dcore_chiq.py` gains a `main()` (currently only an `if __name__` block).
   - Sibling imports become intra-package: `from chiq.cli import chiq_main`,
     `from chiq.cli.gen_qpath import GenQPath`. All three sibling-import sites are migrated.
-- **Entry points** in `pyproject.toml`: `chiq_main = "chiq.cli.chiq_main:main"`, etc. — one
-  per command. Optional-dependency commands (`dcore_chiq` needs `dcore`; `plot_chiq_path`,
-  `plot_Ir` need `matplotlib`) still install as entry points but their heavy deps are
-  imported **lazily inside `main()`** (or the module already imports a now-core dep — see §6),
-  so `--help`/`--version` work on a core install and a missing extra yields a clear
-  `"<command> requires the '<extra>' extra: pip install chiq[<extra>]"` error only when the
-  functionality is actually invoked.
+- **Entry points** under `[project.scripts]`: `chiq_main = "chiq.cli.chiq_main:main"`, etc. —
+  one per command. Optional-dependency commands (`dcore_chiq` needs `dcore`; `plot_chiq_path`,
+  `plot_Ir` need `matplotlib`) still install as entry points, but each `main()` **parses
+  `--help`/`--version` (argparse) BEFORE importing its optional dep** — the heavy import
+  happens only after arg parsing, inside the code path that does real work. So
+  `dcore_chiq --help` / `--version` succeed on a **core** install (tested in the core-only
+  env, §7), while actually running it without the extra yields a clear
+  `"<command> requires the '<extra>' extra: pip install chiq[<extra>]"` error.
 - **Legacy compatibility.** `python/scripts/<name>.py` are kept as **thin wrappers**
   (`from chiq.cli.<name> import main; main()`) so the direct-CMake path installs them to
-  `bin` exactly as today. Additionally, deprecated `<name>.py` console-script aliases (e.g.
-  `chiq_main.py = "chiq.cli._deprecated:chiq_main_py"`) are shipped for one release; each
-  prints a deprecation line to `stderr` before delegating (so shell users see it, §10).
+  `bin` exactly as today. Additionally, deprecated `<name>.py` console-script aliases are
+  shipped for one release as **quoted** script keys (dotted names are invalid unquoted TOML
+  keys), e.g. `"chiq_main.py" = "chiq.cli._deprecated:chiq_main_py"`; each prints a
+  deprecation line to `stderr` before delegating (so shell users see it, §10). A §7 test
+  asserts the generated executable has the exact legacy name.
 
 ## 5. Optional-dependency handling (module-scope import audit)
 
@@ -138,10 +164,14 @@ Confirmed by grep of the actual source:
 - `chiq.sumk_dft_chi`, `chiq.dcore_chiq_worker`, `chiq.cli.dcore_chiq` import **dcore**
   (and `mpi4py`) at module scope → gated behind the `dcore`/`mpi` extras; these are only
   reached by the χ₀ preprocessing command, imported lazily in that command's `main()`.
-- `chiq.g2scl_core` imports **matplotlib** at module scope (`matplotlib.use('Agg')`). Because
-  a non-optional core module imports it, **matplotlib is a core runtime dependency** (not a
-  `plot`-only extra); the earlier "plot-only" classification was wrong. The `plot` extra is
-  removed (matplotlib is core); plotting commands need nothing beyond core.
+- `chiq.g2scl_core` imports **matplotlib** at module scope (`matplotlib.use('Agg')`). To keep
+  matplotlib **optional** (headless HPC nodes should not need it just to solve), this design
+  makes that import **lazy**: move the `matplotlib`/`pyplot`/`cm` imports out of
+  `chiq.g2scl_core` module scope into the plotting functions that use them (a small, behavior-
+  preserving refactor), and likewise keep the plotting CLI modules (`plot_chiq_path`,
+  `plot_Ir`) importing matplotlib lazily inside `main()`. matplotlib then stays a `plot`
+  extra; importing `chiq.g2scl_core` (or running a non-plot command) no longer requires it,
+  and invoking a plot command without `[plot]` yields a clear missing-extra error.
 - `chiq._mpi` imports `mpi4py`, but `chiq.mpi` falls back to `chiq._no_mpi` when absent, so
   core commands (`chiq_main` etc.) run without `mpi4py`.
 
@@ -150,13 +180,17 @@ Confirmed by grep of the actual source:
 - **Python:** `requires-python = ">=3.8"` (kept for ohtaka). CI runs the full
   build+test on **3.8 and 3.13**; a note states only these endpoints are continuously
   validated (a 3.11 wheel/import smoke job is added to catch mid-range breakage).
-- **Core runtime deps:** `numpy>=1.23`, `scipy`, `more-itertools`, `h5py`, `toml`,
-  **`matplotlib`** (imported by `chiq.g2scl_core`, §5).
-- **Optional extras:** `mpi` → `mpi4py`; `dcore` → `dcore` (χ₀ preprocessing). `gpu` → `cupy`
-  (future). (`plot` extra dropped — matplotlib is core; `test` → `pytest`.)
-- **Build deps** (bounded so a future release cannot silently drop 3.8 from an isolated
-  build): `scikit-build-core>=0.10,<1.0`, `pybind11>=2.12,<3.0`, `cmake>=3.15`. The sdist
-  build is exercised under Python 3.8 in CI (§7) to catch build-dep drift early.
+- **Core runtime deps:** `numpy>=1.23`, `scipy`, `more-itertools`, `h5py`, `toml`.
+  (`toml` is kept because `bse_toml.py` both reads *and* writes TOML — stdlib `tomllib`/
+  `tomli` are read-only, so a straight swap is not possible; migrating the writer is a
+  separate future cleanup, out of scope here.)
+- **Optional extras:** `plot` → `matplotlib` (lazy, §5); `mpi` → `mpi4py`; `dcore` → `dcore`
+  (χ₀ preprocessing); `gpu` → `cupy` (future); `test` → `pytest`.
+- **Build deps:** `scikit-build-core>=0.10,<1.0`, `pybind11>=2.12,<3.0`, `cmake>=3.15`
+  (no `cmake` upper bound — CMake 4.x is supported via the
+  `-DCMAKE_POLICY_VERSION_MINIMUM=3.5` arg in §3.1). The **sdist build is exercised under
+  Python 3.8 in CI** (§7) so build-dep drift that drops 3.8 is caught early rather than only
+  by `requires-python` advertising.
 
 ## 7. Testing
 
@@ -169,16 +203,26 @@ Confirmed by grep of the actual source:
   extra-gated command `dcore_chiq --help` is tested only in a `[dcore]` env. Run under 3.8
   and 3.13.
 - **sdist content assertion:** unpack the **sdist archive itself** (not the installed env,
-  which builds a wheel) to assert test `.h5` fixtures are present in the sdist; assert the
-  built **wheel** archive contains `chiq/` (with `_bse_solver` + `point_group_data`) and
-  **no** test `.h5`, `lib/bse-python`, raw scripts, or `chiqvars.sh`.
+  which builds a wheel) and assert it contains everything needed to configure+compile in a
+  clean checkout-less environment — the required CMake files (`CMakeLists.txt`,
+  `src/CMakeLists.txt`, `cmake/`), C++ sources/headers, all Python sources
+  (`chiq/`, `bse/`, `bse_solver.py`, `chiq/cli/`), `point_group_data`, test `.h5` fixtures,
+  and `LICENSE`/`README.md`. Additionally build the sdist in an environment **without the
+  git submodule** to confirm the `find_package(pybind11)` path (§3.2) works. Assert the
+  built **wheel** archive contains `chiq/` (with `chiq/_bse_solver.<ext>` + `point_group_data`),
+  `bse/`, `bse_solver.py`, and **no** test `.h5`, `lib/bse-python`, raw scripts, or
+  `chiqvars.sh`.
 - **Editable install:** `pip install -e .` then `import chiq._bse_solver` from a directory
   **outside** the repo (so in-tree `.so`/source can't mask a broken editable install);
   document that C++ source edits require an explicit `pip install -e . --no-build-isolation`
   rebuild (scikit-build-core does not auto-recompile on import).
 - **Direct-CMake path unchanged:** a CI job still runs `cmake -DTesting=ON && make &&
   source chiqvars.sh && ctest -V && pytest`, proving the legacy workflow still works and
-  installs the extension at the same `chiq._bse_solver` location.
+  installs the extension at the same `chiq._bse_solver` location. Run the legacy import
+  checks from a directory **outside the repo** and assert each imported module's `__file__`
+  lies under the temporary install prefix (not the source tree), so the test validates the
+  *installed* shims/extension rather than in-tree files. Also verify the old `bse` symlink is
+  gone and `bse/` is the real shim package (the §3.3 symlink-removal rule worked).
 - **Shim tests:** `bse`/`bse_solver` import-form/identity/import-order tests; a test that the
   deprecation notice fires once per process.
 
@@ -204,8 +248,15 @@ Confirmed by grep of the actual source:
   env, then `pip install . --no-build-isolation`.
 - Compiler / Eigen selection: cluster users pass toolchain and Eigen hints via
   `CMAKE_ARGS="-DEIGEN3_DIR=... -DCMAKE_CXX_COMPILER=..."` env var (scikit-build-core forwards
-  it). Documented alongside. (This is also why the CMake workflow is retained — it is the
-  recommended path when heavy custom compile configuration is needed.)
+  it). Documented alongside.
+- **`mpi` extra on clusters:** `pip install chiq[mpi]` builds `mpi4py`, which must link the
+  cluster's MPI (not a generic host MPI). `doc/install.rst` instructs users to `module load`
+  their MPI and pre-install with the cluster wrapper, e.g.
+  `MPICC=mpicc pip install mpi4py --no-binary=mpi4py`, *before* installing chiq.
+- **pip-vs-CMake decision matrix** (in `doc/install.rst`): recommend **pip** for standard
+  users / laptops / virtualenvs / CI; recommend the **CMake + chiqvars.sh** workflow for HPC
+  admins or anyone needing custom compilers, custom Eigen search paths, or specialized build
+  flags. This is why the CMake path is retained, not merely tolerated.
 - Install-precedence note: `doc/install.rst` warns against having both a pip-installed
   `chiq` and a `chiqvars.sh`-sourced `PYTHONPATH` entry active at once (pick one env), since
   a stale top-level `bse_solver` on `PYTHONPATH` could otherwise mask the shim.
@@ -221,7 +272,36 @@ Confirmed by grep of the actual source:
   running `chiq_main.py` will see it. Each message names the replacement (`chiq_main`,
   `import chiq...`) and the removal version (2.0).
 
-## 11. Review resolution (Codex + Antigravity, round 1)
+## 11. Review resolution (Codex + Antigravity)
+
+### Round 2
+
+- **`bse` MetaPathFinder unsound + breaks tooling (Codex must-fix, Antigravity risk):**
+  replaced with a **static forwarding-shim package** (allowlist of thin `bse/<mod>.py`
+  re-export modules); lazy per-submodule, deterministic, IDE/mypy-friendly; identity contract
+  weakened to class/function identity (honest) rather than module-object identity (§3.3).
+- **Wheel shim inclusion + `wheel.install-dir` ambiguity (Codex must-fix):** `wheel.packages`
+  lists `chiq` and `bse`; `bse_solver.py` included as a top-level module; `wheel.install-dir`
+  left unset with the extension installed to `DESTINATION chiq`; exact archive paths asserted
+  (§3.1, §7).
+- **CMake symlink-follow overwrites `chiq/__init__.py` on upgrade (Antigravity must-fix):**
+  legacy install `rm -f`s the old `bse` symlink before installing the real `bse/` package
+  (§3.3).
+- **matplotlib bloats headless nodes (Antigravity should-fix):** made lazy in `chiq.g2scl_core`
+  + plot CLI, kept as the `plot` extra rather than promoted to core (§5–6).
+- **`cmake` unbounded / 3.8 (Codex should-fix):** no `cmake` upper bound; CMake 4.x handled via
+  `-DCMAKE_POLICY_VERSION_MINIMUM=3.5`; sdist build tested on 3.8 (§3.1, §6).
+- **Optional-CLI `--help` on core (Codex should-fix):** `--help`/`--version` parsed before the
+  optional import; `dcore_chiq --help` tested in the core env (§4, §7).
+- **Dotted script keys / legacy-origin / sdist allowlist (Codex should-fix):** quoted
+  `"chiq_main.py"` keys; legacy import tests assert install-prefix origin; sdist asserted to
+  build submodule-free with a full file allowlist (§4, §7).
+- **mpi4py cluster linking + pip-vs-cmake guidance (Antigravity should-fix):** documented
+  `MPICC=... pip install mpi4py --no-binary` and a decision matrix in `doc/install.rst` (§9).
+- Editable-install rebuild caveat (both, open question): documented — scikit-build-core does
+  not auto-recompile on import; C++ edits need an explicit `-e .` rebuild (§7).
+
+### Round 1
 
 - **CLI not importable / sibling imports (Codex):** resolved by moving CLI into `chiq.cli`
   with intra-package imports and `chiq.cli.<name>:main` entry points; legacy `scripts/*.py`
