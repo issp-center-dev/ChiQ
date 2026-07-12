@@ -1,7 +1,7 @@
 # Design: pip packaging via scikit-build-core (coexisting with the CMake workflow)
 
 **Date:** 2026-07-12
-**Status:** Ready for review (round 3 — incorporates Codex + Antigravity design review rounds 1-2)
+**Status:** Ready for review (incorporates Codex + Antigravity design review rounds 1-3)
 **Repo:** ChiQ (Bethe-Salpeter / DMFT momentum-dependent susceptibility solver)
 **Branch:** `design/pip-packaging` (stacked on `design/numpy-backend-packaging` / PR #6,
 which adds the `chiq.solver` subpackage this design references)
@@ -49,12 +49,12 @@ subpackage (§4) so entry points are possible.
 - Add `pyproject.toml` with **scikit-build-core** as the build backend, driving the existing
   top-level `CMakeLists.txt`.
 - `[tool.scikit-build]` config (exact):
-  - **Pure-Python payload** (the `chiq` package, the `bse` shim package, and the top-level
-    `bse_solver.py` module) is included via scikit-build-core file selection from
-    `python/package/` — `wheel.packages = ["python/package/chiq", "python/package/bse"]`
-    plus the single-module `bse_solver.py` (listed so it lands at the wheel top level). The
-    §7 wheel test asserts the exact archive paths `chiq/__init__.py`, `bse/__init__.py`,
-    `bse_solver.py`.
+  - **Pure-Python payload** — three package directories under `python/package/`:
+    `wheel.packages = ["python/package/chiq", "python/package/bse", "python/package/bse_solver"]`.
+    All three are packages (the `bse_solver` shim is a package, not a single `.py`, precisely
+    so `wheel.packages` covers it with no single-module special-case). The §7 wheel test
+    asserts the exact archive paths `chiq/__init__.py`, `bse/__init__.py`,
+    `bse_solver/__init__.py`.
   - **`wheel.install-dir` is left UNSET** (default = wheel root). The extension is the only
     CMake-installed artifact in wheel mode and is installed with `install(TARGETS
     _bse_solver ... DESTINATION chiq)`, landing at `chiq/_bse_solver.<ext>` (no `chiq/chiq`
@@ -92,11 +92,15 @@ sdist has no `extern/pybind11`. Resolution:
   `OUTPUT_NAME _bse_solver` so the `.so` basename matches. `BSESolver` and bindings unchanged.
   The extension installs as `chiq._bse_solver` in **both** layouts (wheel: `chiq/`; legacy:
   `lib/bse-python/chiq/`). `chiq/solver/cpp.py` does `from chiq import _bse_solver`.
-- **Top-level `bse_solver` shim** (`python/package/bse_solver.py`,
-  `from chiq._bse_solver import *`) preserves `import bse_solver; bse_solver.BSESolver`.
-  Installed in **both** layouts (wheel: top-level module; legacy CMake: into `lib/bse-python`,
-  a new install rule — this closes the gap that the legacy path previously installed only
-  `chiq`). Emits a visible deprecation notice on import (§10).
+- **Top-level `bse_solver` shim — a package, not a single module**
+  (`python/package/bse_solver/__init__.py`, `from chiq._bse_solver import *`) preserves
+  `import bse_solver; bse_solver.BSESolver`. It is a *package* (directory + `__init__.py`)
+  rather than a standalone `bse_solver.py` so it is covered by `wheel.packages` (which selects
+  package directories, not single top-level modules) with no special single-file rule.
+  Installed in **both** layouts (wheel: via `wheel.packages`; legacy CMake: into
+  `lib/bse-python`, a new install rule — this closes the gap that the legacy path previously
+  installed only `chiq`). Emits its own visible deprecation notice on first import (§10),
+  independent of the `bse` shim's warning.
 - **`bse` package — static forwarding shims, not a dynamic finder** (`python/package/bse/`):
   the previous "eager `sys.modules` registration" plan broke core installs (it would import
   `chiq.sumk_dft_chi`/`chiq.g2scl_core` and their optional deps), and a dynamic
@@ -116,16 +120,24 @@ sdist has no `extern/pybind11`. Resolution:
     objects (`bse.h5bse.h5BSE is chiq.h5bse.h5BSE`), which is what legacy `from bse import
     h5bse; h5bse.h5BSE(...)` code needs; the *module objects* differ (`bse.h5bse is not
     chiq.h5bse`). This is deterministic, tooling-friendly, and needs no import hook.
-  - `point_group_data` is mirrored as a real subpackage `bse/point_group_data/` with thin
-    forwarding modules so `import bse.point_group_data.C1` works.
+  - `point_group_data` is mirrored as a real subpackage `bse/point_group_data/` with a thin
+    forwarding module for **every** public module in `chiq/point_group_data/` — the full
+    inventory is `__init__`, `base`, `C1`, `C2`, `D3`, `D4`, `D6`, `O`, `Oh` — so
+    `import bse.point_group_data.<X>` works for all of them (tested, not just `C1`).
   - Supported/tested forms (§7): `import bse`, `import bse.h5bse`, `from bse import h5bse`,
     `import bse.point_group_data.C1`, mixed `chiq`/`bse` order.
   - Replaces the filesystem symlink (unreliable in wheels). **Legacy CMake install must first
-    remove any existing `bse` symlink at the destination** (`rm -f` the old
-    `lib/bse-python/bse` symlink) *before* installing the real `bse/` package — otherwise
-    `make install` on an upgrade could follow the old `bse -> chiq` symlink and overwrite
-    `chiq/__init__.py`. Both layouts then ship the same real shim and one deprecation
-    behavior.
+    remove any existing `bse` symlink at the destination** *before* installing the real
+    `bse/` package — otherwise `make install` on an upgrade could follow the old
+    `bse -> chiq` symlink and overwrite `chiq/__init__.py`. Removal is done at **install
+    time** via a portable `install(CODE "file(REMOVE ...)")` (not a shell `rm`, for
+    Windows/portability), constructed to honor **`DESTDIR`** and `CMAKE_INSTALL_PREFIX`
+    (staged/packaged installs) and to target *only* `<dest>/lib/bse-python/bse`. Both layouts
+    then ship the same real shim and one deprecation behavior.
+  - **Static-shim caveat (documented):** `from chiq.<mod> import *` forwards only the public
+    names (respecting each module's `__all__`; underscore-prefixed names are not re-exported).
+    The allowlisted modules' public surfaces are the compatibility contract; a legacy caller
+    reaching a private `bse.<mod>._x` name is out of scope (none are known to).
 
 ## 4. CLI restructure into `chiq.cli` (required for entry points)
 
@@ -200,8 +212,11 @@ Confirmed by grep of the actual source:
   mixed-order forms (§3.3), `point_group_data` load, and each **core** console command's
   `--version`/`--help` (`chiq_main`, `chiq_post`, `chiq_fft`, `gen_qpath`, `gen_allq`,
   `calc_Iq`, `calc_Iq_scl`, `plot_chiq_path`, `plot_Ir`, `eigenvec_viewer`). The
-  extra-gated command `dcore_chiq --help` is tested only in a `[dcore]` env. Run under 3.8
-  and 3.13.
+  extra-gated commands' **`--help`/`--version` are tested in the CORE-only env** (they must
+  succeed there because help/version are parsed before any optional import, §4); their
+  **real execution** without the extra is tested to emit the actionable missing-extra message
+  (via a `try/except ImportError` in `main()`, not a raw traceback), and a separate `[dcore]`
+  env exercises `dcore_chiq` end-to-end. Run under 3.8 and 3.13.
 - **sdist content assertion:** unpack the **sdist archive itself** (not the installed env,
   which builds a wheel) and assert it contains everything needed to configure+compile in a
   clean checkout-less environment — the required CMake files (`CMakeLists.txt`,
@@ -223,21 +238,31 @@ Confirmed by grep of the actual source:
   lies under the temporary install prefix (not the source tree), so the test validates the
   *installed* shims/extension rather than in-tree files. Also verify the old `bse` symlink is
   gone and `bse/` is the real shim package (the §3.3 symlink-removal rule worked).
-- **Shim tests:** `bse`/`bse_solver` import-form/identity/import-order tests; a test that the
-  deprecation notice fires once per process.
+- **Shim tests:** `bse`/`bse_solver` import-form/identity/import-order tests. `bse` and
+  `bse_solver` are **independent** deprecated surfaces — each emits its own notice once per
+  process (a test asserts `import bse` warns once and `import bse_solver` warns once,
+  independently).
 
 ## 8. Files touched / added
 
-- Add: `pyproject.toml`; `python/package/bse_solver.py` (shim); `python/package/bse/__init__.py`
-  (lazy MetaPathFinder shim); `python/package/chiq/cli/` (one module per command +
-  `_deprecated.py` wrappers).
+- Add: `pyproject.toml`; `python/package/bse_solver/__init__.py` (top-level shim package);
+  `python/package/bse/` (static forwarding-shim package: `__init__.py` + one thin
+  `from chiq.<mod> import *` module per allowlisted submodule + `point_group_data/` mirror);
+  `python/package/chiq/cli/` (one module per command + `_deprecated.py` wrappers).
 - Edit: `src/bse_solver_pybind.cpp` (module rename); top-level `CMakeLists.txt` +
   `src/CMakeLists.txt` + `python/CMakeLists.txt` (add `CHIQ_WHEEL_BUILD`, pybind11 selection,
   install destinations/shims for both layouts); `python/package/chiq/solver/cpp.py`
   (`from chiq import _bse_solver`).
 - Edit: `python/scripts/*.py` → thin wrappers delegating to `chiq.cli.*`.
-- Edit: `.github/workflows/main.yml` (pip job + install/sdist/editable tests + 3.11 smoke);
-  `README.md`, `doc/install.rst`.
+- Edit: `.github/workflows/main.yml` (pip job + install/sdist/editable tests + 3.11 smoke).
+- Edit docs: `README.md` — add a "Quick install (pip)" subsection (`pip install .`) above the
+  CMake instructions; update the "How to use" examples from `chiq_main.py`/`chiq_post.py` to
+  the entry-point names `chiq_main`/`chiq_post`; fix the stale doc-build path
+  `sphinx-build -b html ../bse/doc html` → `../ChiQ/doc`. `doc/install.rst` — pip vs CMake
+  decision matrix (§9), offline `--no-build-isolation` path (§9), cluster `mpi4py` build
+  (§9), editable-install C++ rebuild caveat, and a **warning to unset a stale `PYTHONPATH`**
+  from a prior `chiqvars.sh` when switching to the pip install (else the old tree masks the
+  pip package / a stale `bse_solver` shadows the shim).
 
 ## 9. HPC / offline build (ohtaka)
 
@@ -273,6 +298,30 @@ Confirmed by grep of the actual source:
   `import chiq...`) and the removal version (2.0).
 
 ## 11. Review resolution (Codex + Antigravity)
+
+### Round 3
+
+- **`bse_solver.py` single-module wheel inclusion undefined (Codex must-fix):** the top-level
+  shim is now a **package** `bse_solver/__init__.py`, covered by `wheel.packages` like the
+  others — no single-file mechanism needed (§3.1, §3.3, §8).
+- **§8 still said "MetaPathFinder" (Codex should-fix):** file inventory corrected to the static
+  forwarding-shim package (§8).
+- **§4/§7 `dcore_chiq --help` env conflict (Codex should-fix):** `--help`/`--version` tested in
+  the **core-only** env; missing-extra message and end-to-end tested with `[dcore]` (§7).
+- **Symlink removal portability/DESTDIR (Codex + Antigravity):** removal via
+  `install(CODE "file(REMOVE ...)")` honoring `DESTDIR`/prefix, targeting only
+  `lib/bse-python/bse` (§3.3).
+- **`point_group_data` nested inventory (Codex should-fix):** full module list enumerated
+  (`base,C1,C2,D3,D4,D6,O,Oh`) and all tested (§3.3).
+- **Per-shim warning semantics (Codex should-fix):** `bse` and `bse_solver` warn independently,
+  once each per process (§7).
+- **`import *` only forwards public names (Codex risk):** documented static-shim caveat (§3.3).
+- **README stale (`chiq_main.py`, `../bse/doc`) + no pip mention (Antigravity must-fix-docs):**
+  captured as required doc edits in §8 (README pip quick-install, `chiq_main` command names,
+  fixed doc-build path) + PYTHONPATH-unset warning — applied during implementation, not now
+  (design HARD-GATE).
+- Unpinned runtime deps vs 3.8 (Codex risk): accepted — endpoint CI catches drift; hard pins
+  would over-constrain research users. Documented as a monitored risk.
 
 ### Round 2
 
