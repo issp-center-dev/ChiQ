@@ -626,19 +626,19 @@ def convert_a2b(bm, nb, nw, n_in):
 
 def convert_b2a(bm, nb, nw, n_in):
     """B-type -> A-type. Emits (b1,b2) iff its assembled A block is not
-    exactly zero (matches Convert_B2A isZero(0) pruning)."""
+    exactly zero (matches Convert_B2A isZero(0) pruning — gate on the
+    assembled VALUE, not on input key presence: matmul can produce a
+    present-but-exactly-zero B block via cancellation)."""
     out = {}
     for b1 in range(nb):
         for b2 in range(nb):
             r = np.zeros((n_in, nw, n_in, nw), dtype=complex)
-            any_nonzero = False
             for iw1 in range(nw):
                 for iw2 in range(nw):
                     key = (iw1 * nb + b1, iw2 * nb + b2)
                     if key in bm:
                         r[:, iw1, :, iw2] = bm[key]
-                        any_nonzero = True
-            if any_nonzero:
+            if np.any(r != 0):
                 out[(b1, b2)] = r.reshape(n_in * nw, n_in * nw)
     return out
 
