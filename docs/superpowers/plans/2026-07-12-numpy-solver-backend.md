@@ -958,7 +958,7 @@ from .base import SolverBase, SET_LAYOUT, CALC_TYPES, GET_NAMES
 from .layout import parse_matrix_info
 
 # internal require-names used in the C++ error strings (bse.hpp)
-_REQUIRE_NAME = {"X0_loc": "X0_Loc"}  # others equal their set name
+_REQUIRE_NAME = {"X0_loc": "X0_Loc", "Phi_sum": "Phi_Sum"}  # C++ internal names (bse.hpp); others equal their set name
 
 # calc_type -> list of required set names (from bse.hpp require() calls)
 _REQUIRED = {
