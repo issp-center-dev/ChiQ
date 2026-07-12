@@ -1,7 +1,8 @@
 # Design: NumPy solver backend + backend-switch + pip packaging (Phase 0)
 
 **Date:** 2026-07-12
-**Status:** Ready for human review (incorporates Codex design review rounds 1–4)
+**Status:** Ready for human review (incorporates Codex design review rounds 1–4 + a
+source-grounded Codex code-review pass — see §9)
 **Repo:** ChiQ (Bethe-Salpeter / DMFT momentum-dependent susceptibility solver)
 
 ## 1. Context and goal
@@ -99,6 +100,11 @@ Backends:
 | `gamma0`   | C      | bare vertex                   |
 | `Phi_sum`  | C      | SCL summed vertex (√chi_loc)  |
 
+**calc name case:** `calc()` accepts **both upper- and lower-case** spellings —
+`"BSE"|"bse"`, `"RPA"|"rpa"`, `"RRPA"|"rrpa"`, `"SCL"|"scl"` (and `"chi0"`)
+(`bse_solver_pybind.cpp:114-136`). Both backends accept both cases; the facade does not
+narrow this. (The driver passes lower-case, but the API contract is case-tolerant.)
+
 **calc_type → required set names / produced get names** (from `bse.hpp` `require()`
 calls and `chiq_main.py` worker classes `chi_chi0/chi_bse/chi_rpa/chi_rrpa/chi_scl`):
 
@@ -111,15 +117,31 @@ calls and `chiq_main.py` worker classes `chi_chi0/chi_bse/chi_rpa/chi_rrpa/chi_s
 | `scl`  | X0_q, X0_loc, Phi, Phi_sum        | chi_q_scl, I_q_scl             |
 
 † `chi0_q` for `bse` is produced by a preceding `chi0` calc in the driver, not by
-`CalcChiq_BSE`; the driver's `output_q` lists reflect what is written to HDF5. The
-solver contract is: `get(name)` returns the last computed result of that name and
-raises `KeyError`-style errors if that calc has not run.
+`CalcChiq_BSE`; the driver's `output_q` lists reflect what is written to HDF5.
+
+**`get` before compute → empty dict (not an exception).** The C++ getters return a
+default-constructed `block_matrix` member, which the binding converts to an **empty
+dict `{}`** (`bse_solver_pybind.cpp:160-200`). `get(name)` for a valid-but-not-yet-
+computed name therefore returns `{}`; only an **unknown** name raises
+`RuntimeError("Invalid type '<name>'")`. `NumpySolver` mirrors this exactly (empty dict
+for un-computed valid names). This corrects the earlier "KeyError-style" claim, which
+did not match the C++ backend.
+
+**`I_q` and `I_q_scl` share one result slot.** Both map to `GetIq()`
+(`bse_solver_pybind.cpp:185-190`), which returns the single `Iq` member. `CalcChiq_BSE`
+and `CalcChiq_SCL` both write that same member. So `get("I_q")` and `get("I_q_scl")`
+return whichever irreducible vertex was computed most recently, regardless of which
+name is used. `NumpySolver` uses a single `Iq` slot too, so this hidden aliasing is
+preserved rather than accidentally split into two independent results.
 
 **Lifecycle / error semantics** (match observed C++ behavior):
 - `set` is idempotent-overwrite: setting the same name replaces prior data.
 - `calc` requires all inputs in its row to be set; a missing input raises
-  `RuntimeError("'<name>' must be set before calling calc.")` (mirrors
-  `bse.hpp` `require`).
+  `RuntimeError("'<internal-name>' must be set before calling calc.")` (mirrors
+  `bse.hpp` `require`). **The name in the message is the C++ *internal* name, which is
+  not always the public set name:** missing `X0_loc` reports **`'X0_Loc'`** (capital L,
+  `bse.hpp:225,246,328`); the others match their set names. `NumpySolver` reproduces the
+  exact strings (including `X0_Loc`) so error-message tests are backend-agnostic.
 - Repeated `calc` recomputes from currently-set inputs and overwrites outputs.
 - **No output caching / no auto-invalidation** (matches C++ `BSESolver`, which holds
   inputs by pointer and recomputes on each `calc`): `get` returns the result of the
@@ -162,8 +184,13 @@ blocks are explicitly unsupported in Phase 0.)
 | B      | `v = iw*nb + b`, `iw∈[0,nw)`   | `n_in × n_in`            | `info_B[v]=n_in`  |
 | A      | `v ∈ [0, nb)`                  | `(n_in*nw) × (n_in*nw)`  | `info_A[v]=n_in*nw` |
 
-- B is structurally block-diagonal in `iw`: only keys `(iw*nb+b_i, iw*nb+b_j)`
-  (same `iw`) may be present.
+- B **input** matrices (`X0_loc`, `X0_q`, `Phi`) are structurally block-diagonal in
+  `iw`: only same-`iw` keys `(iw*nb+b_i, iw*nb+b_j)` are present. **Intermediate** B
+  matrices produced by `Convert_A2B` (inside `Prod_A_B` on the BSE path) are **not** so
+  restricted: `Convert_A2B` (`bse.hpp:534-558`) loops `iw1, iw2` independently and can
+  emit **cross-frequency** keys `(iw1*nb+b1, iw2*nb+b2)` with `iw1 ≠ iw2`. The B key
+  domain is therefore the full `[0, nb*nw)²`; only the specific *inputs* above happen to
+  be `iw`-diagonal.
 - A flattens its inner index as `in*nw + iw`.
 - All blocks are **square**; the layout module asserts this and A/B/C mutual
   consistency (`nb, nw, n_in`) on construction, raising on mismatch.
@@ -175,7 +202,12 @@ Reductions/conversions are functions `dict → dict` with the exact key/shape co
 - `Sumfreq_B` (B→C): output key `(b_i,b_j)`;
   `out[(i,j)] = Σ_iw B[(iw*nb+i, iw*nb+j)]` over keys present.
 - `Convert_A2B` (A→B) / `Convert_B2A` (B→A): index remap per `bse.hpp:519-613`;
-  keys and shapes follow the B/A domains above.
+  keys/shapes follow the B/A domains above. **Important:** these two routines are the
+  *one exception* to the "keys are structural" rule — they **prune exactly-zero blocks**
+  via Eigen `isZero(0)` (`bse.hpp:554, 605`), so a converted block is emitted only if it
+  is not identically zero. The NumPy `Convert_*` must reproduce this exact-zero pruning
+  (`if np.any(block != 0)`) so the resulting B/A key sets are backend-identical. (This
+  is exact-zero, not a tolerance, so it is deterministic across backends.)
 
 ### 3.5 Kernel formulas (ordered, matching C++)
 
@@ -218,8 +250,11 @@ Component derivation and fill-in match C++ exactly:
   numerical result. The NumPy `*` reproduces this exact key-path rule, so the output
   sparsity graph is backend-identical regardless of floating-point cancellation.
   Differences (`-`) are entrywise over the union of present keys. Downstream
-  `Sumfreq_*`/`Convert_*`/`get` consume whatever keys are present. No operation ever
-  decides key presence from a numerical zero-test.
+  `Sumfreq_*`/`Convert_*`/`get` consume whatever keys are present. The **only**
+  operations that decide key presence from values are `Convert_A2B`/`Convert_B2A`, and
+  they use an **exact-zero** test (`isZero(0)`) — reproduced verbatim in NumPy (§3.4) so
+  it remains deterministic and backend-identical. `inverse`/`solve`/`*` never test
+  values for key presence.
 
 This is (a) *mathematically identical* to C++ because the full operator is
 block-diagonal across components, and (b) preserves the C++ complexity `Σ_g dim(g)³`,
@@ -269,9 +304,11 @@ Layers:
      `np.all(np.abs(numpy - cpp) <= atol + rtol*np.abs(cpp))` per block, with
      `atol=1e-10`, `rtol=1e-8` (implemented via `np.testing.assert_allclose`, which also
      reports the worst offending element). The scale is `|cpp|` at each position, so a
-     large entry cannot mask an error at a zero/small entry. **NaN/Inf policy:** a
-     position passes only if both backends are non-finite *and equal in the IEEE sense
-     for that kind* (NaN↔NaN, +Inf↔+Inf); any finite-vs-non-finite mismatch fails.
+     large entry cannot mask an error at a zero/small entry. **NaN/Inf policy
+     (explicit):** run `assert_allclose(..., equal_nan=True)` for the finite-tolerance
+     comparison, *preceded* by two boolean masks that must match exactly — NaN positions
+     (`np.isnan`) and signed-infinity positions (`np.isposinf`/`np.isneginf` separately,
+     so `+Inf` vs `−Inf` fails). Any finite-vs-non-finite mismatch fails.
    - **relative backward error** of each internal solve,
      `||(I-M)x - b||_inf / (||b||_inf + atol) <= 1e-8`, evaluated at a
      **kernel/linalg-adapter test seam** — not through the public facade, so no debug
@@ -351,12 +388,17 @@ error.
   `3.13` (the range endpoints), plus a **lightweight wheel/import/backend smoke job**
   on `3.11` and `3.12`, so the whole advertised range is exercised.
 - Build: `scikit-build-core>=0.10`, `pybind11>=2.12` (2.12+ supports 3.13),
-  `cmake>=3.15`. Runtime deps are pinned by a **per-script import audit**: core =
-  `numpy>=1.23`, `more-itertools`, `h5py` (HDF5 I/O in `h5bse`), `tomli` (only for
-  <3.11; 3.11+ uses stdlib `tomllib`). Optional extras: `mpi[mpi4py]`,
-  `dcore` (χ₀ preprocessing scripts only), `plot[matplotlib]` (plotting scripts only),
-  `test[pytest]`, `gpu[cupy]` (later). Each advertised console script is smoke-tested
-  in the extra that provides its deps.
+  `cmake>=3.15`. Runtime deps come from an **actual per-file import audit** (not
+  assumed): core = `numpy>=1.23`, `scipy` (imported by `chiq.g2scl_core` and by the
+  `chiq_fft`/`calc_Iq`/`calc_Iq_scl` scripts), `more-itertools`, `h5py` (HDF5 I/O in
+  `h5bse`), and **`toml`** — `bse_toml.py` imports the third-party `toml` package
+  (read *and* write), **not** `tomllib`/`tomli`; keep `toml` as a core dep (no source
+  migration in Phase 0; `tomllib` is read-only and would require a `dump` replacement).
+  Optional extras (PEP 621 strings pinned in `pyproject.toml`): `mpi` → `mpi4py`,
+  `dcore` → `dcore` (χ₀ preprocessing scripts only), `plot` → `matplotlib` (plotting
+  scripts only), `test` → `pytest`, `gpu` → `cupy` (later). Each advertised console
+  script is smoke-tested in the extra that provides its deps. A CI import-audit step
+  re-derives this list so it cannot silently drift.
 - If a verified 3.13 wheel/source build of any dep is not yet available at
   implementation time, 3.13 drops to "best-effort" in CI and the floor/`3.10` target
   is unaffected.
@@ -486,3 +528,27 @@ must-fix was addressed in-doc. The C++-oracle risk is mitigated by independent
 analytical tests (§4.3); remaining reviewer items are should-fix precision deferred to
 TDD. Antigravity's user/workflow lens was unavailable (environment defect, §8 top), so
 the human review gate substitutes for it.
+
+## 9. Code-review pass resolution (Codex, source-grounded)
+
+A Codex code-review of the diff (reading the actual repository, not just the design)
+surfaced concrete mismatches between the spec and the real C++ behavior that the design
+rounds had missed. All verified against source and fixed in-doc:
+
+- **`Convert_A2B`/`Convert_B2A` cross-frequency keys + exact-zero pruning** → *resolved*:
+  §3.4 now scopes the "same-iw only" invariant to B *inputs*, states the full B key
+  domain for intermediates, and documents that the Convert routines prune `isZero(0)`
+  blocks (the one value-based key decision), reproduced exactly in NumPy (§3.5).
+- **`get` before compute returns `{}`, not an exception** → *resolved*: §3.3 corrected;
+  both backends return an empty dict for un-computed valid names.
+- **calc accepts upper+lower case; missing-`X0_loc` error says `'X0_Loc'`** → *resolved*:
+  §3.3 records the case-tolerant calc names and the exact internal error strings.
+- **`I_q`/`I_q_scl` share one `Iq` slot** → *resolved*: §3.3 documents the aliasing;
+  NumpySolver keeps a single slot.
+- **deps: `toml` (not `tomli`), `scipy` missing** → *resolved*: §5.4 rewritten from an
+  actual per-file import audit; `toml` and `scipy` are core deps; a CI import-audit step
+  prevents drift.
+
+CLAUDE.md was reported "substantially accurate"; no correctness changes required. The
+`recommended_tests` (facade compatibility, analytical key-set tests, clean-env wheel
+installs, import audit) are folded into §4 and will be written as part of TDD.
