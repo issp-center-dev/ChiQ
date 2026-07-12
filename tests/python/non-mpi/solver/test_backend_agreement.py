@@ -123,14 +123,16 @@ def test_bse_agreement(nb, nw, n_in):
         "X_loc": _a_blocks(nb, nw, n_in),
         "chi_loc": _c_blocks_wc(nb, n_in),
     }
-    outs = {}
+    outs_chi, outs_iq = {}, {}
     for backend in ("cpp", "numpy"):
         s = get_solver(backend, 12.0, iA, iB, iC)
         for name, bm in inputs.items():
             s.set(bm, name)
         s.calc("bse")
-        outs[backend] = s.get("chi_q")
-    _assert_agree(outs["cpp"], outs["numpy"])
+        outs_chi[backend] = s.get("chi_q")
+        outs_iq[backend] = s.get("I_q")
+    _assert_agree(outs_chi["cpp"], outs_chi["numpy"])
+    _assert_agree(outs_iq["cpp"], outs_iq["numpy"])
 
 @pytest.mark.parametrize("nb,nw,n_in", [(1, 2, 1), (2, 2, 2)])
 def test_scl_agreement(nb, nw, n_in):
@@ -141,11 +143,13 @@ def test_scl_agreement(nb, nw, n_in):
         "Phi": _b_blocks_diag(nb, nw, n_in),
         "Phi_sum": _c_blocks_wc(nb, n_in),
     }
-    outs = {}
+    outs_chi, outs_iq = {}, {}
     for backend in ("cpp", "numpy"):
         s = get_solver(backend, 12.0, iA, iB, iC)
         for name, bm in inputs.items():
             s.set(bm, name)
         s.calc("scl")
-        outs[backend] = s.get("chi_q_scl")
-    _assert_agree(outs["cpp"], outs["numpy"])
+        outs_chi[backend] = s.get("chi_q_scl")
+        outs_iq[backend] = s.get("I_q_scl")
+    _assert_agree(outs_chi["cpp"], outs_chi["numpy"])
+    _assert_agree(outs_iq["cpp"], outs_iq["numpy"])
