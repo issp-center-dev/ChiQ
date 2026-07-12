@@ -6,7 +6,9 @@ removed in ChiQ 2.0 -- use `chiq.solver.get_solver` instead.
 """
 import warnings
 
-from chiq._bse_solver import *  # noqa: F401,F403
+from chiq._bse_solver import BSESolver
+
+__all__ = ["BSESolver"]
 
 warnings.warn(
     "Importing the top-level 'bse_solver' module is deprecated and will be "

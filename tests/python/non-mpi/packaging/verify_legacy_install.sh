@@ -4,17 +4,28 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/../../../.." && pwd)"
 PREFIX=$(mktemp -d)
-SDK=${SDK:-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk}
 PYTHON=${PYTHON:-$(command -v python3)}
 PYTHON_INCLUDE_DIR=${PYTHON_INCLUDE_DIR:-$("$PYTHON" -c "import sysconfig; print(sysconfig.get_path('include'))")}
 PYTHON_LIBRARY=${PYTHON_LIBRARY:-$("$PYTHON" -c "import os, sysconfig; print(os.path.join(sysconfig.get_config_var('LIBDIR'), sysconfig.get_config_var('LIBRARY') or sysconfig.get_config_var('LDLIBRARY')))")}
+CMAKE_PLATFORM_ARGS=()
 
 if [[ -z "${EIGEN3_INCLUDE_DIR:-}" ]]; then
-  if brew --prefix eigen@3 >/dev/null 2>&1; then
-    EIGEN3_INCLUDE_DIR="$(brew --prefix eigen@3)/include/eigen3"
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    if brew --prefix eigen@3 >/dev/null 2>&1; then
+      EIGEN3_INCLUDE_DIR="$(brew --prefix eigen@3)/include/eigen3"
+    else
+      EIGEN3_INCLUDE_DIR="$(brew --prefix eigen)/include/eigen3"
+    fi
   else
-    EIGEN3_INCLUDE_DIR="$(brew --prefix eigen)/include/eigen3"
+    EIGEN3_INCLUDE_DIR=/usr/include/eigen3
   fi
+fi
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  SDK=${SDK:-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk}
+  CMAKE_PLATFORM_ARGS+=(
+    "-DCMAKE_CXX_FLAGS=-isysroot $SDK -isystem $SDK/usr/include/c++/v1"
+  )
 fi
 
 cd "$REPO"
@@ -27,8 +38,18 @@ cmake .. -DTesting=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM
   -DPYTHON_EXECUTABLE="$PYTHON" \
   -DPYTHON_INCLUDE_DIR="$PYTHON_INCLUDE_DIR" \
   -DPYTHON_LIBRARY="$PYTHON_LIBRARY" \
-  -DCMAKE_CXX_FLAGS="-isysroot $SDK -isystem $SDK/usr/include/c++/v1"
+  "${CMAKE_PLATFORM_ARGS[@]}"
 make _bse_solver
+
+# The uninstalled build tree must work with the environment exported by
+# chiqvars.sh. Use a clean package copy so a developer's local .so cannot mask
+# an incorrect build-tree import path.
+SOURCE_PACKAGE=$(mktemp -d)
+cp -R "$REPO/python/package" "$SOURCE_PACKAGE/package"
+find "$SOURCE_PACKAGE/package" -name '_bse_solver*.so' -delete
+PYTHONPATH="$SOURCE_PACKAGE/package:$REPO/build_legacy/src" "$PYTHON" -c \
+  "from chiq.solver import get_solver; get_solver('cpp', 1.0, [1], [1], [1]); print('legacy build tree OK')"
+
 make install
 cd "$REPO"
 
@@ -37,5 +58,7 @@ test -f "$LIBDIR/chiq/__init__.py"
 test -f "$LIBDIR"/chiq/_bse_solver*.so
 test -f "$LIBDIR/bse/__init__.py" && ! test -L "$LIBDIR/bse"
 test -f "$LIBDIR/bse_solver/__init__.py"
+test -x "$PREFIX/bin/chiq_main"
+PYTHONPATH="$LIBDIR" "$PREFIX/bin/chiq_main" --version
 PYTHONPATH="$LIBDIR" "$PYTHON" -c "from chiq import _bse_solver; import bse, bse_solver; print('legacy layout OK')"
 echo "LEGACY INSTALL VERIFIED at $PREFIX"

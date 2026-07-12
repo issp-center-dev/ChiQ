@@ -11,6 +11,12 @@ else()
   install(FILES ${scripts}
    PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ
    DESTINATION ${CMAKE_INSTALL_BINDIR})
+  foreach(script ${scripts})
+    get_filename_component(command_name "${script}" NAME_WE)
+    install(PROGRAMS "${script}"
+      DESTINATION ${CMAKE_INSTALL_BINDIR}
+      RENAME "${command_name}")
+  endforeach()
   install(DIRECTORY package/chiq DESTINATION ${CMAKE_INSTALL_LIBDIR}/bse-python)
   # Remove any stale symlink before installing the real backward-compat packages.
   install(CODE "file(REMOVE \"\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/bse-python/bse\")")

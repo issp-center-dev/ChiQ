@@ -2,13 +2,16 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/../../../.." && pwd)"
-SDK=${SDK:-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk}
 PYTHON=${PYTHON:-$(command -v python3)}
-EIGEN_PREFIX=""
-if brew --prefix eigen@3 >/dev/null 2>&1; then
-  EIGEN_PREFIX="$(brew --prefix eigen@3)"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  SDK=${SDK:-/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk}
+  if brew --prefix eigen@3 >/dev/null 2>&1; then
+    EIGEN3_INCLUDE_DIR="$(brew --prefix eigen@3)/include/eigen3"
+  else
+    EIGEN3_INCLUDE_DIR="$(brew --prefix eigen)/include/eigen3"
+  fi
 else
-  EIGEN_PREFIX="$(brew --prefix eigen)"
+  EIGEN3_INCLUDE_DIR=${EIGEN3_INCLUDE_DIR:-/usr/include/eigen3}
 fi
 
 VENV=$(mktemp -d)/venv
@@ -20,10 +23,13 @@ pip install -U pip build
 PYTHON_INCLUDE_DIR=$(python -c "import sysconfig; print(sysconfig.get_path('include'))")
 PYTHON_LIBRARY=$(python -c "import os, sysconfig; print(os.path.join(sysconfig.get_config_var('LIBDIR'), sysconfig.get_config_var('LIBRARY') or sysconfig.get_config_var('LDLIBRARY')))")
 export CMAKE_ARGS="-DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-  -DEIGEN3_INCLUDE_DIR=$EIGEN_PREFIX/include/eigen3 \
+  -DEIGEN3_INCLUDE_DIR=$EIGEN3_INCLUDE_DIR \
   -DPYTHON_INCLUDE_DIR=$PYTHON_INCLUDE_DIR \
-  -DPYTHON_LIBRARY=$PYTHON_LIBRARY \
-  -DCMAKE_CXX_FLAGS=-isysroot\\ $SDK\\ -isystem\\ $SDK/usr/include/c++/v1"
+  -DPYTHON_LIBRARY=$PYTHON_LIBRARY"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_CXX_FLAGS=-isysroot\\ $SDK\\ -isystem\\ $SDK/usr/include/c++/v1"
+  export CMAKE_ARGS
+fi
 
 # --- wheel: build, install into the clean venv OUTSIDE the repo, import-check ---
 WORK=$(mktemp -d)

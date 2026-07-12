@@ -13,5 +13,7 @@ def test_top_level_bse_solver_shim_warns_and_forwards():
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         import bse_solver
-    assert hasattr(bse_solver, "BSESolver")
+    from chiq import _bse_solver
+
+    assert bse_solver.BSESolver is _bse_solver.BSESolver
     assert any(issubclass(x.category, FutureWarning) for x in w)

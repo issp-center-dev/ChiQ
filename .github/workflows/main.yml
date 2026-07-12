@@ -59,7 +59,7 @@ jobs:
 
     name: Pip install + test with Python ${{ matrix.python-version }}
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout code
@@ -84,6 +84,12 @@ jobs:
           chiq_main --version
           cd /tmp
           python -m pytest "$GITHUB_WORKSPACE/tests/python/non-mpi" -q -k "not mpi"
+
+      - name: Verify legacy and pip packaging layouts
+        if: matrix.python-version == '3.13'
+        run: |
+          bash tests/python/non-mpi/packaging/verify_legacy_install.sh
+          bash tests/python/non-mpi/packaging/verify_pip_install.sh
 
   pip-import-smoke:
     name: Pip import smoke with Python 3.11
