@@ -72,7 +72,7 @@ as follows:
 
 .. code-block:: bash
 
-  gen_qpath.py dmft_2orb.in qpath.in
+  gen_qpath dmft_2orb.in qpath.in
 
 Next, we need to prepare the input file for the BSE calculation.
 
@@ -83,8 +83,8 @@ BSE calculation can be performed using the following commands:
 
 .. code-block:: bash
 
-  dcore_chiq.py --np 4 bse.in
-  mpiexec --np 4 chiq_main.py bse.in
+  dcore_chiq --np 4 bse.in
+  mpiexec --np 4 chiq_main bse.in
 
 The obtained susceptibility is a 16x16 complex-valued matrix.
 In this example, we transform the susceptibility to the basis described in the reference paper.
@@ -92,12 +92,12 @@ The transformation matrix is given by ``eigenvec.in`` as follows:
 
 .. literalinclude:: ../../examples/two_orbital/eigenvec.in
 
-This has the same format as the eigenvector file outputted by ``chiq_post.py``.
-To check these basis, use ``eigenvec_viewer.py`` as follows:
+This has the same format as the eigenvector file outputted by ``chiq_post``.
+To check these basis, use ``eigenvec_viewer`` as follows:
 
 .. code-block:: bash
 
-  eigenvec_viewer.py eigenvec.in -a 1 --spin-charge
+  eigenvec_viewer eigenvec.in -a 1 --spin-charge
 
 For example, the 11th eigenvector (``#10``) is as follows:
 
@@ -122,25 +122,25 @@ For example, the 11th eigenvector (``#10``) is as follows:
 :math:`2 \times 2` matrices are the orbital components :math:`\tau` coupled to each spin-charge component.
 Therefore, this says that the 11th eigenvector is :math:`\sigma^z \times \tau^x` (one of the :math:`T_{1u}`).
 
-Basis transformation is performed by ``chiq_post.py`` as follows:
+Basis transformation is performed by ``chiq_post`` as follows:
 
 .. code-block:: bash
 
-  chiq_post.py bse.in
+  chiq_post bse.in
 
 The transformed susceptibility is stored in ``bse/chi_q_eigen.dat``.
 
-In the plotting tool, ``plot_chiq_path.py``, you can select the susceptibility to plot by specifying the eigenvector index by using the following file, ``label.in``:
+In the plotting tool, ``plot_chiq_path``, you can select the susceptibility to plot by specifying the eigenvector index by using the following file, ``label.in``:
 
 .. literalinclude:: ../../examples/two_orbital/label.in
 
 This file has a python dictionary, where the key is the eigenvector index and the value is the label in the plot.
 Note that the line starting with ``#`` is a comment, and then the four bands, 1, 4, 6, and 10, are specified in this case.
-``label.in`` is passed to ``plot_chiq_path.py`` as follows:
+``label.in`` is passed to ``plot_chiq_path`` as follows:
 
 .. code-block:: bash
 
-  plot_chiq_path.py q_path.dat bse/chi_q_eigen.dat --label=label.in
+  plot_chiq_path q_path.dat bse/chi_q_eigen.dat --label=label.in
 
 The obtained figure shows the susceptibility along the path in the Brillouin zone as follows:
 

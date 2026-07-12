@@ -15,12 +15,64 @@ Before beginning the installation, ensure that you have the following software i
 - **Python**: Required for using pybind11, which interfaces C++ with Python. Ensure Python is compatible with the required version of pybind11.
 - **CMake** (version 3 or higher): Required for building the software.
 - **GNU Make** or equivalent: Used for running make commands.
-- **C++ Compiler** (supporting C++11 standard): Necessary for compiling the source code.
+- **C++ Compiler** (supporting C++17 standard): Necessary for compiling the source code.
 - **Eigen3** (version 3.1 or higher): C++ header-only library for linear algebra.
 
 Additionally, make sure that you have write access to the installation directory (`$HOME/local` in the example below) and that Python's bin directory is in your system's PATH.
 
-Installation
+Quick install with pip
+----------------------
+
+For laptops, virtual environments, and CI jobs, the recommended path is a normal pip install:
+
+.. code-block:: bash
+
+    python3 -m pip install .
+
+For development, use an editable install:
+
+.. code-block:: bash
+
+    python3 -m pip install -e .
+
+Optional runtime dependencies are installed with extras:
+
+.. code-block:: bash
+
+    python3 -m pip install .[plot]
+    python3 -m pip install .[mpi,dcore]
+
+The pip build compiles the C++ extension as ``chiq._bse_solver`` and installs console
+commands such as ``chiq_main`` and ``chiq_post``. If you previously used a CMake install,
+unset stale ``PYTHONPATH`` entries before testing a pip install so Python does not import an
+older ``lib/bse-python`` tree.
+
+Use the CMake workflow below when you need an HPC module environment, a custom compiler, a
+custom install prefix with ``chiqvars.sh``, or site-managed build flags.
+
+Offline or module-based HPC installs
+------------------------------------
+
+On clusters without build isolation access to PyPI, install the build requirements into the
+environment first and then disable build isolation:
+
+.. code-block:: bash
+
+    python3 -m pip install scikit-build-core pybind11 cmake
+    python3 -m pip install . --no-build-isolation
+
+For MPI support, build ``mpi4py`` with the cluster MPI compiler after loading the relevant
+modules:
+
+.. code-block:: bash
+
+    MPICC=mpicc python3 -m pip install mpi4py --no-binary=mpi4py
+
+Editable installs do not automatically recompile the C++ extension when C++ sources change.
+After editing files under ``src/``, rerun the editable install command, adding
+``--no-build-isolation`` if your environment provides its own CMake/pybind11 modules.
+
+CMake installation
 ------------------
 
 First, clone the repository from GitHub:
@@ -71,8 +123,8 @@ After configuration, type the following to build, test, and install
     make test  # when -DTesting=ON is activated in cmake
     make install
 
-Python scripts such as ``chiq_main.py`` are installed in ``$HOME/local/bin``.
-A python package ``chiq`` and a shared library ``bse_solver.cpython-XXX-YYY.so`` (``XXX`` is the python version, and ``YYY`` is the os info) is installed in ``Home/local/lib/bse-python`` (or ``lib64/bse-python``).
+Legacy wrapper scripts such as ``chiq_main.py`` are installed in ``$HOME/local/bin``.
+A python package ``chiq`` and a shared library ``_bse_solver.cpython-XXX-YYY.so`` (``XXX`` is the python version, and ``YYY`` is the os info) is installed in ``$HOME/local/lib/bse-python/chiq`` (or ``lib64/bse-python/chiq``).
 A configurations file ``chiqvars.sh`` is installed in ``$HOME/local/share``, see the next section for details.
 
 Environment variables
@@ -94,7 +146,7 @@ Provided Python package and scripts depend on external Python packages. Before r
 
 .. code-block:: bash
 
-    python3 -m pip install numpy matplotlib scipy more-itertools
+    python3 -m pip install numpy scipy more-itertools h5py toml matplotlib
 
 Test of python package/scripts
 ------------------------------

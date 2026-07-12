@@ -22,11 +22,35 @@ Features:
 ### Requirements
 
 - CMake (>= 3.5)
-- C++ compiler compatible with C++11
+- C++ compiler compatible with C++17
 - [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page) (>= 3.1)
 - Python
   - more-itertools package
     - `python3 -m pip install more-itertools`
+
+### Quick install (pip)
+
+For a standard Python environment or CI job, install ChiQ directly with pip:
+
+``` bash
+python3 -m pip install .
+```
+
+For development, use an editable install:
+
+``` bash
+python3 -m pip install -e .
+```
+
+Optional runtime dependencies are available as extras:
+
+``` bash
+python3 -m pip install .[plot]
+python3 -m pip install .[mpi,dcore]
+```
+
+The pip build compiles the C++ extension as `chiq._bse_solver` and installs console commands
+such as `chiq_main` and `chiq_post`.
 
 ### Download
 
@@ -76,15 +100,15 @@ make test  # when -DTesting=ON is activated in cmake
 make install
 ```
 
-Python scripts such as `chiq_main.py` are installed in **$HOME/local/bin**.
-A python package **chiq** and a shared library **bse_solver.cpython-XXX-YYY.so** (XXX is the python version, and YYY is the os info) is installed in **$Home/local/lib/bse-python** (or **lib64/bse-python**).
+Legacy wrapper scripts such as `chiq_main.py` are installed in **$HOME/local/bin**.
+A python package **chiq** and a shared library **_bse_solver.cpython-XXX-YYY.so** (XXX is the python version, and YYY is the os info) is installed in **$Home/local/lib/bse-python/chiq** (or **lib64/bse-python/chiq**).
 A configurations file **chiqvars.sh** is installed in **$HOME/local/share**, see the next section.
 
 You can build the documentation as follows.
 
 ``` bash
 pip3 install sphinx wild_sphinx_theme matplotlib
-sphinx-build -b html ../bse/doc html
+sphinx-build -b html ../ChiQ/doc html
 ```
 
 ### Environment variables
@@ -116,8 +140,8 @@ pytest tests/python/non-mpi/bsetool_BSE/test_bsetool_BSE.py
 ## How to use
 
 ``` bash
-mpiexec -np 4 chiq_main.py chiq.toml
-chiq_post.py chiq.toml
+mpiexec -np 4 chiq_main chiq.toml
+chiq_post chiq.toml
 ```
 
 ### Input parameters

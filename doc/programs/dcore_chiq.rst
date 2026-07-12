@@ -3,7 +3,7 @@ dcore_chiq
 
 .. code-block:: bash
 
-    dcore_chiq.py [-h] --np NP [--version] [path_input_files ...]
+    dcore_chiq [-h] --np NP [--version] [path_input_files ...]
 
 Description
 -----------
@@ -36,13 +36,13 @@ The first usage involves adding the ChiQ input parameters directly to the DCore 
 
 .. code-block:: console
 
-    $ dcore_chiq.py --np 4 square.ini
+    $ dcore_chiq --np 4 square.ini
 
 The second usage keeps the DCore input file (``dcore.ini``) unchanged while specifying the ChiQ input parameters in a separate file (``bse.in``).
 
 .. code-block:: console
 
-    $ dcore_chiq.py --np 4 dcore.ini bse.ini
+    $ dcore_chiq --np 4 dcore.ini bse.ini
 
 
 Input parameters

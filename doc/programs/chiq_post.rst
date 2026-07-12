@@ -3,12 +3,12 @@ chiq_post
 
 .. code-block:: bash
 
-    chiq_post.py [-h] toml
+    chiq_post [-h] toml
 
 Description
 -----------
 
-``chiq_post.py`` is a post script for outputting text-based data from results stored in HDF5 file. For the basic idea for how to analyze the susceptibility, see :ref:`Algorithm_Eigen`
+``chiq_post`` is a post script for outputting text-based data from results stored in HDF5 file. For the basic idea for how to analyze the susceptibility, see :ref:`Algorithm_Eigen`
 
 Positional Arguments
 ---------------------
@@ -29,4 +29,4 @@ Basic usage:
 
 .. code-block:: console
 
-    $ chiq_post.py parameters.toml
+    $ chiq_post parameters.toml
