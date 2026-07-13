@@ -35,11 +35,38 @@ _mkdir = os.mkdir
 _capability_override = None
 
 
-def _git(repo_fd, *args):
-    command = ["git"] + list(args)
+_GIT_EXEC_HELPER = """\
+import os
+import sys
 
-    def enter_open_checkout():
-        os.fchdir(repo_fd)
+repo_fd = int(sys.argv[1])
+os.fchdir(repo_fd)
+environment = {
+    key: value
+    for key, value in os.environ.items()
+    if not key.upper().startswith("GIT_")
+}
+os.execvpe("git", ["git"] + sys.argv[2:], environment)
+"""
+
+
+def _sanitized_git_environment():
+    """Remove every inherited Git override at the checkout trust boundary."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if not key.upper().startswith("GIT_")
+    }
+
+
+def _git(repo_fd, *args):
+    command = [
+        sys.executable,
+        "-I",
+        "-c",
+        _GIT_EXEC_HELPER,
+        str(repo_fd),
+    ] + list(args)
 
     try:
         return subprocess.run(
@@ -48,7 +75,7 @@ def _git(repo_fd, *args):
             stderr=subprocess.PIPE,
             check=True,
             pass_fds=(repo_fd,),
-            preexec_fn=enter_open_checkout,
+            env=_sanitized_git_environment(),
         ).stdout
     except subprocess.CalledProcessError as error:
         detail = error.stderr.decode("utf-8", "replace").strip()
@@ -88,27 +115,40 @@ def _parse_index(raw):
         except (UnicodeDecodeError, ValueError) as error:
             raise SnapshotError("malformed git index record") from error
         path = _decode_path(raw_path)
-        _validate_relative_path(path)
+        components = _validate_relative_path(path)
         if stage != 0:
             raise SnapshotError("unmerged/non-stage-0 index entry for %s" % path)
         if mode == SYMLINK_MODE:
             raise SnapshotError("tracked symlink is unsupported: %s" % path)
         if mode not in REGULAR_MODES and mode != GITLINK_MODE:
             raise SnapshotError("unsupported index mode %s for %s" % (mode, path))
-        key = unicodedata.normalize("NFC", path).casefold()
-        previous = collision_keys.get(key)
-        if previous is not None and previous != path:
-            raise SnapshotError("normalized path collision: %s and %s" % (previous, path))
-        collision_keys[key] = path
+        normalized_prefix = []
+        for position, component in enumerate(components):
+            normalized_prefix.append(unicodedata.normalize("NFC", component).casefold())
+            key = tuple(normalized_prefix)
+            display = "/".join(components[: position + 1])
+            previous = collision_keys.get(key)
+            if previous is not None and previous != display:
+                raise SnapshotError(
+                    "normalized path collision: %s and %s" % (previous, display)
+                )
+            collision_keys[key] = display
         entries.append((path, mode))
     return entries
 
 
 def _is_package_artifact(path):
-    if not path.startswith(PACKAGE_PREFIX):
+    components = [
+        unicodedata.normalize("NFC", component).casefold()
+        for component in path.split("/")
+    ]
+    package_components = PACKAGE_PREFIX.rstrip("/").split("/")
+    if components[: len(package_components)] != package_components:
         return False
-    components = path.split("/")
-    return "__pycache__" in components or path.lower().endswith(NATIVE_SUFFIXES + (".pyc",))
+    normalized_path = "/".join(components)
+    return "__pycache__" in components or normalized_path.endswith(
+        NATIVE_SUFFIXES + (".pyc",)
+    )
 
 
 def _nul_paths(raw):
@@ -198,6 +238,21 @@ def _close_preserving_error(descriptor):
         pass
 
 
+def _close_all(descriptors):
+    primary_error = sys.exc_info()[1]
+    close_error = None
+    for descriptor in descriptors:
+        if descriptor is None:
+            continue
+        try:
+            os.close(descriptor)
+        except BaseException as error:
+            if close_error is None:
+                close_error = error
+    if primary_error is None and close_error is not None:
+        raise close_error
+
+
 def _open_validated_directory(path, description):
     try:
         before = _stat(os.fspath(path), follow_symlinks=False)
@@ -226,6 +281,7 @@ def _create_destination_root(destination):
     if name in ("", ".", "..") or "/" in name:
         raise SnapshotError("invalid destination path")
     parent_fd = _open_validated_directory(destination.parent, "destination parent")
+    descriptor = None
     try:
         _mkdir(name, 0o700, dir_fd=parent_fd)
         before = _safe_stat(name, parent_fd, "destination root")
@@ -250,13 +306,18 @@ def _create_destination_root(destination):
             raise
         return descriptor
     finally:
-        os.close(parent_fd)
+        try:
+            _close_all([parent_fd])
+        except BaseException:
+            _close_all([descriptor])
+            raise
 
 
 def _open_source_leaf(root_fd, path, index_mode):
     components = _validate_relative_path(path)
     parent_fd = root_fd
     owned = []
+    leaf_fd = None
     try:
         for position, component in enumerate(components[:-1]):
             description = "ancestor %s of %s" % ("/".join(components[: position + 1]), path)
@@ -300,13 +361,17 @@ def _open_source_leaf(root_fd, path, index_mode):
             raise
         return leaf_fd
     finally:
-        for descriptor in reversed(owned):
-            os.close(descriptor)
+        try:
+            _close_all(reversed(owned))
+        except BaseException:
+            _close_all([leaf_fd])
+            raise
 
 
 def _open_destination_parent(root_fd, components):
     parent_fd = root_fd
     owned = []
+    result = None
     try:
         for component in components:
             try:
@@ -344,12 +409,16 @@ def _open_destination_parent(root_fd, components):
             owned.append(child_fd)
             parent_fd = child_fd
         if not owned:
-            return os.dup(root_fd)
+            result = os.dup(root_fd)
+            return result
         result = os.dup(parent_fd)
         return result
     finally:
-        for descriptor in reversed(owned):
-            os.close(descriptor)
+        try:
+            _close_all(reversed(owned))
+        except BaseException:
+            _close_all([result])
+            raise
 
 
 def _copy_open_file(source_fd, destination_root_fd, path, output_mode):
@@ -378,9 +447,7 @@ def _copy_open_file(source_fd, destination_root_fd, path, output_mode):
                 offset += os.write(output_fd, block[offset:])
         return digest.hexdigest()
     finally:
-        if output_fd is not None:
-            os.close(output_fd)
-        os.close(parent_fd)
+        _close_all([output_fd, parent_fd])
 
 
 def _warn(stderr, message):
@@ -433,13 +500,11 @@ def create_snapshot(repo, destination, stderr):
                     source_fd, destination_root_fd, path, REGULAR_MODES[index_mode]
                 )
             finally:
-                os.close(source_fd)
+                _close_all([source_fd])
             rows.append({"path": path, "index_mode": index_mode, "sha256": digest})
         diff_stat = _git(source_root_fd, "diff", "HEAD", "--stat").decode("utf-8")
     finally:
-        if destination_root_fd is not None:
-            os.close(destination_root_fd)
-        os.close(source_root_fd)
+        _close_all([destination_root_fd, source_root_fd])
 
     return {
         "head": head,
