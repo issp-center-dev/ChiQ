@@ -175,7 +175,7 @@ The implementation may place these in `tests/python/non-mpi/packaging/contracts.
 
   Fail closed if `dir_fd`, `O_NOFOLLOW`, or no-follow stat support is unavailable. Create the destination with mode `0700`; open output files exclusively and set only `0644`/`0755`. Return `HEAD`, `git diff HEAD --stat`, and sorted `{path, index_mode, sha256}` rows to the caller, which writes `snapshot-manifest.json` beside the retained artifacts—not inside the build snapshot.
 
-  Warn for non-ignored untracked files from `git status --porcelain=v1 -z --untracked-files=all`. Independently scan ignored and untracked paths under package roots and fail for `__pycache__`, `*.pyc`, `*.so`, `*.pyd`, or `*.dylib`. This makes a tracked native artifact a hard failure and prevents it from being mistaken for the CMake output.
+  Warn for non-ignored untracked files from `git status --porcelain=v1 -z --untracked-files=all`. Independently scan ignored and untracked paths under package roots and record diagnostics for `__pycache__`, `*.pyc`, `*.so`, `*.pyd`, or `*.dylib`; none can enter the tracked-only snapshot. A matching tracked index entry is a hard failure, which prevents a source-tree native artifact from being mistaken for the CMake output without making verification destructively clean a developer checkout.
 
 - [ ] **Step 4: Re-run tests and inspect the real manifest.**
 
