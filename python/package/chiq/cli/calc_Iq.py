@@ -6,6 +6,7 @@ import sys
 import argparse
 from itertools import product
 
+from chiq.cli._common import add_version_argument
 from chiq.h5bse import h5BSE
 from chiq.matrix_dict import MatrixDict
 
@@ -160,6 +161,7 @@ def calc_Iq(h5_file : str, wb : np.ndarray, retain : int, remove : int, verbose=
 
 def main():
     P = argparse.ArgumentParser()
+    add_version_argument(P)
     P.add_argument('-f', '--file', default='dmft_bse.out.h5', help="h5 filename. Default is 'dmft_bse.out.h5'")
     group = P.add_mutually_exclusive_group()
     group.add_argument('--remove', type=int, default=1, help="Number of eigenmodes removed. Default is 1, which intends to remove the charge susceptibility.")

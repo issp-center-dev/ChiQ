@@ -7,6 +7,7 @@ import argparse
 import ast
 
 from chiq.chiq_eigen_path import ChiQEigenPath
+from chiq.cli._common import add_version_argument
 
 # matplotlib is an optional dependency (the 'plot' extra); it is imported
 # lazily inside main() so this module stays importable on a core install.
@@ -24,6 +25,7 @@ def cmap(i):
 
 def main():
     P = argparse.ArgumentParser()
+    add_version_argument(P)
     P.add_argument("file_qpath")
     P.add_argument("file_eigen")
     P.add_argument(

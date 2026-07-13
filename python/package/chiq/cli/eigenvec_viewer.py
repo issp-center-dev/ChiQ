@@ -7,6 +7,7 @@ import argparse
 import math
 import ast
 
+from chiq.cli._common import add_version_argument
 from chiq.point_group import PointGroup
 
 
@@ -67,6 +68,7 @@ def find_max_rank(multipoles):
 
 def main():
     P = argparse.ArgumentParser()
+    add_version_argument(P)
     P.add_argument('filein', help="File name, e.g., chi_q_eigenvec.00.00.00.dat")
     # P.add_argument('-b', '--blocks', default=None, type=int, help="Number of blocks. If this is given, each block is printed as a matrix.")
     P.add_argument('-a', '--atoms', default=None, type=int, help="Number of atoms. If this is given, eigenvector for each atom is printed as a matrix.")

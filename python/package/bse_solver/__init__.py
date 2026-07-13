@@ -18,9 +18,16 @@ BSESolver = _impl.BSESolver
 
 __all__ = ["BSESolver"]
 
-warnings.warn(
-    "Importing the top-level 'bse_solver' module is deprecated and will be "
-    "removed in ChiQ 2.0; use chiq.solver.get_solver(...) instead.",
-    FutureWarning,
-    stacklevel=2,
-)
+try:
+    _warning_emitted
+except NameError:
+    _warning_emitted = False
+
+if not _warning_emitted:
+    warnings.warn(
+        "Importing the top-level 'bse_solver' module is deprecated and will be "
+        "removed in ChiQ 2.0; use chiq.solver.get_solver(...) instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
+    _warning_emitted = True

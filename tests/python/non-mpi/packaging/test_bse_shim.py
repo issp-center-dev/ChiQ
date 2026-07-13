@@ -1,8 +1,33 @@
 import builtins
 import importlib
+import json
+import os
+import subprocess
 import sys
 import warnings
-import pytest
+
+from contracts import POINT_GROUP_MODULES, SHIM_MODULES
+
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+
+
+def _fresh_python(code):
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join((
+        os.path.join(ROOT, "python", "package"),
+        os.path.join(ROOT, "build", "src"),
+    ))
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=os.path.dirname(ROOT),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "Traceback" not in result.stderr
+    return result
 
 def _fresh(monkeypatch, *drop_prefixes):
     for name in list(sys.modules):
@@ -36,8 +61,48 @@ def test_nested_point_group_data():
     name = public[0]
     assert getattr(bse.point_group_data.C1, name) is getattr(chiq.point_group_data.C1, name)
 
+
+def test_nested_imports_emit_exactly_one_bse_warning_in_fresh_process():
+    result = _fresh_python("""
+import importlib
+import json
+import warnings
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter('always')
+    importlib.import_module('bse')
+    importlib.import_module('bse.tools')
+    importlib.import_module('bse.point_group_data.C1')
+print(json.dumps([w.category.__name__ for w in caught]))
+""")
+    assert json.loads(result.stdout) == ["FutureWarning"]
+
+
+def test_forwarding_modules_are_distinct_but_public_objects_are_identical():
+    result = _fresh_python("""
+import json
+import bse.tools
+import bse.point_group_data.C1
+import chiq.tools
+import chiq.point_group_data.C1
+print(json.dumps({
+    'tools_modules_distinct': bse.tools is not chiq.tools,
+    'tools_object_identical': bse.tools.WallTime is chiq.tools.WallTime,
+    'point_modules_distinct': bse.point_group_data.C1 is not chiq.point_group_data.C1,
+    'point_object_identical': bse.point_group_data.C1.PointGroupData is chiq.point_group_data.C1.PointGroupData,
+}))
+""")
+    assert json.loads(result.stdout) == {
+        "tools_modules_distinct": True,
+        "tools_object_identical": True,
+        "point_modules_distinct": True,
+        "point_object_identical": True,
+    }
+
+
 def test_all_allowlisted_modules_importable():
-    for mod in ["h5bse", "bse_toml", "matrix_dict", "point_group", "tools", "index_pair", "mpi"]:
-        importlib.import_module(f"bse.{mod}")
-    for x in ["base", "C1", "C2", "D3", "D4", "D6", "O", "Oh"]:
-        importlib.import_module(f"bse.point_group_data.{x}")
+    for mod in SHIM_MODULES:
+        assert importlib.util.find_spec("bse.%s" % mod) is not None
+    for mod in ("h5bse", "bse_toml", "matrix_dict", "point_group", "tools", "index_pair", "mpi"):
+        importlib.import_module("bse.%s" % mod)
+    for name in POINT_GROUP_MODULES:
+        importlib.import_module("bse.point_group_data.%s" % name)

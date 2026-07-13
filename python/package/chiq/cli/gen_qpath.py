@@ -9,6 +9,8 @@ import os
 import argparse
 import ast
 
+from chiq.cli._common import add_version_argument
+
 
 # Move q point into 0 <= q < 2*pi  (for integer index, 0 <= q < L)
 def regularize(q, L):
@@ -200,6 +202,7 @@ class GenQPath:
 
 def main():
     P = argparse.ArgumentParser()
+    add_version_argument(P)
     P.add_argument('file_param', help="config file or HDF5 file. Config file should have (Lx, Ly, Lz) in [H0] section, (nk0, nk1, nk2) or nk in [model] section (DCore interface), or dft_h5file in [DMFT] section.")
     P.add_argument('file_qpoints', help="generator of q-path")
     P.add_argument('-o', '--outfile', type=str, default='q_path.dat', help="Output file name")

@@ -1,6 +1,8 @@
 import os
 import sys
 
+from contracts import CANONICAL_COMMANDS, DEPRECATED_COMMANDS
+
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -25,11 +27,46 @@ def test_pyproject_core_metadata():
     core = " ".join(d["project"]["dependencies"])
     for dep in ["numpy", "scipy", "more-itertools", "h5py", "toml"]:
         assert dep in core
-    scripts = d["project"]["scripts"]
-    for cmd in ["chiq_main", "chiq_post", "gen_qpath", "dcore_chiq"]:
-        assert scripts[cmd] == f"chiq.cli.{cmd}:main"
-    assert scripts["chiq_main.py"] == "chiq.cli._deprecated:chiq_main_py"
     extras = d["project"]["optional-dependencies"]
     assert "matplotlib" in " ".join(extras["plot"])
     assert "mpi4py" in " ".join(extras["mpi"])
     assert "dcore" in " ".join(extras["dcore"])
+
+
+def test_pyproject_has_exact_script_contract():
+    d = _load(os.path.join(ROOT, "pyproject.toml"))
+    scripts = d["project"]["scripts"]
+    expected = {}
+    for name in CANONICAL_COMMANDS:
+        expected[name] = "chiq.cli.%s:main" % name
+        expected[name + ".py"] = "chiq.cli._deprecated:%s_py" % name
+    assert len(scripts) == 22
+    assert tuple(sorted(scripts)) == tuple(sorted(CANONICAL_COMMANDS + DEPRECATED_COMMANDS))
+    assert scripts == expected
+
+
+def test_pyproject_retains_packages_and_dynamic_version_provider():
+    d = _load(os.path.join(ROOT, "pyproject.toml"))
+    assert d["project"]["dynamic"] == ["version"]
+    assert d["tool"]["scikit-build"]["wheel"]["packages"] == [
+        "python/package/chiq",
+        "python/package/bse",
+        "python/package/bse_solver",
+    ]
+    version = d["tool"]["scikit-build"]["metadata"]["version"]
+    assert version["provider"] == "scikit_build_core.metadata.regex"
+    assert version["input"] == "python/package/chiq/__init__.py"
+    assert "__version__" in version["regex"]
+
+
+def test_pyproject_contains_no_local_macos_paths():
+    text = open(os.path.join(ROOT, "pyproject.toml")).read()
+    forbidden = (
+        "/Users/",
+        "/Library/Developer/",
+        "/Applications/",
+        "/opt/homebrew/",
+        "/usr/local/opt/",
+        "MacOSX.sdk",
+    )
+    assert not any(path in text for path in forbidden)

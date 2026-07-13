@@ -29,6 +29,7 @@ import time
 from itertools import product
 
 # from BSE repo
+from chiq.cli._common import VERSION_MESSAGE, add_version_argument
 from chiq.h5bse import h5BSE
 
 # ---------------------------------------------------------------------------
@@ -780,9 +781,6 @@ def dcore_chiq(filename, np=1):
 
 def main():
     import argparse
-    from chiq import __version__ as version
-
-    _version_message = f'ChiQ version {version}'
 
     # The full per-option epilog text comes from dcore itself. Build it best-
     # effort so that --help/--version still work on a core (non-dcore)
@@ -796,12 +794,12 @@ def main():
                     " Install it with: pip install chiq[dcore])")
 
     parser = argparse.ArgumentParser(
-        prog='dcore_chiq.py',
         description='Post-processing script in DCore (bse)',
         # usage='$ dcore_chiq input --np 4',
         formatter_class=argparse.RawTextHelpFormatter,
         epilog=_epilog,
         add_help=True)
+    add_version_argument(parser)
     parser.add_argument('path_input_files',
                         action='store',
                         default=None,
@@ -810,7 +808,6 @@ def main():
                         help="Input filename(s)",
                         )
     parser.add_argument('--np', help='Number of MPI processes', required=True)
-    parser.add_argument('--version', action='version', version=_version_message)
 
     args = parser.parse_args()
 
@@ -821,7 +818,7 @@ def main():
         if os.path.isfile(path_input_file) is False:
             sys.exit(f"Input file '{path_input_file}' does not exist.")
 
-    print(_version_message)
+    print(VERSION_MESSAGE)
 
     dcore_chiq(args.path_input_files, int(args.np))
 

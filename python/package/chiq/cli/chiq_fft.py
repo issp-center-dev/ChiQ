@@ -8,6 +8,7 @@ import numpy as np
 from scipy import fftpack
 
 from chiq.h5bse import h5BSE
+from chiq.cli._common import add_version_argument
 from chiq.cli.gen_qpath import GenQPath
 
 
@@ -129,6 +130,7 @@ class BSEFFT(object):
 
 def main():
     P = argparse.ArgumentParser()
+    add_version_argument(P)
     P.add_argument('file_param', help="config file or HDF5 file. Config file should have (Lx, Ly, Lz) in [H0] section, (nk0, nk1, nk2) or nk in [model] section (DCore interface), or dft_h5file in [DMFT] section.")
     P.add_argument('-f', '--file_bse', default='dmft_bse.out.h5', help="input/output HDF5 file containing BSE data (default: 'dmft_bse.out.h5')")
     P.add_argument('--input_dname', default='I_q', help="input data name in HDF5 file (default: 'I_q')")

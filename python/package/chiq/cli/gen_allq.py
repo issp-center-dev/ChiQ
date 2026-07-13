@@ -5,6 +5,7 @@ import sys
 import argparse
 from itertools import product
 
+from chiq.cli._common import add_version_argument
 from chiq.cli.gen_qpath import GenQPath
 
 
@@ -28,6 +29,7 @@ class GenQfbz(GenQPath):
 
 def main():
     P = argparse.ArgumentParser()
+    add_version_argument(P)
     P.add_argument('file_param', help="config file or HDF5 file. Config file should have either (Lx, Ly, Lz) in [H0] section or dft_h5file in [DMFT] section.")
     P.add_argument('-o', '--outfile', type=str, default='q_fbz.dat', help="Output file name")
     args = P.parse_args()

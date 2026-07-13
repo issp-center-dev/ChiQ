@@ -7,6 +7,8 @@ import argparse
 import ast
 from collections import namedtuple
 
+from chiq.cli._common import add_version_argument
+
 # matplotlib is an optional dependency (the 'plot' extra); it is imported
 # lazily inside main() so this module stays importable on a core install.
 _cmap = None  # default color map, set by main() once matplotlib is imported
@@ -87,6 +89,7 @@ class IrEigen4Plot(object):
 def main():
 
     P = argparse.ArgumentParser()
+    add_version_argument(P)
     P.add_argument("file_eigen")
     # P.add_argument('--mode', default='I_r', choices=['I_r',], help="default: I_r")
     P.add_argument(

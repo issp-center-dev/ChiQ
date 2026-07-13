@@ -9,6 +9,7 @@ import configparser
 from itertools import product
 from collections import OrderedDict
 
+from chiq.cli._common import add_version_argument
 from chiq.h5bse import h5BSE
 from chiq.matrix_dict import MatrixDict
 
@@ -303,6 +304,7 @@ def read_params(file):
 
 def main():
     P = argparse.ArgumentParser()
+    add_version_argument(P)
     P.add_argument('input_file', help="Input parameter file")
     P.add_argument('--verbose', action='store_true', help="verbose output")
     args = P.parse_args()

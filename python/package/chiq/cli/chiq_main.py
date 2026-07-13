@@ -9,9 +9,9 @@ import logging
 import re
 from more_itertools import divide
 
-from chiq import __version__ as version
 from chiq import bse_toml
 from chiq import h5bse
+from chiq.cli._common import VERSION_MESSAGE, add_version_argument
 from chiq.mpi import COMM_WORLD as comm
 from chiq.solver import get_solver
 
@@ -402,9 +402,6 @@ class chi_scl(chi_base):
         return data_Phi, data_PhiSum
 
 
-_version_message = f'ChiQ version {version}'
-
-
 def main():
     rank = comm.Get_rank()
     size = comm.Get_size()
@@ -413,14 +410,14 @@ def main():
         description='Calculate chi0_q and chi_q.',
         add_help=True,
     )
+    add_version_argument(parser)
 
     parser.add_argument('toml', type=str, help='Parameter file in toml format')
-    parser.add_argument('--version', action='version', version=_version_message)
 
     args = parser.parse_args()
 
     if rank==0:
-        print(f"{_version_message}\n")
+        print("%s\n" % VERSION_MESSAGE)
 
     # Load parameters from toml file
     dict_common, dict_tool, _ = bse_toml.load_params_from_toml(args.toml, print_summary=(rank==0))

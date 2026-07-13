@@ -16,6 +16,7 @@ import os
 from chiq import h5bse
 from chiq import bse_toml
 from chiq.cli import chiq_main
+from chiq.cli._common import add_version_argument
 
 
 # ============================================================================
@@ -335,6 +336,7 @@ def main():
         description='Calculate chi0_q and chi_q.',
         add_help=True,
     )
+    add_version_argument(parser)
 
     parser.add_argument('toml', type=str, help='Parameter file in toml format')
 

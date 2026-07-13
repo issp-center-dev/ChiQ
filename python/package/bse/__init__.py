@@ -6,9 +6,16 @@ deprecated and will be REMOVED in ChiQ 2.0 -- import from `chiq` instead.
 """
 import warnings
 
-warnings.warn(
-    "The 'bse' package is deprecated and will be removed in ChiQ 2.0; "
-    "import from 'chiq' instead (e.g. `from chiq import h5bse`).",
-    FutureWarning,
-    stacklevel=2,
-)
+try:
+    _warning_emitted
+except NameError:
+    _warning_emitted = False
+
+if not _warning_emitted:
+    warnings.warn(
+        "The 'bse' package is deprecated and will be removed in ChiQ 2.0; "
+        "import from 'chiq' instead (e.g. `from chiq import h5bse`).",
+        FutureWarning,
+        stacklevel=2,
+    )
+    _warning_emitted = True

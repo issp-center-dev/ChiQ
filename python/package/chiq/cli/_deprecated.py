@@ -14,7 +14,7 @@ def _make(name):
             "warning: the '%s.py' command is deprecated and will be removed in "
             "ChiQ 2.0; use '%s' instead.\n" % (name, name)
         )
-        importlib.import_module("chiq.cli." + name).main()
+        return importlib.import_module("chiq.cli." + name).main()
     _entry.__name__ = name + "_py"
     return _entry
 
