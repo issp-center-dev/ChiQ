@@ -1,0 +1,298 @@
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import stat
+import subprocess
+import sys
+
+import pytest
+
+import source_snapshot
+
+
+def git(repo, *args, input_data=None):
+    return subprocess.run(
+        ["git", "-C", str(repo)] + list(args),
+        input=input_data,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+    ).stdout
+
+
+@pytest.fixture
+def repo(tmp_path):
+    root = tmp_path / "repo"
+    root.mkdir()
+    git(root, "init", "-q")
+    git(root, "config", "user.email", "snapshot@example.invalid")
+    git(root, "config", "user.name", "Snapshot Test")
+    (root / "README").write_text("initial\n")
+    git(root, "add", "README")
+    git(root, "commit", "-qm", "initial")
+    return root
+
+
+def snapshot(repo, tmp_path, name="snapshot"):
+    stderr = io.StringIO()
+    destination = tmp_path / name
+    manifest = source_snapshot.create_snapshot(repo, destination, stderr)
+    return destination, manifest, stderr.getvalue()
+
+
+def test_copies_current_tracked_bytes_modes_and_sorted_manifest(repo, tmp_path):
+    script = repo / "bin" / "run"
+    script.parent.mkdir()
+    script.write_bytes(b"#!/bin/sh\necho staged\n")
+    script.chmod(0o755)
+    git(repo, "add", "bin/run")
+    (repo / "README").write_bytes(b"unstaged bytes\n")
+
+    destination, manifest, warnings = snapshot(repo, tmp_path)
+
+    assert (destination / "README").read_bytes() == b"unstaged bytes\n"
+    assert (destination / "bin/run").read_bytes() == b"#!/bin/sh\necho staged\n"
+    assert stat.S_IMODE((destination / "README").stat().st_mode) == 0o644
+    assert stat.S_IMODE((destination / "bin/run").stat().st_mode) == 0o755
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o700
+    assert [row["path"] for row in manifest["files"]] == ["README", "bin/run"]
+    assert manifest["files"] == [
+        {
+            "path": "README",
+            "index_mode": "100644",
+            "sha256": hashlib.sha256(b"unstaged bytes\n").hexdigest(),
+        },
+        {
+            "path": "bin/run",
+            "index_mode": "100755",
+            "sha256": hashlib.sha256(b"#!/bin/sh\necho staged\n").hexdigest(),
+        },
+    ]
+    assert manifest["head"] == git(repo, "rev-parse", "HEAD").decode().strip()
+    assert manifest["diff_stat"] == git(repo, "diff", "HEAD", "--stat").decode()
+    assert warnings == ""
+
+
+def test_warns_and_excludes_nonignored_untracked_files(repo, tmp_path):
+    (repo / "notes.txt").write_text("do not copy")
+
+    destination, manifest, warnings = snapshot(repo, tmp_path)
+
+    assert not (destination / "notes.txt").exists()
+    assert manifest["diagnostics"]["excluded_untracked"] == ["notes.txt"]
+    assert "notes.txt" in warnings
+
+
+def test_diagnoses_ignored_and_untracked_package_artifacts(repo, tmp_path):
+    (repo / ".gitignore").write_text("*.pyc\n*.so\n")
+    git(repo, "add", ".gitignore")
+    git(repo, "commit", "-qm", "ignore caches")
+    package = repo / "python" / "package" / "chiq"
+    (package / "__pycache__").mkdir(parents=True)
+    (package / "__pycache__" / "module.pyc").write_bytes(b"cache")
+    (package / "_bse_solver.so").write_bytes(b"native")
+    (package / "local.pyd").write_bytes(b"native")
+
+    destination, manifest, warnings = snapshot(repo, tmp_path)
+
+    artifacts = manifest["diagnostics"]["excluded_package_artifacts"]
+    assert artifacts == [
+        "python/package/chiq/__pycache__/module.pyc",
+        "python/package/chiq/_bse_solver.so",
+        "python/package/chiq/local.pyd",
+    ]
+    assert all(not (destination / path).exists() for path in artifacts)
+    assert "package cache/native artifact" in warnings
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "python/package/chiq/__pycache__/module.py",
+        "python/package/chiq/module.pyc",
+        "python/package/chiq/_bse_solver.so",
+        "python/package/chiq/_bse_solver.pyd",
+        "python/package/chiq/_bse_solver.dylib",
+    ],
+)
+def test_rejects_tracked_package_cache_or_native_entries(repo, tmp_path, path):
+    tracked = repo / path
+    tracked.parent.mkdir(parents=True, exist_ok=True)
+    tracked.write_bytes(b"tracked contamination")
+    git(repo, "add", path)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="tracked package cache/native"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+
+def test_skips_gitlinks_without_copying_contents(repo, tmp_path):
+    head = git(repo, "rev-parse", "HEAD").decode().strip()
+    git(repo, "update-index", "--add", "--cacheinfo", "160000,%s,vendor/dependency" % head)
+    contents = repo / "vendor" / "dependency"
+    contents.mkdir(parents=True)
+    (contents / "CMakeLists.txt").write_text("attacker bytes")
+
+    destination, manifest, warnings = snapshot(repo, tmp_path)
+
+    assert not (destination / "vendor").exists()
+    assert [row["path"] for row in manifest["files"]] == ["README"]
+    assert "vendor/dependency" in warnings
+
+
+def test_rejects_unmerged_index_entries(repo, tmp_path):
+    blob = git(repo, "hash-object", "README").decode().strip()
+    git(repo, "rm", "--cached", "-q", "README")
+    records = (
+        "100644 %s 1\tREADME\n100644 %s 2\tREADME\n" % (blob, blob)
+    ).encode()
+    git(repo, "update-index", "--index-info", input_data=records)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="stage 0|unmerged"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+
+def test_rejects_tracked_symlink(repo, tmp_path):
+    link = repo / "link"
+    link.symlink_to("README")
+    git(repo, "add", "link")
+
+    with pytest.raises(source_snapshot.SnapshotError, match="symlink"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+
+def test_index_parser_rejects_unknown_modes():
+    raw = b"100600 0000000000000000000000000000000000000000 0\todd\0"
+
+    with pytest.raises(source_snapshot.SnapshotError, match="unsupported index mode"):
+        source_snapshot._parse_index(raw)
+
+
+def test_rejects_nonregular_leaf(repo, tmp_path):
+    os.unlink(str(repo / "README"))
+    os.mkfifo(str(repo / "README"))
+
+    with pytest.raises(source_snapshot.SnapshotError, match="regular file"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+
+def test_rejects_executable_mode_mismatch(repo, tmp_path):
+    (repo / "README").chmod(0o755)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="executable mode"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+
+def test_rejects_symlink_ancestor(repo, tmp_path):
+    tracked = repo / "safe" / "file.txt"
+    tracked.parent.mkdir()
+    tracked.write_text("safe")
+    git(repo, "add", "safe/file.txt")
+    git(repo, "commit", "-qm", "nested")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "file.txt").write_text("attacker")
+    tracked.unlink()
+    tracked.parent.rmdir()
+    (repo / "safe").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="ancestor|directory|symlink"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+
+def test_leaf_replacement_between_stat_and_open_fails_closed(repo, tmp_path, monkeypatch):
+    real_open = source_snapshot._open
+    replaced = {"done": False}
+
+    def replacing_open(path, flags, mode=0o777, *, dir_fd=None):
+        if path == "README" and flags & os.O_RDONLY == os.O_RDONLY and not replaced["done"]:
+            replaced["done"] = True
+            (repo / "README").unlink()
+            (repo / "README").write_bytes(b"attacker replacement\n")
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(source_snapshot, "_open", replacing_open)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="replaced|race"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+    copied = tmp_path / "snapshot" / "README"
+    assert not copied.exists() or copied.read_bytes() != b"attacker replacement\n"
+
+
+def test_ancestor_replacement_after_open_uses_safe_descriptor(repo, tmp_path, monkeypatch):
+    tracked = repo / "safe" / "file.txt"
+    tracked.parent.mkdir()
+    tracked.write_bytes(b"safe bytes\n")
+    git(repo, "add", "safe/file.txt")
+    real_open = source_snapshot._open
+    replaced = {"done": False}
+
+    def replacing_open(path, flags, mode=0o777, *, dir_fd=None):
+        fd = real_open(path, flags, mode, dir_fd=dir_fd)
+        if path == "safe" and flags & os.O_DIRECTORY and not replaced["done"]:
+            replaced["done"] = True
+            (repo / "safe").rename(repo / "opened-safe")
+            (repo / "safe").mkdir()
+            (repo / "safe" / "file.txt").write_bytes(b"attacker bytes\n")
+        return fd
+
+    monkeypatch.setattr(source_snapshot, "_open", replacing_open)
+
+    destination, manifest, warnings = snapshot(repo, tmp_path)
+
+    assert (destination / "safe/file.txt").read_bytes() == b"safe bytes\n"
+
+
+@pytest.mark.parametrize("missing", ["nofollow", "dir_fd", "stat_nofollow"])
+def test_fails_closed_when_descriptor_safety_is_unsupported(repo, tmp_path, monkeypatch, missing):
+    monkeypatch.setattr(source_snapshot, "_capability_override", missing)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="unsupported"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+
+@pytest.mark.parametrize(
+    "names",
+    [
+        ("caf\N{LATIN SMALL LETTER E WITH ACUTE}.txt", "cafe\N{COMBINING ACUTE ACCENT}.txt"),
+        ("README.txt", "readme.TXT"),
+    ],
+)
+def test_rejects_unicode_nfc_casefold_path_aliases(names):
+    records = []
+    for name in names:
+        records.append(
+            b"100644 0000000000000000000000000000000000000000 0\t"
+            + name.encode("utf-8")
+            + b"\0"
+        )
+    with pytest.raises(source_snapshot.SnapshotError, match="collision"):
+        source_snapshot._parse_index(b"".join(records))
+
+
+def test_destination_must_be_new(repo, tmp_path):
+    destination = tmp_path / "snapshot"
+    destination.mkdir()
+
+    with pytest.raises((FileExistsError, source_snapshot.SnapshotError)):
+        source_snapshot.create_snapshot(repo, destination, io.StringIO())
+
+
+def test_cli_writes_manifest_outside_snapshot(repo, tmp_path):
+    destination = tmp_path / "snapshot"
+    manifest_path = tmp_path / "snapshot-manifest.json"
+    script = Path(source_snapshot.__file__)
+
+    subprocess.run(
+        [sys.executable, str(script), str(repo), str(destination), "--manifest", str(manifest_path)],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    manifest = json.loads(manifest_path.read_text())
+    assert manifest["files"][0]["path"] == "README"
+    assert not (destination / ".git").exists()
+    assert not (destination / "snapshot-manifest.json").exists()
