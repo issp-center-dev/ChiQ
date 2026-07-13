@@ -191,6 +191,13 @@ def _safe_open(component, flags, parent_fd, description):
         raise SnapshotError("cannot safely open %s" % description) from error
 
 
+def _close_preserving_error(descriptor):
+    try:
+        os.close(descriptor)
+    except OSError:
+        pass
+
+
 def _open_validated_directory(path, description):
     try:
         before = _stat(os.fspath(path), follow_symlinks=False)
@@ -204,10 +211,13 @@ def _open_validated_directory(path, description):
         )
     except (OSError, TypeError, NotImplementedError) as error:
         raise SnapshotError("cannot safely open %s" % description) from error
-    after = os.fstat(descriptor)
-    if not stat.S_ISDIR(after.st_mode) or not _same_identity(before, after):
-        os.close(descriptor)
-        raise SnapshotError("%s replacement race" % description)
+    try:
+        after = os.fstat(descriptor)
+        if not stat.S_ISDIR(after.st_mode) or not _same_identity(before, after):
+            raise SnapshotError("%s replacement race" % description)
+    except BaseException:
+        _close_preserving_error(descriptor)
+        raise
     return descriptor
 
 
@@ -227,15 +237,17 @@ def _create_destination_root(destination):
             parent_fd,
             "destination root",
         )
-        after = os.fstat(descriptor)
-        if not stat.S_ISDIR(after.st_mode) or not _same_identity(before, after):
-            os.close(descriptor)
-            raise SnapshotError("destination root replacement race")
-        current = _safe_stat(name, parent_fd, "destination root")
-        if not _same_identity(after, current):
-            os.close(descriptor)
-            raise SnapshotError("destination root replacement race")
-        os.fchmod(descriptor, 0o700)
+        try:
+            after = os.fstat(descriptor)
+            if not stat.S_ISDIR(after.st_mode) or not _same_identity(before, after):
+                raise SnapshotError("destination root replacement race")
+            current = _safe_stat(name, parent_fd, "destination root")
+            if not _same_identity(after, current):
+                raise SnapshotError("destination root replacement race")
+            os.fchmod(descriptor, 0o700)
+        except BaseException:
+            _close_preserving_error(descriptor)
+            raise
         return descriptor
     finally:
         os.close(parent_fd)
@@ -257,10 +269,13 @@ def _open_source_leaf(root_fd, path, index_mode):
                 parent_fd,
                 description,
             )
-            after = os.fstat(child_fd)
-            if not stat.S_ISDIR(after.st_mode) or not _same_identity(before, after):
-                os.close(child_fd)
-                raise SnapshotError("ancestor replacement race for %s" % path)
+            try:
+                after = os.fstat(child_fd)
+                if not stat.S_ISDIR(after.st_mode) or not _same_identity(before, after):
+                    raise SnapshotError("ancestor replacement race for %s" % path)
+            except BaseException:
+                _close_preserving_error(child_fd)
+                raise
             owned.append(child_fd)
             parent_fd = child_fd
 
@@ -269,19 +284,20 @@ def _open_source_leaf(root_fd, path, index_mode):
         if not stat.S_ISREG(before.st_mode):
             raise SnapshotError("tracked leaf is not a regular file: %s" % path)
         leaf_fd = _safe_open(leaf, os.O_RDONLY | os.O_NOFOLLOW, parent_fd, "leaf %s" % path)
-        after = os.fstat(leaf_fd)
-        if not stat.S_ISREG(after.st_mode) or not _same_identity(before, after):
-            os.close(leaf_fd)
-            raise SnapshotError("leaf replacement race for %s" % path)
-        before_executable = bool(before.st_mode & 0o111)
-        executable = bool(after.st_mode & 0o111)
-        if before_executable != executable:
-            os.close(leaf_fd)
-            raise SnapshotError("executable mode race for %s" % path)
-        expected_executable = index_mode == "100755"
-        if executable != expected_executable:
-            os.close(leaf_fd)
-            raise SnapshotError("executable mode differs from index for %s" % path)
+        try:
+            after = os.fstat(leaf_fd)
+            if not stat.S_ISREG(after.st_mode) or not _same_identity(before, after):
+                raise SnapshotError("leaf replacement race for %s" % path)
+            before_executable = bool(before.st_mode & 0o111)
+            executable = bool(after.st_mode & 0o111)
+            if before_executable != executable:
+                raise SnapshotError("executable mode race for %s" % path)
+            expected_executable = index_mode == "100755"
+            if executable != expected_executable:
+                raise SnapshotError("executable mode differs from index for %s" % path)
+        except BaseException:
+            _close_preserving_error(leaf_fd)
+            raise
         return leaf_fd
     finally:
         for descriptor in reversed(owned):
@@ -294,19 +310,37 @@ def _open_destination_parent(root_fd, components):
     try:
         for component in components:
             try:
-                os.mkdir(component, 0o755, dir_fd=parent_fd)
+                _mkdir(component, 0o755, dir_fd=parent_fd)
             except FileExistsError:
                 pass
+            before = _safe_stat(
+                component, parent_fd, "destination directory %s" % component
+            )
+            if not stat.S_ISDIR(before.st_mode):
+                raise SnapshotError("destination ancestor is not a directory")
             child_fd = _safe_open(
                 component,
                 os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
                 parent_fd,
                 "destination directory %s" % component,
             )
-            if not stat.S_ISDIR(os.fstat(child_fd).st_mode):
-                os.close(child_fd)
-                raise SnapshotError("destination ancestor is not a directory")
-            os.fchmod(child_fd, 0o755)
+            try:
+                after = os.fstat(child_fd)
+                if not stat.S_ISDIR(after.st_mode) or not _same_identity(before, after):
+                    raise SnapshotError(
+                        "destination directory %s replacement race" % component
+                    )
+                current = _safe_stat(
+                    component, parent_fd, "destination directory %s" % component
+                )
+                if not _same_identity(after, current):
+                    raise SnapshotError(
+                        "destination directory %s replacement race" % component
+                    )
+                os.fchmod(child_fd, 0o755)
+            except BaseException:
+                _close_preserving_error(child_fd)
+                raise
             owned.append(child_fd)
             parent_fd = child_fd
         if not owned:

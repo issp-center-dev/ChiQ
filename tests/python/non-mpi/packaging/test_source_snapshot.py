@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import errno
 import os
 from pathlib import Path
 import stat
@@ -40,6 +41,12 @@ def snapshot(repo, tmp_path, name="snapshot"):
     destination = tmp_path / name
     manifest = source_snapshot.create_snapshot(repo, destination, stderr)
     return destination, manifest, stderr.getvalue()
+
+
+def assert_fd_closed(descriptor):
+    with pytest.raises(OSError) as caught:
+        os.fstat(descriptor)
+    assert caught.value.errno == errno.EBADF
 
 
 def test_copies_current_tracked_bytes_modes_and_sorted_manifest(repo, tmp_path):
@@ -387,6 +394,198 @@ def test_destination_symlink_swap_after_creation_fails_without_touching_target(
 
     assert stat.S_IMODE(external.stat().st_mode) == original_mode
     assert list(external.iterdir()) == []
+
+
+def test_nested_destination_replacement_before_open_fails_closed(
+    repo, tmp_path, monkeypatch
+):
+    script = repo / "bin" / "run"
+    script.parent.mkdir()
+    script.write_bytes(b"#!/bin/sh\n")
+    script.chmod(0o755)
+    git(repo, "add", "bin/run")
+    destination = tmp_path / "snapshot"
+    detached = tmp_path / "detached-bin"
+    attacker = tmp_path / "attacker-bin"
+    attacker.mkdir(mode=0o711)
+    (attacker / "marker").write_bytes(b"unchanged\n")
+    original_mode = stat.S_IMODE(attacker.stat().st_mode)
+    real_open = source_snapshot._open
+    destination_root = {"fd": None}
+    replaced = {"done": False}
+
+    def replacing_open(path, flags, mode=0o777, *, dir_fd=None):
+        if path == destination.name and flags & os.O_DIRECTORY and dir_fd is not None:
+            fd = real_open(path, flags, mode, dir_fd=dir_fd)
+            destination_root["fd"] = fd
+            return fd
+        if (
+            path == "bin"
+            and flags & os.O_DIRECTORY
+            and dir_fd == destination_root["fd"]
+            and not replaced["done"]
+        ):
+            replaced["done"] = True
+            (destination / "bin").rename(detached)
+            attacker.rename(destination / "bin")
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(source_snapshot, "_open", replacing_open)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="destination directory.*race"):
+        source_snapshot.create_snapshot(repo, destination, io.StringIO())
+
+    assert (destination / "bin/marker").read_bytes() == b"unchanged\n"
+    assert stat.S_IMODE((destination / "bin").stat().st_mode) == original_mode
+    assert not (destination / "bin/run").exists()
+
+
+def test_checkout_root_fd_closes_when_fstat_raises(repo, tmp_path, monkeypatch):
+    real_open = source_snapshot._open
+    real_fstat = os.fstat
+    target = {"fd": None, "raised": False}
+
+    def recording_open(path, flags, mode=0o777, *, dir_fd=None):
+        fd = real_open(path, flags, mode, dir_fd=dir_fd)
+        if os.fspath(path) == os.fspath(repo) and flags & os.O_DIRECTORY:
+            target["fd"] = fd
+        return fd
+
+    def failing_fstat(fd):
+        if fd == target["fd"] and not target["raised"]:
+            target["raised"] = True
+            raise OSError(errno.EIO, "injected checkout-root fstat failure")
+        return real_fstat(fd)
+
+    monkeypatch.setattr(source_snapshot, "_open", recording_open)
+    monkeypatch.setattr(source_snapshot.os, "fstat", failing_fstat)
+
+    with pytest.raises(OSError, match="injected checkout-root"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+    assert_fd_closed(target["fd"])
+
+
+@pytest.mark.parametrize("failure", ["fstat", "fchmod"])
+def test_destination_root_fd_closes_after_open_failure(
+    repo, tmp_path, monkeypatch, failure
+):
+    destination = tmp_path / "snapshot"
+    real_open = source_snapshot._open
+    real_fstat = os.fstat
+    real_fchmod = os.fchmod
+    target = {"fd": None, "raised": False}
+
+    def recording_open(path, flags, mode=0o777, *, dir_fd=None):
+        fd = real_open(path, flags, mode, dir_fd=dir_fd)
+        if path == destination.name and flags & os.O_DIRECTORY and dir_fd is not None:
+            target["fd"] = fd
+        return fd
+
+    def failing_fstat(fd):
+        if failure == "fstat" and fd == target["fd"] and not target["raised"]:
+            target["raised"] = True
+            raise OSError(errno.EIO, "injected destination-root fstat failure")
+        return real_fstat(fd)
+
+    def failing_fchmod(fd, mode):
+        if failure == "fchmod" and fd == target["fd"] and not target["raised"]:
+            target["raised"] = True
+            raise OSError(errno.EIO, "injected destination-root fchmod failure")
+        return real_fchmod(fd, mode)
+
+    monkeypatch.setattr(source_snapshot, "_open", recording_open)
+    monkeypatch.setattr(source_snapshot.os, "fstat", failing_fstat)
+    monkeypatch.setattr(source_snapshot.os, "fchmod", failing_fchmod)
+
+    with pytest.raises(OSError, match="injected destination-root"):
+        source_snapshot.create_snapshot(repo, destination, io.StringIO())
+
+    assert_fd_closed(target["fd"])
+
+
+@pytest.mark.parametrize("kind", ["ancestor", "leaf"])
+def test_source_fd_closes_when_fstat_raises(repo, tmp_path, monkeypatch, kind):
+    nested = repo / "safe" / "file.txt"
+    nested.parent.mkdir()
+    nested.write_text("safe")
+    git(repo, "add", "safe/file.txt")
+    real_open = source_snapshot._open
+    real_fstat = os.fstat
+    target = {"fd": None, "raised": False}
+
+    def recording_open(path, flags, mode=0o777, *, dir_fd=None):
+        fd = real_open(path, flags, mode, dir_fd=dir_fd)
+        is_source_ancestor = kind == "ancestor" and path == "safe" and flags & os.O_DIRECTORY
+        is_source_leaf = (
+            kind == "leaf"
+            and path == "README"
+            and not flags & os.O_DIRECTORY
+            and not flags & (os.O_WRONLY | os.O_RDWR)
+        )
+        if is_source_ancestor or is_source_leaf:
+            target["fd"] = fd
+        return fd
+
+    def failing_fstat(fd):
+        if fd == target["fd"] and not target["raised"]:
+            target["raised"] = True
+            raise OSError(errno.EIO, "injected source-%s fstat failure" % kind)
+        return real_fstat(fd)
+
+    monkeypatch.setattr(source_snapshot, "_open", recording_open)
+    monkeypatch.setattr(source_snapshot.os, "fstat", failing_fstat)
+
+    with pytest.raises(OSError, match="injected source-%s" % kind):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+    assert_fd_closed(target["fd"])
+
+
+@pytest.mark.parametrize("failure", ["fstat", "fchmod"])
+def test_nested_destination_fd_closes_after_open_failure(
+    repo, tmp_path, monkeypatch, failure
+):
+    script = repo / "bin" / "run"
+    script.parent.mkdir()
+    script.write_bytes(b"#!/bin/sh\n")
+    script.chmod(0o755)
+    git(repo, "add", "bin/run")
+    destination = tmp_path / "snapshot"
+    real_open = source_snapshot._open
+    real_fstat = os.fstat
+    real_fchmod = os.fchmod
+    destination_root = {"fd": None}
+    target = {"fd": None, "raised": False}
+
+    def recording_open(path, flags, mode=0o777, *, dir_fd=None):
+        fd = real_open(path, flags, mode, dir_fd=dir_fd)
+        if path == destination.name and flags & os.O_DIRECTORY and dir_fd is not None:
+            destination_root["fd"] = fd
+        elif path == "bin" and flags & os.O_DIRECTORY and dir_fd == destination_root["fd"]:
+            target["fd"] = fd
+        return fd
+
+    def failing_fstat(fd):
+        if failure == "fstat" and fd == target["fd"] and not target["raised"]:
+            target["raised"] = True
+            raise OSError(errno.EIO, "injected nested-destination fstat failure")
+        return real_fstat(fd)
+
+    def failing_fchmod(fd, mode):
+        if failure == "fchmod" and fd == target["fd"] and not target["raised"]:
+            target["raised"] = True
+            raise OSError(errno.EIO, "injected nested-destination fchmod failure")
+        return real_fchmod(fd, mode)
+
+    monkeypatch.setattr(source_snapshot, "_open", recording_open)
+    monkeypatch.setattr(source_snapshot.os, "fstat", failing_fstat)
+    monkeypatch.setattr(source_snapshot.os, "fchmod", failing_fchmod)
+
+    with pytest.raises(OSError, match="injected nested-destination"):
+        source_snapshot.create_snapshot(repo, destination, io.StringIO())
+
+    assert_fd_closed(target["fd"])
 
 
 @pytest.mark.parametrize("missing", ["nofollow", "dir_fd", "stat_nofollow"])
