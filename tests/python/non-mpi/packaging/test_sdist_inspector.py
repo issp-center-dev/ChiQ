@@ -1,0 +1,454 @@
+import io
+import json
+from pathlib import Path
+import stat
+import subprocess
+import sys
+import tarfile
+
+import pytest
+
+import artifact_inspector
+
+
+VERSION = "1.2.3"
+ROOT = "chiq-" + VERSION
+
+
+def required_files(version=VERSION):
+    pyproject = """\
+[project]
+name = "chiq"
+dynamic = ["version"]
+
+[tool.scikit-build.metadata.version]
+provider = "scikit_build_core.metadata.regex"
+input = "python/package/chiq/__init__.py"
+regex = '''__version__\\s*=\\s*["'](?P<value>[^"']+)["']'''
+"""
+    return {
+        "pyproject.toml": pyproject.encode(),
+        "PKG-INFO": (
+            "Metadata-Version: 2.3\nName: chiq\nVersion: %s\n\n" % version
+        ).encode(),
+        "LICENSE": b"license\n",
+        "README.md": b"readme\n",
+        "CMakeLists.txt": b"project(ChiQ)\n",
+        "python/CMakeLists.txt": b"# python\n",
+        "src/CMakeLists.txt": b"# sources\n",
+        "src/solver.cpp": b"int solve() { return 0; }\n",
+        "src/solver.hpp": b"int solve();\n",
+        "cmake/FindEigen3.cmake": b"# helper\n",
+        "python/package/chiq/__init__.py": (
+            '__version__ = "%s"\n' % version
+        ).encode(),
+        "python/package/chiq/cli/__init__.py": b"",
+        "python/package/chiq/cli/chiq_main.py": b"",
+        "python/package/chiq/point_group_data/__init__.py": b"",
+        "python/package/chiq/point_group_data/C1.py": b"",
+        "python/package/bse/__init__.py": b"",
+        "python/package/bse_solver/__init__.py": b"",
+        "tests/python/non-mpi/fixture/ref/data.h5": b"HDF5 fixture",
+    }
+
+
+def make_sdist(tmp_path, files=None, entries=(), filename=None, root=ROOT):
+    if files is None:
+        files = required_files()
+    path = tmp_path / (filename or (root + ".tar.gz"))
+    with tarfile.open(str(path), "w:gz") as archive:
+        for relative, data in files.items():
+            info = tarfile.TarInfo(root + "/" + relative)
+            info.size = len(data)
+            info.mode = 0o644
+            archive.addfile(info, io.BytesIO(data))
+        for info, data in entries:
+            archive.addfile(info, io.BytesIO(data) if data is not None else None)
+    return path
+
+
+def tar_info(name, data=b"", type_=tarfile.REGTYPE, mode=0o644):
+    info = tarfile.TarInfo(name)
+    info.type = type_
+    info.mode = mode
+    info.size = len(data) if type_ in (tarfile.REGTYPE, tarfile.AREGTYPE) else 0
+    return info, data
+
+
+def replace_file(files, path, data):
+    changed = dict(files)
+    changed[path] = data
+    return changed
+
+
+def test_validates_without_extracting_and_accepts_implicit_root(tmp_path):
+    archive = make_sdist(tmp_path)
+
+    manifest = artifact_inspector.validate_sdist(archive)
+
+    assert manifest["kind"] == "sdist"
+    assert manifest["name"] == "chiq"
+    assert manifest["version"] == VERSION
+    assert manifest["root"] == ROOT
+    assert manifest["members"] == sorted(manifest["members"], key=lambda row: row["path"])
+    assert not (tmp_path / ROOT).exists()
+
+
+def test_accepts_explicit_root_directory(tmp_path):
+    archive = make_sdist(
+        tmp_path,
+        entries=[tar_info(ROOT, type_=tarfile.DIRTYPE)],
+    )
+
+    assert artifact_inspector.validate_sdist(archive)["root"] == ROOT
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "../escape",
+        "/absolute",
+        "C:/drive",
+        "//server/share",
+        "\\\\server\\share",
+        "root\\child",
+        "root//child",
+        "root/./child",
+        "root/../child",
+        "root/",
+        "root\x00child",
+    ],
+)
+def test_canonical_path_rejects_unsafe_spelling(path):
+    with pytest.raises(artifact_inspector.ArtifactError, match="path"):
+        artifact_inspector.canonical_member_path(path)
+
+
+@pytest.mark.parametrize(
+    "first,second",
+    [
+        ("chiq-1.2.3/A.py", "chiq-1.2.3/a.py"),
+        ("chiq-1.2.3/caf\N{LATIN SMALL LETTER E WITH ACUTE}/x", "chiq-1.2.3/cafe\N{COMBINING ACUTE ACCENT}/y"),
+        ("chiq-1.2.3/Dir/x", "chiq-1.2.3/dir/y"),
+    ],
+)
+def test_rejects_normalized_full_and_prefix_aliases(tmp_path, first, second):
+    archive = make_sdist(
+        tmp_path,
+        entries=[tar_info(first, b"one"), tar_info(second, b"two")],
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="collision|alias"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_rejects_duplicate_entries(tmp_path):
+    duplicate = ROOT + "/README.md"
+    archive = make_sdist(tmp_path, entries=[tar_info(duplicate, b"again")])
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="duplicate"):
+        artifact_inspector.validate_sdist(archive)
+
+
+@pytest.mark.parametrize(
+    "entries",
+    [
+        [tar_info(ROOT + "/conflict", b"file"), tar_info(ROOT + "/conflict", type_=tarfile.DIRTYPE)],
+        [tar_info(ROOT + "/ancestor", b"file"), tar_info(ROOT + "/ancestor/child", b"child")],
+        [tar_info(ROOT + "/ancestor/child", b"child"), tar_info(ROOT + "/ancestor", b"file")],
+    ],
+)
+def test_rejects_file_directory_and_ancestor_file_conflicts(tmp_path, entries):
+    archive = make_sdist(tmp_path, entries=entries)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="conflict|ancestor|duplicate"):
+        artifact_inspector.validate_sdist(archive)
+
+
+@pytest.mark.parametrize(
+    "type_",
+    [
+        tarfile.SYMTYPE,
+        tarfile.LNKTYPE,
+        tarfile.CHRTYPE,
+        tarfile.BLKTYPE,
+        tarfile.FIFOTYPE,
+        tarfile.GNUTYPE_SPARSE,
+        tarfile.CONTTYPE,
+    ],
+)
+def test_rejects_links_sparse_and_special_members(tmp_path, type_):
+    info, data = tar_info(ROOT + "/special", type_=type_)
+    if type_ in (tarfile.SYMTYPE, tarfile.LNKTYPE):
+        info.linkname = "target"
+    archive = make_sdist(tmp_path, entries=[(info, data)])
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="regular|directory|special|sparse"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_rejects_physical_archive_limit_before_tar_parsing(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    monkeypatch.setattr(artifact_inspector, "_physical_size", lambda path: artifact_inspector.MAX_ARCHIVE + 1)
+    monkeypatch.setattr(
+        artifact_inspector.tarfile,
+        "open",
+        lambda *args, **kwargs: pytest.fail("tar parser must not run"),
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="archive.*size|512"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_accepts_resource_boundaries_and_rejects_overflow(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    count = len(required_files())
+    logical = sum(len(value) for value in required_files().values())
+    monkeypatch.setattr(artifact_inspector, "MAX_MEMBERS", count)
+    monkeypatch.setattr(artifact_inspector, "MAX_FILE", max(map(len, required_files().values())))
+    monkeypatch.setattr(artifact_inspector, "MAX_TOTAL", logical)
+    monkeypatch.setattr(artifact_inspector, "MAX_RATIO", logical / archive.stat().st_size)
+    artifact_inspector.validate_sdist(archive)
+
+    for constant, value, message in [
+        ("MAX_MEMBERS", count - 1, "member"),
+        ("MAX_FILE", 1, "file"),
+        ("MAX_TOTAL", logical - 1, "total"),
+        ("MAX_RATIO", (logical / archive.stat().st_size) - 0.000001, "ratio"),
+    ]:
+        monkeypatch.setattr(artifact_inspector, constant, value)
+        with pytest.raises(artifact_inspector.ArtifactError, match=message):
+            artifact_inspector.validate_sdist(archive)
+        monkeypatch.undo()
+
+
+def test_rejects_logical_huge_member_without_allocating(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    real_open = artifact_inspector.tarfile.open
+
+    class LogicalArchive:
+        def __init__(self):
+            self.archive = real_open(str(archive), "r:*")
+
+        def close(self):
+            self.archive.close()
+
+        def getmembers(self):
+            members = self.archive.getmembers()
+            members[0].size = artifact_inspector.MAX_FILE + 1
+            return members
+
+    monkeypatch.setattr(artifact_inspector.tarfile, "open", lambda *args, **kwargs: LogicalArchive())
+    with pytest.raises(artifact_inspector.ArtifactError, match="file"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_invalid_complete_graph_writes_nothing(tmp_path):
+    invalid = tar_info(ROOT + "/z-link", type_=tarfile.SYMTYPE)[0]
+    invalid.linkname = "elsewhere"
+    archive = make_sdist(tmp_path, entries=[(invalid, None)])
+    destination = tmp_path / "extract"
+
+    with pytest.raises(artifact_inspector.ArtifactError):
+        artifact_inspector.extract_sdist(archive, destination)
+
+    assert not destination.exists()
+
+
+def test_extracts_with_sanitized_modes(tmp_path):
+    files = required_files()
+    executable = tar_info(ROOT + "/python/tool.py", b"#!/usr/bin/env python\n", mode=0o6771)
+    nonexecutable = tar_info(ROOT + "/python/data.txt", b"data", mode=0o666)
+    archive = make_sdist(tmp_path, files=files, entries=[executable, nonexecutable])
+    destination = tmp_path / "extract"
+
+    manifest = artifact_inspector.extract_sdist(archive, destination)
+
+    assert manifest["root"] == ROOT
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o700
+    assert stat.S_IMODE((destination / ROOT / "python").stat().st_mode) == 0o755
+    assert stat.S_IMODE((destination / ROOT / "python" / "tool.py").stat().st_mode) == 0o755
+    assert stat.S_IMODE((destination / ROOT / "python" / "data.txt").stat().st_mode) == 0o644
+
+
+def test_root_permissions_are_applied_through_open_descriptor(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    monkeypatch.setattr(
+        artifact_inspector.os,
+        "chmod",
+        lambda *args, **kwargs: pytest.fail("path-based chmod is race-prone"),
+    )
+
+    artifact_inspector.extract_sdist(archive, tmp_path / "extract")
+
+
+def test_requires_new_destination_and_rejects_symlink_collision(tmp_path):
+    archive = make_sdist(tmp_path)
+    destination = tmp_path / "extract"
+    destination.symlink_to(tmp_path / "elsewhere")
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="destination|symlink|exist"):
+        artifact_inspector.extract_sdist(archive, destination)
+
+    assert not (tmp_path / "elsewhere").exists()
+
+
+def test_file_creation_is_exclusive_and_nofollow(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    real_open = artifact_inspector._open
+    checked = []
+
+    def checking_open(path, flags, *args, **kwargs):
+        if flags & artifact_inspector.os.O_CREAT:
+            checked.append(flags)
+            assert flags & artifact_inspector.os.O_EXCL
+            assert flags & artifact_inspector.os.O_NOFOLLOW
+        return real_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(artifact_inspector, "_open", checking_open)
+    artifact_inspector.extract_sdist(archive, tmp_path / "extract")
+
+    assert checked
+
+
+def test_resolved_containment_rejects_nested_symlink(tmp_path):
+    root = tmp_path / "root"
+    outside = tmp_path / "outside"
+    root.mkdir()
+    outside.mkdir()
+    (root / "link").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="escapes"):
+        artifact_inspector._require_contained(root, root / "link" / "file")
+
+
+def test_resolved_containment_handles_tmp_aliases(tmp_path, monkeypatch):
+    root = Path("/private/tmp/extract")
+    candidate = Path("/tmp/extract") / ROOT / "README.md"
+    real_resolve = artifact_inspector._resolve_path
+
+    def macos_resolve(path):
+        value = Path(path)
+        if str(value).startswith("/tmp/"):
+            return Path("/private" + str(value))
+        return real_resolve(value)
+
+    monkeypatch.setattr(artifact_inspector, "_resolve_path", macos_resolve)
+    artifact_inspector._require_contained(root, candidate)
+
+
+@pytest.mark.parametrize(
+    "missing",
+    [
+        "pyproject.toml",
+        "LICENSE",
+        "README.md",
+        "CMakeLists.txt",
+        "python/CMakeLists.txt",
+        "src/CMakeLists.txt",
+        "src/solver.cpp",
+        "src/solver.hpp",
+        "cmake/FindEigen3.cmake",
+        "python/package/chiq/cli/chiq_main.py",
+        "python/package/chiq/point_group_data/C1.py",
+        "python/package/bse/__init__.py",
+        "python/package/bse_solver/__init__.py",
+        "tests/python/non-mpi/fixture/ref/data.h5",
+    ],
+)
+def test_rejects_missing_required_sdist_content(tmp_path, missing):
+    files = required_files()
+    del files[missing]
+    archive = make_sdist(tmp_path, files=files)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="required|missing|HDF5|content"):
+        artifact_inspector.validate_sdist(archive)
+
+
+@pytest.mark.parametrize(
+    "forbidden",
+    [
+        "python/package/chiq/native.so",
+        "python/package/chiq/native.pyd",
+        "python/package/chiq/native.dylib",
+        "python/package/chiq/cache.pyc",
+        "python/package/chiq/__pycache__/cache",
+        "build/output.txt",
+        "build-macos/output.txt",
+        "nested/build/output.txt",
+        "lib/bse-python/chiq/__init__.py",
+        "prefix/lib/bse-python/chiq/__init__.py",
+        "chiqvars.sh",
+        "install_manifest.txt",
+    ],
+)
+def test_rejects_forbidden_built_or_installed_artifacts(tmp_path, forbidden):
+    archive = make_sdist(tmp_path, entries=[tar_info(ROOT + "/" + forbidden, b"bad")])
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="forbidden|native|cache|build|installed"):
+        artifact_inspector.validate_sdist(archive)
+
+
+@pytest.mark.parametrize(
+    "filename,root,files",
+    [
+        ("other-1.2.3.tar.gz", ROOT, required_files()),
+        (ROOT + ".tar.gz", "chiq-9.9", required_files()),
+        (ROOT + ".tar.gz", ROOT, replace_file(required_files(), "PKG-INFO", b"Metadata-Version: 2.3\nName: other\nVersion: 1.2.3\n\n")),
+        (ROOT + ".tar.gz", ROOT, replace_file(required_files(), "PKG-INFO", b"Metadata-Version: 2.3\nName: chiq\nVersion: 9.9\n\n")),
+        (ROOT + ".tar.gz", ROOT, replace_file(required_files(), "python/package/chiq/__init__.py", b'__version__ = "9.9"\n')),
+        (ROOT + ".tar.gz", ROOT, replace_file(required_files(), "pyproject.toml", required_files()["pyproject.toml"].replace(b'name = "chiq"', b'name = "other"'))),
+        (ROOT + ".tar.gz", ROOT, replace_file(required_files(), "pyproject.toml", required_files()["pyproject.toml"].replace(b'dynamic = ["version"]', b'dynamic = ["version"]\nversion = "1.2.3"'))),
+        (ROOT + ".tar.gz", ROOT, replace_file(required_files(), "pyproject.toml", required_files()["pyproject.toml"].replace(b"scikit_build_core.metadata.regex", b"other.provider"))),
+        (ROOT + ".tar.gz", ROOT, replace_file(required_files(), "pyproject.toml", required_files()["pyproject.toml"].replace(b"python/package/chiq/__init__.py", b"VERSION"))),
+    ],
+)
+def test_rejects_metadata_disagreement(tmp_path, filename, root, files):
+    archive = make_sdist(tmp_path, filename=filename, root=root, files=files)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="name|version|metadata|provider|filename|root"):
+        artifact_inspector.validate_sdist(archive)
+
+
+@pytest.mark.parametrize(
+    "pkg_info",
+    [
+        b"Metadata-Version: 2.3\nName: chiq\nName: chiq\nVersion: 1.2.3\n\n",
+        b"Metadata-Version: 2.3\nName: chiq\nVersion: 1.2.3\nVersion: 1.2.3\n\n",
+        b"not valid metadata",
+    ],
+)
+def test_rejects_malformed_or_duplicate_pkg_info(tmp_path, pkg_info):
+    archive = make_sdist(
+        tmp_path,
+        files=replace_file(required_files(), "PKG-INFO", pkg_info),
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="PKG-INFO|metadata"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_requires_one_shared_top_level_component(tmp_path):
+    archive = make_sdist(tmp_path, entries=[tar_info("other-root/file", b"bad")])
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="top-level|root"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_cli_writes_manifest_outside_extraction_root(tmp_path):
+    archive = make_sdist(tmp_path)
+    destination = tmp_path / "extract"
+    manifest = tmp_path / "reports" / "sdist.json"
+    script = Path(artifact_inspector.__file__)
+
+    subprocess.run(
+        [sys.executable, str(script), "sdist", str(archive), "--extract", str(destination), "--manifest", str(manifest)],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+
+    result = json.loads(manifest.read_text())
+    assert result["root"] == ROOT
+    assert (destination / ROOT / "README.md").is_file()
+    assert not (destination / ROOT / "reports" / "sdist.json").exists()
