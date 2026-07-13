@@ -16,7 +16,9 @@ def _core_only_env(tmp_path):
     blocker = tmp_path / "blocked_optional_dependencies"
     blocker.mkdir()
     (blocker / "matplotlib.py").write_text("raise ImportError('matplotlib blocked')\n")
-    (blocker / "dcore.py").write_text("raise ImportError('dcore blocked')\n")
+    (blocker / "dcore.py").write_text(
+        "raise AssertionError('core CLI attempted to import dcore')\n"
+    )
     env = dict(os.environ)
     env["PYTHONPATH"] = os.pathsep.join((
         str(blocker),
@@ -27,7 +29,10 @@ def _core_only_env(tmp_path):
 
 
 def _run_module(name, args, tmp_path):
-    code = "from chiq.cli.%s import main; main()" % name
+    code = (
+        "import sys; sys.argv[0] = %r; "
+        "from chiq.cli.%s import main; main()" % (name, name)
+    )
     return subprocess.run(
         [sys.executable, "-c", code] + list(args),
         cwd=str(tmp_path),
@@ -52,6 +57,13 @@ def test_canonical_help_runs_on_core_install(name, tmp_path):
     assert r.returncode == 0, r.stderr
     assert "usage:" in r.stdout.lower()
     assert "Traceback" not in r.stderr
+
+
+def test_dcore_help_uses_invoked_command_name(tmp_path):
+    r = _run_module("dcore_chiq", ["--help"], tmp_path)
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.startswith("usage: dcore_chiq ")
+    assert "dcore_chiq.py" not in r.stdout
 
 
 @pytest.mark.parametrize("name", CANONICAL_COMMANDS)
@@ -93,23 +105,30 @@ def test_deprecated_alias_prints_stderr_and_forwards_argv(name, monkeypatch, cap
     from chiq.cli import _deprecated
 
     argv = [name + ".py", "--sentinel", "value"]
+    imported = []
     seen = []
 
     def forwarded_main():
         seen.append(list(sys.argv))
-        return "forwarded-result"
+
+    def import_module(module_name):
+        imported.append(module_name)
+        return SimpleNamespace(main=forwarded_main)
 
     monkeypatch.setattr(sys, "argv", argv)
     monkeypatch.setattr(
         _deprecated.importlib,
         "import_module",
-        lambda module_name: SimpleNamespace(main=forwarded_main),
+        import_module,
     )
     result = getattr(_deprecated, name + "_py")()
 
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert "'%s.py' command is deprecated" % name in captured.err
-    assert "use '%s' instead" % name in captured.err
+    assert captured.err == (
+        "warning: the '%s.py' command is deprecated and will be removed in "
+        "ChiQ 2.0; use '%s' instead.\n" % (name, name)
+    )
+    assert imported == ["chiq.cli.%s" % name]
     assert seen == [argv]
-    assert result == "forwarded-result"
+    assert result is None

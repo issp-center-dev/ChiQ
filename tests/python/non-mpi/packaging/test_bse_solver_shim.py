@@ -50,7 +50,8 @@ import warnings
 with warnings.catch_warnings(record=True) as caught:
     warnings.simplefilter('always')
     importlib.import_module('bse')
-    importlib.import_module('bse_solver')
+    bse_solver = importlib.import_module('bse_solver')
+    importlib.reload(bse_solver)
 print(json.dumps([(w.category.__name__, str(w.message)) for w in caught]))
 """
     result = subprocess.run(

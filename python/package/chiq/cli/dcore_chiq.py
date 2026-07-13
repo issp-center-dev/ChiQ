@@ -782,16 +782,10 @@ def dcore_chiq(filename, np=1):
 def main():
     import argparse
 
-    # The full per-option epilog text comes from dcore itself. Build it best-
-    # effort so that --help/--version still work on a core (non-dcore)
-    # install; the real 'dcore' extra is only required once we get past
-    # argument parsing (see _import_dcore() below).
-    try:
-        from dcore.option_tables import generate_all_description
-        _epilog = generate_all_description()
-    except ImportError:
-        _epilog = ("(Full option list unavailable: the 'dcore' extra is not installed.\n"
-                    " Install it with: pip install chiq[dcore])")
+    # Keep parser construction DCore-free so core installs can use
+    # --help/--version without even attempting an optional import.
+    _epilog = ("DCore is required to run this command.\n"
+               "Install it with: pip install chiq[dcore]")
 
     parser = argparse.ArgumentParser(
         description='Post-processing script in DCore (bse)',

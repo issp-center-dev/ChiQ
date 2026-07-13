@@ -69,9 +69,10 @@ import json
 import warnings
 with warnings.catch_warnings(record=True) as caught:
     warnings.simplefilter('always')
-    importlib.import_module('bse')
+    bse = importlib.import_module('bse')
     importlib.import_module('bse.tools')
     importlib.import_module('bse.point_group_data.C1')
+    importlib.reload(bse)
 print(json.dumps([w.category.__name__ for w in caught]))
 """)
     assert json.loads(result.stdout) == ["FutureWarning"]
