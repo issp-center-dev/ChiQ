@@ -45,8 +45,8 @@ python3 -m pip install -e .
 Optional runtime dependencies are available as extras:
 
 ``` bash
-python3 -m pip install .[plot]
-python3 -m pip install .[mpi,dcore]
+python3 -m pip install ".[plot]"
+python3 -m pip install ".[mpi,dcore]"
 ```
 
 The pip build compiles the C++ extension as `chiq._bse_solver` and installs console commands
@@ -100,7 +100,8 @@ make test  # when -DTesting=ON is activated in cmake
 make install
 ```
 
-Legacy wrapper scripts such as `chiq_main.py` are installed in **$HOME/local/bin**.
+Both suffix-free commands such as `chiq_main` and deprecated `.py` wrappers such as
+`chiq_main.py` are installed in **$HOME/local/bin**.
 A python package **chiq** and a shared library **_bse_solver.cpython-XXX-YYY.so** (XXX is the python version, and YYY is the os info) is installed in **$HOME/local/lib/bse-python/chiq** (or **lib64/bse-python/chiq**).
 A configurations file **chiqvars.sh** is installed in **$HOME/local/share**, see the next section.
 
