@@ -31,21 +31,30 @@ class SnapshotError(RuntimeError):
 # Small seams used by race and platform-capability tests.
 _open = os.open
 _stat = os.stat
+_mkdir = os.mkdir
 _capability_override = None
 
 
-def _git(repo, *args):
-    command = ["git", "-C", os.fspath(repo)] + list(args)
+def _git(repo_fd, *args):
+    command = ["git"] + list(args)
+
+    def enter_open_checkout():
+        os.fchdir(repo_fd)
+
     try:
         return subprocess.run(
             command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=True,
+            pass_fds=(repo_fd,),
+            preexec_fn=enter_open_checkout,
         ).stdout
     except subprocess.CalledProcessError as error:
         detail = error.stderr.decode("utf-8", "replace").strip()
         raise SnapshotError("Git command failed: %s" % detail) from error
+    except (OSError, subprocess.SubprocessError) as error:
+        raise SnapshotError("cannot bind Git to the open checkout") from error
 
 
 def _decode_path(value):
@@ -106,8 +115,8 @@ def _nul_paths(raw):
     return [_decode_path(item) for item in raw.split(b"\0") if item]
 
 
-def _untracked_paths(repo):
-    raw = _git(repo, "status", "--porcelain=v1", "-z", "--untracked-files=all")
+def _untracked_paths(repo_fd):
+    raw = _git(repo_fd, "status", "--porcelain=v1", "-z", "--untracked-files=all")
     paths = []
     records = raw.split(b"\0")
     index = 0
@@ -128,9 +137,18 @@ def _untracked_paths(repo):
     return sorted(paths)
 
 
-def _ignored_paths(repo):
+def _ignored_paths(repo_fd):
     return sorted(
-        _nul_paths(_git(repo, "ls-files", "-z", "--others", "--ignored", "--exclude-standard"))
+        _nul_paths(
+            _git(
+                repo_fd,
+                "ls-files",
+                "-z",
+                "--others",
+                "--ignored",
+                "--exclude-standard",
+            )
+        )
     )
 
 
@@ -143,8 +161,12 @@ def _require_capabilities():
         raise SnapshotError("unsupported descriptor safety: open(dir_fd=...)")
     if os.stat not in getattr(os, "supports_dir_fd", set()):
         raise SnapshotError("unsupported descriptor safety: stat(dir_fd=...)")
+    if os.mkdir not in getattr(os, "supports_dir_fd", set()):
+        raise SnapshotError("unsupported descriptor safety: mkdir(dir_fd=...)")
     if os.stat not in getattr(os, "supports_follow_symlinks", set()):
         raise SnapshotError("unsupported descriptor safety: stat(follow_symlinks=False)")
+    if os.name != "posix" or not hasattr(os, "fchdir"):
+        raise SnapshotError("unsupported descriptor safety: fchdir-bound Git")
 
 
 def _same_identity(left, right):
@@ -167,6 +189,56 @@ def _safe_open(component, flags, parent_fd, description):
         return _open(component, flags, 0o777, dir_fd=parent_fd)
     except (OSError, TypeError, NotImplementedError) as error:
         raise SnapshotError("cannot safely open %s" % description) from error
+
+
+def _open_validated_directory(path, description):
+    try:
+        before = _stat(os.fspath(path), follow_symlinks=False)
+    except (OSError, TypeError, NotImplementedError) as error:
+        raise SnapshotError("cannot no-follow stat %s" % description) from error
+    if not stat.S_ISDIR(before.st_mode):
+        raise SnapshotError("%s is not a directory" % description)
+    try:
+        descriptor = _open(
+            os.fspath(path), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, 0o777
+        )
+    except (OSError, TypeError, NotImplementedError) as error:
+        raise SnapshotError("cannot safely open %s" % description) from error
+    after = os.fstat(descriptor)
+    if not stat.S_ISDIR(after.st_mode) or not _same_identity(before, after):
+        os.close(descriptor)
+        raise SnapshotError("%s replacement race" % description)
+    return descriptor
+
+
+def _create_destination_root(destination):
+    name = destination.name
+    if name in ("", ".", "..") or "/" in name:
+        raise SnapshotError("invalid destination path")
+    parent_fd = _open_validated_directory(destination.parent, "destination parent")
+    try:
+        _mkdir(name, 0o700, dir_fd=parent_fd)
+        before = _safe_stat(name, parent_fd, "destination root")
+        if not stat.S_ISDIR(before.st_mode):
+            raise SnapshotError("destination root is not a directory or is a symlink")
+        descriptor = _safe_open(
+            name,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+            parent_fd,
+            "destination root",
+        )
+        after = os.fstat(descriptor)
+        if not stat.S_ISDIR(after.st_mode) or not _same_identity(before, after):
+            os.close(descriptor)
+            raise SnapshotError("destination root replacement race")
+        current = _safe_stat(name, parent_fd, "destination root")
+        if not _same_identity(after, current):
+            os.close(descriptor)
+            raise SnapshotError("destination root replacement race")
+        os.fchmod(descriptor, 0o700)
+        return descriptor
+    finally:
+        os.close(parent_fd)
 
 
 def _open_source_leaf(root_fd, path, index_mode):
@@ -201,7 +273,11 @@ def _open_source_leaf(root_fd, path, index_mode):
         if not stat.S_ISREG(after.st_mode) or not _same_identity(before, after):
             os.close(leaf_fd)
             raise SnapshotError("leaf replacement race for %s" % path)
+        before_executable = bool(before.st_mode & 0o111)
         executable = bool(after.st_mode & 0o111)
+        if before_executable != executable:
+            os.close(leaf_fd)
+            raise SnapshotError("executable mode race for %s" % path)
         expected_executable = index_mode == "100755"
         if executable != expected_executable:
             os.close(leaf_fd)
@@ -282,47 +358,37 @@ def create_snapshot(repo, destination, stderr):
     _require_capabilities()
     repo = Path(repo)
     destination = Path(destination)
-    entries = _parse_index(_git(repo, "ls-files", "--stage", "-z"))
-
-    tracked_artifacts = sorted(path for path, mode in entries if mode != GITLINK_MODE and _is_package_artifact(path))
-    if tracked_artifacts:
-        raise SnapshotError(
-            "tracked package cache/native artifact: %s" % ", ".join(tracked_artifacts)
-        )
-
-    untracked = _untracked_paths(repo)
-    ignored = _ignored_paths(repo)
-    package_artifacts = sorted(set(path for path in untracked + ignored if _is_package_artifact(path)))
-    gitlinks = sorted(path for path, mode in entries if mode == GITLINK_MODE)
-    for path in untracked:
-        _warn(stderr, "excluded untracked path %s" % path)
-    for path in package_artifacts:
-        _warn(stderr, "excluded package cache/native artifact %s" % path)
-    for path in gitlinks:
-        _warn(stderr, "excluded gitlink %s" % path)
-
-    try:
-        os.mkdir(os.fspath(destination), 0o700)
-    except OSError:
-        raise
-    os.chmod(os.fspath(destination), 0o700)
-
-    source_root_fd = None
+    source_root_fd = _open_validated_directory(repo, "checkout root")
     destination_root_fd = None
     rows = []
     try:
-        try:
-            source_root_fd = _open(
-                os.fspath(repo), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, 0o777
+        entries = _parse_index(_git(source_root_fd, "ls-files", "--stage", "-z"))
+        head = _git(source_root_fd, "rev-parse", "HEAD").decode("ascii").strip()
+
+        tracked_artifacts = sorted(
+            path
+            for path, mode in entries
+            if mode != GITLINK_MODE and _is_package_artifact(path)
+        )
+        if tracked_artifacts:
+            raise SnapshotError(
+                "tracked package cache/native artifact: %s" % ", ".join(tracked_artifacts)
             )
-        except (OSError, TypeError, NotImplementedError) as error:
-            raise SnapshotError("cannot safely open checkout root") from error
-        try:
-            destination_root_fd = _open(
-                os.fspath(destination), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, 0o777
-            )
-        except (OSError, TypeError, NotImplementedError) as error:
-            raise SnapshotError("cannot safely open destination root") from error
+
+        untracked = _untracked_paths(source_root_fd)
+        ignored = _ignored_paths(source_root_fd)
+        package_artifacts = sorted(
+            set(path for path in untracked + ignored if _is_package_artifact(path))
+        )
+        gitlinks = sorted(path for path, mode in entries if mode == GITLINK_MODE)
+        for path in untracked:
+            _warn(stderr, "excluded untracked path %s" % path)
+        for path in package_artifacts:
+            _warn(stderr, "excluded package cache/native artifact %s" % path)
+        for path in gitlinks:
+            _warn(stderr, "excluded gitlink %s" % path)
+
+        destination_root_fd = _create_destination_root(destination)
 
         for path, index_mode in sorted(entries):
             if index_mode == GITLINK_MODE:
@@ -335,15 +401,15 @@ def create_snapshot(repo, destination, stderr):
             finally:
                 os.close(source_fd)
             rows.append({"path": path, "index_mode": index_mode, "sha256": digest})
+        diff_stat = _git(source_root_fd, "diff", "HEAD", "--stat").decode("utf-8")
     finally:
         if destination_root_fd is not None:
             os.close(destination_root_fd)
-        if source_root_fd is not None:
-            os.close(source_root_fd)
+        os.close(source_root_fd)
 
     return {
-        "head": _git(repo, "rev-parse", "HEAD").decode("ascii").strip(),
-        "diff_stat": _git(repo, "diff", "HEAD", "--stat").decode("utf-8"),
+        "head": head,
+        "diff_stat": diff_stat,
         "files": rows,
         "diagnostics": {
             "excluded_untracked": untracked,

@@ -221,6 +221,27 @@ def test_leaf_replacement_between_stat_and_open_fails_closed(repo, tmp_path, mon
     assert not copied.exists() or copied.read_bytes() != b"attacker replacement\n"
 
 
+def test_leaf_mode_change_between_stat_and_open_fails_closed(repo, tmp_path, monkeypatch):
+    script = repo / "script"
+    script.write_bytes(b"#!/bin/sh\n")
+    script.chmod(0o755)
+    git(repo, "add", "script")
+    script.chmod(0o644)
+    real_open = source_snapshot._open
+    changed = {"done": False}
+
+    def changing_open(path, flags, mode=0o777, *, dir_fd=None):
+        if path == "script" and not changed["done"]:
+            changed["done"] = True
+            script.chmod(0o755)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(source_snapshot, "_open", changing_open)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="mode.*race|changed.*mode"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+
 def test_ancestor_replacement_after_open_uses_safe_descriptor(repo, tmp_path, monkeypatch):
     tracked = repo / "safe" / "file.txt"
     tracked.parent.mkdir()
@@ -245,11 +266,143 @@ def test_ancestor_replacement_after_open_uses_safe_descriptor(repo, tmp_path, mo
     assert (destination / "safe/file.txt").read_bytes() == b"safe bytes\n"
 
 
+def test_checkout_root_replacement_between_stat_and_open_fails_closed(
+    repo, tmp_path, monkeypatch
+):
+    original = tmp_path / "original-repo"
+    real_open = source_snapshot._open
+    replaced = {"done": False}
+
+    def replacing_open(path, flags, mode=0o777, *, dir_fd=None):
+        if (
+            os.fspath(path) == os.fspath(repo)
+            and flags & os.O_DIRECTORY
+            and not replaced["done"]
+        ):
+            replaced["done"] = True
+            repo.rename(original)
+            repo.mkdir()
+            git(repo, "init", "-q")
+            git(repo, "config", "user.email", "attacker@example.invalid")
+            git(repo, "config", "user.name", "Attacker")
+            (repo / "README").write_bytes(b"attacker bytes\n")
+            git(repo, "add", "README")
+            git(repo, "commit", "-qm", "attacker")
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(source_snapshot, "_open", replacing_open)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="checkout root.*race"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+    copied = tmp_path / "snapshot" / "README"
+    assert not copied.exists() or copied.read_bytes() != b"attacker bytes\n"
+
+
+def test_git_queries_and_copy_stay_bound_to_open_checkout(repo, tmp_path, monkeypatch):
+    original_head = git(repo, "rev-parse", "HEAD").decode().strip()
+    original_diff_stat = git(repo, "diff", "HEAD", "--stat").decode()
+    original = tmp_path / "opened-repo"
+    real_open = source_snapshot._open
+    replaced = {"done": False}
+
+    def replacing_open(path, flags, mode=0o777, *, dir_fd=None):
+        fd = real_open(path, flags, mode, dir_fd=dir_fd)
+        if (
+            os.fspath(path) == os.fspath(repo)
+            and flags & os.O_DIRECTORY
+            and not replaced["done"]
+        ):
+            replaced["done"] = True
+            repo.rename(original)
+            repo.mkdir()
+            git(repo, "init", "-q")
+            git(repo, "config", "user.email", "attacker@example.invalid")
+            git(repo, "config", "user.name", "Attacker")
+            (repo / "README").write_bytes(b"attacker bytes\n")
+            git(repo, "add", "README")
+            git(repo, "commit", "-qm", "attacker")
+            (repo / "README").write_bytes(b"attacker modified bytes\n")
+        return fd
+
+    monkeypatch.setattr(source_snapshot, "_open", replacing_open)
+
+    destination, manifest, warnings = snapshot(repo, tmp_path)
+
+    assert (destination / "README").read_bytes() == b"initial\n"
+    assert manifest["head"] == original_head
+    assert manifest["diff_stat"] == original_diff_stat
+
+
+def test_destination_directory_replacement_before_open_fails_closed(
+    repo, tmp_path, monkeypatch
+):
+    destination = tmp_path / "snapshot"
+    detached = tmp_path / "detached-snapshot"
+    attacker = tmp_path / "attacker-directory"
+    attacker.mkdir()
+    (attacker / "marker").write_bytes(b"unchanged\n")
+    real_open = source_snapshot._open
+    replaced = {"done": False}
+
+    def replacing_open(path, flags, mode=0o777, *, dir_fd=None):
+        is_destination = os.fspath(path) == os.fspath(destination) or (
+            path == destination.name and dir_fd is not None
+        )
+        if is_destination and flags & os.O_DIRECTORY and not replaced["done"]:
+            replaced["done"] = True
+            destination.rename(detached)
+            attacker.rename(destination)
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(source_snapshot, "_open", replacing_open)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="destination root.*race"):
+        source_snapshot.create_snapshot(repo, destination, io.StringIO())
+
+    assert (destination / "marker").read_bytes() == b"unchanged\n"
+    assert not (destination / "README").exists()
+
+
+def test_destination_symlink_swap_after_creation_fails_without_touching_target(
+    repo, tmp_path, monkeypatch
+):
+    destination = tmp_path / "snapshot"
+    external = tmp_path / "external"
+    external.mkdir(mode=0o711)
+    original_mode = stat.S_IMODE(external.stat().st_mode)
+    real_mkdir = os.mkdir
+
+    def swapping_mkdir(path, mode=0o777, *, dir_fd=None):
+        result = real_mkdir(path, mode, dir_fd=dir_fd)
+        if path == destination.name and dir_fd is not None:
+            destination.rmdir()
+            destination.symlink_to(external, target_is_directory=True)
+        return result
+
+    monkeypatch.setattr(source_snapshot, "_mkdir", swapping_mkdir, raising=False)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="destination root|symlink"):
+        source_snapshot.create_snapshot(repo, destination, io.StringIO())
+
+    assert stat.S_IMODE(external.stat().st_mode) == original_mode
+    assert list(external.iterdir()) == []
+
+
 @pytest.mark.parametrize("missing", ["nofollow", "dir_fd", "stat_nofollow"])
 def test_fails_closed_when_descriptor_safety_is_unsupported(repo, tmp_path, monkeypatch, missing):
     monkeypatch.setattr(source_snapshot, "_capability_override", missing)
 
     with pytest.raises(source_snapshot.SnapshotError, match="unsupported"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+
+def test_fails_closed_without_descriptor_relative_mkdir(repo, tmp_path, monkeypatch):
+    supported = set(os.supports_dir_fd)
+    supported.discard(os.mkdir)
+    monkeypatch.setattr(source_snapshot.os, "supports_dir_fd", supported)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="unsupported.*mkdir"):
         source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
 
 
