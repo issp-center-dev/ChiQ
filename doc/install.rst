@@ -125,6 +125,7 @@ After configuration, type the following to build, test, and install
 
 Legacy wrapper scripts such as ``chiq_main.py`` are installed in ``$HOME/local/bin``.
 A python package ``chiq`` and a shared library ``_bse_solver.cpython-XXX-YYY.so`` (``XXX`` is the python version, and ``YYY`` is the os info) is installed in ``$HOME/local/lib/bse-python/chiq`` (or ``lib64/bse-python/chiq``).
+The ``chiq`` directory is the package itself; ``PYTHONPATH`` must contain its parent directory, ``$HOME/local/lib/bse-python``. Sourcing ``chiqvars.sh`` sets this correctly.
 A configurations file ``chiqvars.sh`` is installed in ``$HOME/local/share``, see the next section for details.
 
 Environment variables

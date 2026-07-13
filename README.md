@@ -101,7 +101,7 @@ make install
 ```
 
 Legacy wrapper scripts such as `chiq_main.py` are installed in **$HOME/local/bin**.
-A python package **chiq** and a shared library **_bse_solver.cpython-XXX-YYY.so** (XXX is the python version, and YYY is the os info) is installed in **$Home/local/lib/bse-python/chiq** (or **lib64/bse-python/chiq**).
+A python package **chiq** and a shared library **_bse_solver.cpython-XXX-YYY.so** (XXX is the python version, and YYY is the os info) is installed in **$HOME/local/lib/bse-python/chiq** (or **lib64/bse-python/chiq**).
 A configurations file **chiqvars.sh** is installed in **$HOME/local/share**, see the next section.
 
 You can build the documentation as follows.
