@@ -7,6 +7,7 @@ import struct
 import subprocess
 import sys
 import zipfile
+import zlib
 
 import pytest
 import toml
@@ -147,6 +148,48 @@ def _rewrite(path, mutate):
     return path
 
 
+def _raw_deflate(data):
+    compressor = zlib.compressobj(level=9, wbits=-15)
+    return compressor.compress(data) + compressor.flush()
+
+
+def _replace_deflate_stream(path, name, compressed, declared):
+    raw = bytearray(path.read_bytes())
+    entries = _central_entries(raw)
+    target = next(item for item in entries if item[2].decode("utf-8") == name)
+    _target_central, target_values, _target_name = target
+    local_offset = target_values[16]
+    local = list(LOCAL.unpack_from(raw, local_offset))
+    payload_offset = local_offset + LOCAL.size + local[9] + local[10]
+    old_compressed_size = target_values[8]
+    delta = len(compressed) - old_compressed_size
+    old_eocd_offset, eocd = _eocd(raw)
+    old_central_offset = eocd[6]
+    changed = bytearray(
+        raw[:payload_offset]
+        + compressed
+        + raw[payload_offset + old_compressed_size:]
+    )
+    crc = zlib.crc32(declared) & 0xFFFFFFFF
+    local[6] = crc
+    local[7] = len(compressed)
+    local[8] = len(declared)
+    LOCAL.pack_into(changed, local_offset, *local)
+    for central_offset, values, raw_name in entries:
+        values = list(values)
+        if raw_name.decode("utf-8") == name:
+            values[7] = crc
+            values[8] = len(compressed)
+            values[9] = len(declared)
+        if values[16] > local_offset:
+            values[16] += delta
+        CENTRAL.pack_into(changed, central_offset + delta, *values)
+    eocd[6] = old_central_offset + delta
+    EOCD.pack_into(changed, old_eocd_offset + delta, *eocd)
+    path.write_bytes(changed)
+    return path
+
+
 def test_valid_wheel_returns_manifest_without_extracting(tmp_path):
     archive = make_wheel(tmp_path)
     manifest = artifact_inspector.validate_wheel(archive)
@@ -164,6 +207,73 @@ def test_accepts_and_crc_reads_deflated_explicit_package_directory(tmp_path):
         directory_compression=zipfile.ZIP_DEFLATED,
     )
     assert artifact_inspector.validate_wheel(archive)["kind"] == "wheel"
+
+
+@pytest.mark.parametrize("compression", [zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED])
+def test_independent_stream_verifier_accepts_valid_wheels(tmp_path, compression):
+    archive = make_wheel(tmp_path, compression=compression)
+    assert artifact_inspector.validate_wheel(archive)["kind"] == "wheel"
+
+
+def test_stream_verification_does_not_use_zipfile_reader(tmp_path, monkeypatch):
+    archive = make_wheel(tmp_path)
+    monkeypatch.setattr(
+        artifact_inspector.zipfile,
+        "ZipFile",
+        lambda *args, **kwargs: pytest.fail("trusted zipfile reader"),
+    )
+    assert artifact_inspector.validate_wheel(archive)["kind"] == "wheel"
+
+
+def test_rejects_deflate_output_beyond_declared_size(tmp_path):
+    files = wheel_files()
+    files["chiq/payload.dat"] = b"x"
+    archive = make_wheel(tmp_path, files)
+    attack = _raw_deflate(b"x" * (10 * 1024 * 1024))
+    _replace_deflate_stream(archive, "chiq/payload.dat", attack, b"x")
+    with pytest.raises(artifact_inspector.ArtifactError, match="output|size|declared|stream"):
+        artifact_inspector.validate_wheel(archive)
+
+
+def test_rejects_deflate_output_smaller_than_declared_size(tmp_path):
+    files = wheel_files()
+    files["chiq/payload.dat"] = b"xx"
+    archive = make_wheel(tmp_path, files)
+    _replace_deflate_stream(archive, "chiq/payload.dat", _raw_deflate(b"x"), b"xx")
+    with pytest.raises(artifact_inspector.ArtifactError, match="output|size|declared|stream"):
+        artifact_inspector.validate_wheel(archive)
+
+
+def test_raw_deflate_verifier_rejects_incorrect_crc(tmp_path):
+    archive = make_wheel(tmp_path)
+    def mutate(raw):
+        central_offset, values, _name = _central_entries(raw)[0]
+        values[7] ^= 1
+        CENTRAL.pack_into(raw, central_offset, *values)
+        local = list(LOCAL.unpack_from(raw, values[16]))
+        local[6] = values[7]
+        LOCAL.pack_into(raw, values[16], *local)
+    _rewrite(archive, mutate)
+    with pytest.raises(artifact_inspector.ArtifactError, match="CRC"):
+        artifact_inspector.validate_wheel(archive)
+
+
+@pytest.mark.parametrize(
+    "stream",
+    [
+        _raw_deflate(b"x")[:-1],
+        _raw_deflate(b"x") + _raw_deflate(b"second"),
+        _raw_deflate(b"x") + b"trailing",
+    ],
+    ids=("truncated", "concatenated", "trailing"),
+)
+def test_rejects_incomplete_or_trailing_deflate_stream(tmp_path, stream):
+    files = wheel_files()
+    files["chiq/payload.dat"] = b"x"
+    archive = make_wheel(tmp_path, files)
+    _replace_deflate_stream(archive, "chiq/payload.dat", stream, b"x")
+    with pytest.raises(artifact_inspector.ArtifactError, match="deflate|stream|trailing|complete"):
+        artifact_inspector.validate_wheel(archive)
 
 
 def test_physical_size_is_checked_before_zip_parsing(tmp_path, monkeypatch):

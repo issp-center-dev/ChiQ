@@ -32,6 +32,7 @@ import tempfile
 import unicodedata
 import warnings
 import zipfile
+import zlib
 
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
@@ -62,6 +63,7 @@ _LOCAL = struct.Struct("<4s5H3L2H")
 _ZIP_METHODS = (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)
 _ZIP_UTF8 = 0x800
 _ZIP_DEFLATE_OPTIONS = 0x6
+_ZIP_OUTPUT_CHUNK = 1024 * 1024
 _CORE_REQUIREMENTS = ("numpy>=1.23", "scipy", "more-itertools", "h5py", "toml")
 _EXTRA_REQUIREMENTS = {
     "plot": ("matplotlib",),
@@ -1344,6 +1346,7 @@ def _preflight_zip(stream, archive_size):
             "method": method,
             "flags": flags,
             "local_offset": local_offset,
+            "payload_offset": payload_offset,
             "range": (local_offset, end),
         })
         cursor += _CENTRAL.size + variable_size
@@ -1367,52 +1370,116 @@ def _preflight_zip(stream, archive_size):
 def _read_zip_members(stream, entries, retained_paths):
     records = {}
     retained = {}
+    actual_total = 0
+    compressed_total = 0
     try:
-        stream.seek(0)
-        with zipfile.ZipFile(stream, mode="r") as archive:
-            infos = archive.infolist()
-            if len(infos) != len(entries):
-                raise ArtifactError("ZIP parser/central member count disagreement")
-            for entry, info in zip(entries, infos):
-                if (
-                    info.filename != entry["zip_name"]
-                    or info.header_offset != entry["local_offset"]
-                    or info.file_size != entry["size"]
-                    or info.compress_size != entry["compressed_size"]
-                    or info.CRC != entry["crc"]
-                ):
-                    raise ArtifactError("ZIP parser/raw header disagreement")
-                keep = entry["path"] in retained_paths
-                if keep and entry["size"] > MAX_CONTROL_FILE:
-                    raise ArtifactError("wheel control file exceeds in-memory validation limit")
-                chunks = [] if keep else None
-                digest = hashlib.sha256()
-                remaining = entry["size"]
-                with archive.open(info, mode="r") as member:
-                    while remaining:
-                        chunk = member.read(min(1024 * 1024, remaining))
-                        if not chunk:
-                            raise ArtifactError("ZIP member is shorter than declared")
-                        digest.update(chunk)
-                        if chunks is not None:
-                            chunks.append(chunk)
-                        remaining -= len(chunk)
-                    if member.read(1):
-                        raise ArtifactError("ZIP member is longer than declared")
-                if entry["directory"]:
-                    if entry["size"]:
-                        raise ArtifactError("ZIP directory decompressed to file data")
-                else:
-                    records[entry["path"]] = {
-                        "size": entry["size"],
-                        "sha256": digest.digest(),
-                    }
-                    if chunks is not None:
-                        retained[entry["path"]] = b"".join(chunks)
+        for entry in entries:
+            keep = entry["path"] in retained_paths
+            if keep and entry["size"] > MAX_CONTROL_FILE:
+                raise ArtifactError("wheel control file exceeds in-memory validation limit")
+            chunks = [] if keep else None
+            digest = hashlib.sha256()
+            crc = 0
+            actual_size = 0
+
+            def consume(output):
+                nonlocal actual_size, crc
+                if not output:
+                    return
+                actual_size += len(output)
+                if actual_size > entry["size"]:
+                    raise ArtifactError("ZIP stream output exceeds declared size")
+                if actual_size > MAX_FILE:
+                    raise ArtifactError("ZIP stream output exceeds file size limit")
+                if actual_total + actual_size > MAX_TOTAL:
+                    raise ArtifactError("ZIP actual total output exceeds size limit")
+                if entry["compressed_size"] and actual_size > MAX_RATIO * entry["compressed_size"]:
+                    raise ArtifactError("ZIP actual stream compression ratio exceeds limit")
+                digest.update(output)
+                crc = zlib.crc32(output, crc)
+                if chunks is not None:
+                    chunks.append(output)
+
+            stream.seek(entry["payload_offset"])
+            compressed_remaining = entry["compressed_size"]
+            if entry["method"] == zipfile.ZIP_STORED:
+                if compressed_remaining != entry["size"]:
+                    raise ArtifactError("stored ZIP stream size disagreement")
+                while compressed_remaining:
+                    chunk = stream.read(min(1024 * 1024, compressed_remaining))
+                    if not chunk:
+                        raise ArtifactError("truncated stored ZIP stream")
+                    compressed_remaining -= len(chunk)
+                    consume(chunk)
+            elif entry["method"] == zipfile.ZIP_DEFLATED:
+                decompressor = zlib.decompressobj(-15)
+                while compressed_remaining:
+                    compressed = stream.read(min(1024 * 1024, compressed_remaining))
+                    if not compressed:
+                        raise ArtifactError("truncated deflate ZIP payload")
+                    compressed_remaining -= len(compressed)
+                    pending = compressed
+                    while pending:
+                        output_limit = min(
+                            _ZIP_OUTPUT_CHUNK,
+                            entry["size"] - actual_size + 1,
+                            MAX_FILE - actual_size + 1,
+                            MAX_TOTAL - actual_total - actual_size + 1,
+                        )
+                        if entry["compressed_size"]:
+                            output_limit = min(
+                                output_limit,
+                                MAX_RATIO * entry["compressed_size"] - actual_size + 1,
+                            )
+                        if output_limit <= 0:
+                            raise ArtifactError("deflate ZIP output exceeds resource limit")
+                        output = decompressor.decompress(pending, output_limit)
+                        consume(output)
+                        if decompressor.unused_data:
+                            raise ArtifactError("trailing or concatenated deflate ZIP stream")
+                        pending = decompressor.unconsumed_tail
+                        if decompressor.eof and (pending or compressed_remaining):
+                            raise ArtifactError("trailing or concatenated deflate ZIP stream")
+                if not decompressor.eof:
+                    raise ArtifactError("incomplete or truncated deflate ZIP stream")
+                if decompressor.unconsumed_tail or decompressor.unused_data:
+                    raise ArtifactError("trailing or incomplete deflate ZIP stream")
+                flush_limit = min(
+                    _ZIP_OUTPUT_CHUNK,
+                    entry["size"] - actual_size + 1,
+                    MAX_FILE - actual_size + 1,
+                    MAX_TOTAL - actual_total - actual_size + 1,
+                )
+                if flush_limit <= 0:
+                    raise ArtifactError("deflate ZIP flush exceeds resource limit")
+                consume(decompressor.flush(flush_limit))
+            else:
+                raise ArtifactError("unsupported ZIP stream compression method")
+
+            if actual_size != entry["size"]:
+                raise ArtifactError("ZIP stream output size disagrees with declaration")
+            if crc & 0xFFFFFFFF != entry["crc"]:
+                raise ArtifactError("ZIP stream CRC disagrees with declaration")
+            actual_total += actual_size
+            compressed_total += entry["compressed_size"]
+            if entry["directory"]:
+                if actual_size:
+                    raise ArtifactError("ZIP directory decompressed to file data")
+            else:
+                records[entry["path"]] = {
+                    "size": actual_size,
+                    "sha256": digest.digest(),
+                }
+                if chunks is not None:
+                    retained[entry["path"]] = b"".join(chunks)
+        if actual_total and (
+            not compressed_total or actual_total > MAX_RATIO * compressed_total
+        ):
+            raise ArtifactError("ZIP actual aggregate compression ratio exceeds limit")
     except ArtifactError:
         raise
-    except (OSError, EOFError, RuntimeError, NotImplementedError, zipfile.BadZipFile) as error:
-        raise ArtifactError("malformed ZIP member or invalid CRC") from error
+    except (OSError, EOFError, RuntimeError, zlib.error) as error:
+        raise ArtifactError("malformed or invalid ZIP member stream") from error
     return records, retained
 
 
