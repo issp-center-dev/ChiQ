@@ -70,3 +70,21 @@ def test_pyproject_contains_no_local_macos_paths():
         "MacOSX.sdk",
     )
     assert not any(path in text for path in forbidden)
+
+
+def test_pyproject_excludes_source_artifacts_without_hiding_built_extension():
+    d = _load(os.path.join(ROOT, "pyproject.toml"))
+    config = d["tool"]["scikit-build"]
+    assert config["wheel"]["packages"] == [
+        "python/package/chiq",
+        "python/package/bse",
+        "python/package/bse_solver",
+    ]
+    sdist_exclude = " ".join(config["sdist"]["exclude"])
+    for pattern in ("_bse_solver", "__pycache__", "*.pyc", "build"):
+        assert pattern in sdist_exclude
+    assert not any("tests" in pattern and "*.h5" in pattern for pattern in config["sdist"]["exclude"])
+    wheel_exclude = " ".join(config["wheel"]["exclude"])
+    assert "__pycache__" in wheel_exclude
+    assert "*.pyc" in wheel_exclude
+    assert "_bse_solver" not in wheel_exclude
