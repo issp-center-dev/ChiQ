@@ -829,8 +829,10 @@ def _open_directory_chain(root_fd, components):
     try:
         for component in components:
             next_descriptor = _open_bound_directory(component, descriptor, component)
+            previous_descriptor = descriptor
+            descriptor = None
             try:
-                _close_descriptors([descriptor])
+                _close_descriptors([previous_descriptor])
             except BaseException:
                 _close_descriptors([next_descriptor])
                 raise
@@ -911,27 +913,6 @@ def _copy_member(archive, member, root_fd, components):
             raise ArtifactError("cannot close extracted member") from close_error
 
 
-def _cleanup_tree(descriptor):
-    try:
-        names = os.listdir(descriptor)
-    except OSError:
-        return
-    for name in names:
-        try:
-            entry = _safe_stat(name, descriptor, "staging cleanup entry")
-            if stat.S_ISDIR(entry.st_mode):
-                child = _open_bound_directory(name, descriptor, "staging cleanup directory")
-                try:
-                    _cleanup_tree(child)
-                finally:
-                    _close_descriptors([child])
-                os.rmdir(name, dir_fd=descriptor)
-            else:
-                os.unlink(name, dir_fd=descriptor)
-        except BaseException:
-            pass
-
-
 def _require_entry_identity(parent_fd, name, descriptor, description):
     try:
         current = _safe_stat(name, parent_fd, description)
@@ -950,18 +931,32 @@ def _require_entry_identity(parent_fd, name, descriptor, description):
     return opened
 
 
-def _cleanup_staging(parent_fd, name, staging_fd):
+def _cleanup_staging(parent_fd, name, staging_fd, populated):
     if staging_fd is None:
         raise ArtifactError(
             "staging ownership is unavailable; manual cleanup may be required"
         )
     _require_entry_identity(parent_fd, name, staging_fd, "staging cleanup entry")
-    _cleanup_tree(staging_fd)
-    _require_entry_identity(parent_fd, name, staging_fd, "staging cleanup entry")
+    if populated:
+        raise ArtifactError(
+            "populated staging is retained fail-closed; manual cleanup is required"
+        )
+    raise ArtifactError(
+        "empty staging is retained fail-closed; manual cleanup is required"
+    )
+
+
+def _diagnose_cleanup(error):
+    message = str(error)
     try:
-        os.rmdir(name, dir_fd=parent_fd)
-    except OSError as error:
-        raise ArtifactError("cannot remove owned staging entry; manual cleanup may be required") from error
+        warnings.warn(message, RuntimeWarning)
+        return
+    except BaseException:
+        pass
+    try:
+        sys.stderr.write("artifact inspector cleanup diagnostic: %s\n" % message)
+    except BaseException:
+        pass
 
 
 def _entry_exists(parent_fd, name):
@@ -1013,6 +1008,7 @@ def extract_sdist(path, destination):
     renamed = False
     committed = False
     staging_name = None
+    staging_populated = False
     try:
         parent = _resolve_path(destination.parent)
         if not destination.name or destination.name in (".", ".."):
@@ -1036,9 +1032,11 @@ def extract_sdist(path, destination):
             for index in range(1, len(components)):
                 directories.add(components[:index])
         for components in sorted(directories, key=lambda item: (len(item), item)):
+            staging_populated = True
             _make_directory(staging_fd, components)
         for member in members:
             if member.type in _REGULAR_TYPES:
+                staging_populated = True
                 _copy_member(archive, member, staging_fd, canonical_member_path(member.name))
         # Every archive/member/private-copy resource is closed before the
         # directory publication commit point.
@@ -1069,11 +1067,13 @@ def extract_sdist(path, destination):
         cleanup_error = None
         if not renamed and parent_fd is not None and staging_name is not None:
             try:
-                _cleanup_staging(parent_fd, staging_name, staging_fd)
+                _cleanup_staging(
+                    parent_fd, staging_name, staging_fd, staging_populated
+                )
             except BaseException as error:
                 cleanup_error = error
                 if primary_error is not None:
-                    warnings.warn(str(error), RuntimeWarning)
+                    _diagnose_cleanup(error)
         try:
             _close_descriptors([staging_fd, parent_fd])
         except BaseException as error:

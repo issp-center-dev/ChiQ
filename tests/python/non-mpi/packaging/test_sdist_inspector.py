@@ -689,8 +689,9 @@ def test_nested_directory_replacement_does_not_write_attacker(tmp_path, monkeypa
         raising=False,
     )
 
-    with pytest.raises(artifact_inspector.ArtifactError, match="identity|symlink|race|directory"):
-        artifact_inspector.extract_sdist(archive, tmp_path / "extract")
+    with pytest.warns(RuntimeWarning, match="manual cleanup"):
+        with pytest.raises(artifact_inspector.ArtifactError, match="identity|symlink|race|directory"):
+            artifact_inspector.extract_sdist(archive, tmp_path / "extract")
 
     assert not any(attacker.iterdir())
     assert not (tmp_path / "extract").exists()
@@ -709,10 +710,11 @@ def test_write_failure_leaves_destination_absent_and_retryable(tmp_path, monkeyp
         return real_write(descriptor, data)
 
     monkeypatch.setattr(artifact_inspector, "_write", failing_write, raising=False)
-    with pytest.raises(artifact_inspector.ArtifactError, match="write|extraction"):
-        artifact_inspector.extract_sdist(archive, destination)
+    with pytest.warns(RuntimeWarning, match="manual cleanup"):
+        with pytest.raises(artifact_inspector.ArtifactError, match="write|extraction"):
+            artifact_inspector.extract_sdist(archive, destination)
     assert not destination.exists()
-    assert not list(tmp_path.glob(".extract.tmp-*"))
+    assert list(tmp_path.glob(".extract.tmp-*"))
 
     monkeypatch.setattr(artifact_inspector, "_write", real_write)
     artifact_inspector.extract_sdist(archive, destination)
@@ -724,11 +726,36 @@ def test_short_write_leaves_destination_absent(tmp_path, monkeypatch):
     destination = tmp_path / "extract"
     monkeypatch.setattr(artifact_inspector, "_write", lambda descriptor, data: 0)
 
-    with pytest.raises(artifact_inspector.ArtifactError, match="short write"):
-        artifact_inspector.extract_sdist(archive, destination)
+    with pytest.warns(RuntimeWarning, match="manual cleanup"):
+        with pytest.raises(artifact_inspector.ArtifactError, match="short write"):
+            artifact_inspector.extract_sdist(archive, destination)
 
     assert not destination.exists()
-    assert not list(tmp_path.glob(".extract.tmp-*"))
+    assert list(tmp_path.glob(".extract.tmp-*"))
+
+
+def test_nested_file_replacement_is_retained_on_failed_cleanup(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    destination = tmp_path / "extract"
+    replacement = []
+
+    def replace_then_fail(descriptor, data):
+        staging = next(tmp_path.glob(".extract.tmp-*"))
+        target = next(path for path in staging.rglob("*") if path.is_file())
+        owned = target.with_name(target.name + ".owned")
+        target.rename(owned)
+        target.write_bytes(b"attacker replacement")
+        replacement.extend([owned, target])
+        raise artifact_inspector.ArtifactError("primary write failure")
+
+    monkeypatch.setattr(artifact_inspector, "_write", replace_then_fail)
+    with pytest.warns(RuntimeWarning, match="manual cleanup"):
+        with pytest.raises(artifact_inspector.ArtifactError, match="primary write failure"):
+            artifact_inspector.extract_sdist(archive, destination)
+
+    assert not destination.exists()
+    assert replacement[0].exists()
+    assert replacement[1].read_bytes() == b"attacker replacement"
 
 
 def test_swap_during_publish_cannot_return_false_success_or_touch_replacement(
@@ -827,6 +854,7 @@ def test_directory_chain_close_failure_closes_new_descriptor(tmp_path, monkeypat
     real_open = artifact_inspector._open
     real_close = os.close
     opened = []
+    close_attempts = []
 
     def tracking_open(path, flags, *args, **kwargs):
         descriptor = real_open(path, flags, *args, **kwargs)
@@ -835,6 +863,7 @@ def test_directory_chain_close_failure_closes_new_descriptor(tmp_path, monkeypat
         return descriptor
 
     def failing_close(descriptor):
+        close_attempts.append(descriptor)
         real_close(descriptor)
         raise OSError("injected close failure")
 
@@ -851,6 +880,7 @@ def test_directory_chain_close_failure_closes_new_descriptor(tmp_path, monkeypat
         with pytest.raises(OSError) as caught:
             os.fstat(descriptor)
         assert caught.value.errno == artifact_inspector.errno.EBADF
+    assert all(close_attempts.count(descriptor) == 1 for descriptor in set(close_attempts))
 
 
 def test_fchmod_failure_leaves_destination_absent_and_retryable(tmp_path, monkeypatch):
@@ -866,10 +896,11 @@ def test_fchmod_failure_leaves_destination_absent_and_retryable(tmp_path, monkey
         return real_fchmod(descriptor, mode)
 
     monkeypatch.setattr(artifact_inspector, "_fchmod", failing_fchmod)
-    with pytest.raises(artifact_inspector.ArtifactError, match="extraction|file|create"):
-        artifact_inspector.extract_sdist(archive, destination)
+    with pytest.warns(RuntimeWarning, match="manual cleanup"):
+        with pytest.raises(artifact_inspector.ArtifactError, match="extraction|file|create"):
+            artifact_inspector.extract_sdist(archive, destination)
     assert not destination.exists()
-    assert not list(tmp_path.glob(".extract.tmp-*"))
+    assert list(tmp_path.glob(".extract.tmp-*"))
 
     monkeypatch.setattr(artifact_inspector, "_fchmod", real_fchmod)
     artifact_inspector.extract_sdist(archive, destination)
@@ -890,6 +921,24 @@ def test_fstat_failure_leaves_destination_absent(tmp_path, monkeypatch):
     monkeypatch.setattr(artifact_inspector, "_fstat", failing_fstat)
     with pytest.raises(artifact_inspector.ArtifactError, match="destination|open|safe|malformed"):
         artifact_inspector.extract_sdist(archive, destination)
+    assert not destination.exists()
+
+
+def test_cleanup_diagnostic_cannot_mask_primary_when_warnings_are_errors(
+    tmp_path, monkeypatch
+):
+    archive = make_sdist(tmp_path)
+    destination = tmp_path / "extract"
+
+    def primary_failure(descriptor, data):
+        raise artifact_inspector.ArtifactError("primary sentinel")
+
+    monkeypatch.setattr(artifact_inspector, "_write", primary_failure)
+    with artifact_inspector.warnings.catch_warnings():
+        artifact_inspector.warnings.simplefilter("error", RuntimeWarning)
+        with pytest.raises(artifact_inspector.ArtifactError, match="primary sentinel"):
+            artifact_inspector.extract_sdist(archive, destination)
+
     assert not destination.exists()
 
 
