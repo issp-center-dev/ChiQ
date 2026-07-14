@@ -1,30 +1,86 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail
 
-REPO="$(cd "$(dirname "$0")/../../../.." && pwd)"
-PACKAGING="$REPO/tests/python/non-mpi/packaging"
-PYTHON=${PYTHON:-$(command -v python3)}
-PYTHON="$($PYTHON -c 'import os, sys; print(os.path.realpath(sys.executable))')"
+SAFE_PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
 
-# Enter once through an empty environment.  The scrubbed names are repeated in
-# the diagnostic report so reviewers can audit the trust boundary explicitly:
-# PYTHONPATH PYTHONHOME VIRTUAL_ENV CONDA_PREFIX CMAKE_PREFIX_PATH
-# CMAKE_BUILD_PARALLEL_LEVEL SKBUILD_* PIP_* GIT_*.
-if [[ ${CHIQ_SANITIZED_ENVIRONMENT:-0} != 1 ]]; then
-  SAFE_PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
+# The wrapper performs no command lookup and starts no Python. It captures only
+# literal caller values before replacing the complete exported environment.
+if [[ ${CHIQ_VERIFIER_INTERNAL:-0} != 1 ]]; then
+  PYTHON_REQUEST=${PYTHON:-python3}
   clean=(
-    "CHIQ_SANITIZED_ENVIRONMENT=1"
+    "CHIQ_VERIFIER_INTERNAL=1"
     "HOME=${HOME:-}"
     "PATH=$SAFE_PATH"
     "TMPDIR=${TMPDIR:-/tmp}"
-    "PYTHON=$PYTHON"
+    "PYTHON_REQUEST=$PYTHON_REQUEST"
   )
   for name in LANG LC_ALL LC_CTYPE CC CXX SDKROOT CMAKE_ARGS EIGEN3_INCLUDE_DIR; do
     if [[ -n ${!name:-} ]]; then
       clean+=("$name=${!name}")
     fi
   done
-  exec env -i "${clean[@]}" /bin/bash "$0" "$@"
+  exec /usr/bin/env -i "${clean[@]}" /bin/bash "$0" "$@"
+fi
+
+# Direct access to the internal branch fails closed under any ambient state.
+# Bash itself may export PWD/SHLVL/_, but every other name is explicit.
+audit_error=""
+while IFS= read -r name; do
+  case "$name" in
+    CHIQ_VERIFIER_INTERNAL|HOME|PATH|TMPDIR|PYTHON_REQUEST|LANG|LC_ALL|LC_CTYPE|CC|CXX|SDKROOT|CMAKE_ARGS|EIGEN3_INCLUDE_DIR|PWD|SHLVL|_)
+      ;;
+    PYTHONPATH|PYTHONHOME|VIRTUAL_ENV|CONDA_PREFIX|CMAKE_PREFIX_PATH|CMAKE_BUILD_PARALLEL_LEVEL|SKBUILD_*|PIP_*|GIT_*|BASH_ENV|ENV|CDPATH|SHELLOPTS|BASHOPTS|GLOBIGNORE)
+      audit_error="forbidden exported variable $name"
+      break
+      ;;
+    *)
+      audit_error="unexpected exported variable $name"
+      break
+      ;;
+  esac
+done < <(compgen -e)
+if [[ ${CHIQ_VERIFIER_INTERNAL:-0} != 1 || "$PATH" != "$SAFE_PATH" || -n "$audit_error" ]]; then
+  echo "unsafe internal verifier environment: ${audit_error:-invalid marker or PATH}" >&2
+  exit 2
+fi
+
+case "$PYTHON_REQUEST" in
+  /*) PYTHON_CANDIDATE=$PYTHON_REQUEST ;;
+  */*)
+    echo "unsafe internal verifier environment: PYTHON must be absolute or a bare command" >&2
+    exit 2
+    ;;
+  *)
+    PYTHON_CANDIDATE=$(command -v -- "$PYTHON_REQUEST") || {
+      echo "selected Python is unavailable on the safe PATH: $PYTHON_REQUEST" >&2
+      exit 2
+    }
+    ;;
+esac
+[[ -x "$PYTHON_CANDIDATE" ]] || {
+  echo "selected Python is not executable: $PYTHON_CANDIDATE" >&2
+  exit 2
+}
+PYTHON="$($PYTHON_CANDIDATE -I -c 'import os, sys; print(os.path.realpath(sys.executable))')"
+
+REPO="$(cd "$(/usr/bin/dirname "$0")/../../../.." && pwd)"
+PACKAGING="$REPO/tests/python/non-mpi/packaging"
+
+print_environment_policy() {
+  echo "Environment policy: env -i explicit allowlist"
+  echo "Environment audit OK"
+  echo "Restored names: HOME LANG LC_ALL LC_CTYPE PATH TMPDIR PYTHON CC CXX SDKROOT CMAKE_ARGS EIGEN3_INCLUDE_DIR"
+  echo "Scrubbed names: PYTHONPATH PYTHONHOME VIRTUAL_ENV CONDA_PREFIX CMAKE_PREFIX_PATH CMAKE_BUILD_PARALLEL_LEVEL SKBUILD_* PIP_* GIT_* BASH_ENV ENV CDPATH SHELLOPTS BASHOPTS GLOBIGNORE"
+  for name in HOME LANG LC_ALL LC_CTYPE PATH TMPDIR PYTHON CC CXX SDKROOT CMAKE_ARGS EIGEN3_INCLUDE_DIR; do
+    if [[ -n ${!name:-} ]]; then
+      printf '%s=%q\n' "$name" "${!name}"
+    fi
+  done
+}
+
+if [[ ${1:-} == "--audit-environment-only" ]]; then
+  print_environment_policy
+  exit 0
 fi
 
 if [[ -z ${EIGEN3_INCLUDE_DIR:-} ]]; then
@@ -62,16 +118,7 @@ for mode in frontend sdist-build wheel-build wheel sdist editable; do
   mkdir -p "$DIAGNOSTICS/tmp/$mode" "$DIAGNOSTICS/cache/$mode"
 done
 
-{
-  echo "Environment policy: env -i explicit allowlist"
-  echo "Restored names: HOME LANG LC_ALL LC_CTYPE PATH TMPDIR PYTHON CC CXX SDKROOT CMAKE_ARGS EIGEN3_INCLUDE_DIR"
-  echo "Scrubbed names: PYTHONPATH PYTHONHOME VIRTUAL_ENV CONDA_PREFIX CMAKE_PREFIX_PATH CMAKE_BUILD_PARALLEL_LEVEL SKBUILD_* PIP_* GIT_*"
-  for name in HOME LANG LC_ALL LC_CTYPE PATH TMPDIR PYTHON CC CXX SDKROOT CMAKE_ARGS EIGEN3_INCLUDE_DIR; do
-    if [[ -n ${!name:-} ]]; then
-      printf '%s=%q\n' "$name" "${!name}"
-    fi
-  done
-} >"$DIAGNOSTICS/sanitized-environment.txt"
+print_environment_policy >"$DIAGNOSTICS/sanitized-environment.txt"
 cat "$DIAGNOSTICS/sanitized-environment.txt"
 
 "$PYTHON" "$PACKAGING/source_snapshot.py" \

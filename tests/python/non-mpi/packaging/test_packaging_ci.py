@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -111,3 +112,71 @@ def test_backend_probe_canonicalizes_pip_distribution_names(tmp_path):
     assert {row["name"] for row in json.loads(destination.read_text())} == {
         "scikit_build_core", "pybind11", "cmake"
     }
+
+
+def test_verifier_executes_no_python_before_empty_environment_boundary():
+    script = (ROOT / "tests/python/non-mpi/packaging/verify_pip_install.sh").read_text()
+    wrapper = script.split("exec /usr/bin/env -i", 1)[0]
+    assert " -c " not in wrapper
+    assert "command -v" not in wrapper
+    assert "dirname" not in wrapper
+
+
+def test_verifier_normal_wrapper_scrubs_sitecustomize_before_python(tmp_path):
+    script = ROOT / "tests/python/non-mpi/packaging/verify_pip_install.sh"
+    poison = tmp_path / "poison"
+    poison.mkdir()
+    marker = tmp_path / "sitecustomize-ran"
+    (poison / "sitecustomize.py").write_text(
+        "from pathlib import Path\nPath(%r).write_text('ran')\n" % str(marker)
+    )
+    env = {
+        "HOME": os.environ.get("HOME", str(tmp_path)),
+        "PATH": str(poison),
+        "PYTHON": sys.executable,
+        "PYTHONPATH": str(poison),
+        "PIP_INDEX_URL": "https://poison.invalid/simple",
+        "GIT_DIR": str(tmp_path / "poison.git"),
+        "TMPDIR": str(tmp_path),
+    }
+
+    result = subprocess.run(
+        ["/bin/bash", str(script), "--audit-environment-only"],
+        cwd=str(ROOT),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Environment policy: env -i explicit allowlist" in result.stdout
+    assert "Environment audit OK" in result.stdout
+    assert not marker.exists()
+
+
+def test_verifier_rejects_poisoned_direct_internal_mode_before_work(tmp_path):
+    script = ROOT / "tests/python/non-mpi/packaging/verify_pip_install.sh"
+    poison = tmp_path / "poison"
+    poison.mkdir()
+    env = {
+        "CHIQ_VERIFIER_INTERNAL": "1",
+        "PATH": str(poison),
+        "PYTHON_REQUEST": sys.executable,
+        "PYTHONPATH": str(poison),
+        "PIP_CONFIG_FILE": str(tmp_path / "pip.conf"),
+        "GIT_WORK_TREE": str(tmp_path / "checkout"),
+        "BASH_ENV": str(tmp_path / "missing-startup-file"),
+    }
+
+    result = subprocess.run(
+        ["/bin/bash", str(script), "--audit-environment-only"],
+        cwd=str(ROOT),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "unsafe internal verifier environment" in result.stderr
+    assert "Environment policy" not in result.stdout
+    assert "source snapshot" not in result.stdout + result.stderr
