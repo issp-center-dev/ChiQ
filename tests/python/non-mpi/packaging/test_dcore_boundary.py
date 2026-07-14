@@ -1,3 +1,4 @@
+import ast
 import importlib.util
 import os
 from pathlib import Path
@@ -141,7 +142,24 @@ def test_installed_boundary_rejects_dependency_module_outside_environment(
         lambda name: {"dcore": "4.2.0", "mpi4py": "4.1.1"}[name],
     )
 
-    with pytest.raises(AssertionError, match="outside the install environment"):
+    with pytest.raises(smoke.BoundaryError, match="outside the install environment"):
+        smoke._check_import_boundary(expected_root)
+
+
+def test_installed_boundary_reports_module_without_filesystem_origin(
+        tmp_path, monkeypatch):
+    smoke = _load_smoke_module()
+    expected_root = tmp_path / "venv"
+    modules = _fake_boundary_modules(expected_root)
+    del modules["mpi4py"].__file__
+    monkeypatch.setattr(smoke.importlib, "import_module", modules.__getitem__)
+    monkeypatch.setattr(
+        smoke.importlib.metadata,
+        "version",
+        lambda name: {"dcore": "4.2.0", "mpi4py": "4.1.1"}[name],
+    )
+
+    with pytest.raises(smoke.BoundaryError, match="has no filesystem origin"):
         smoke._check_import_boundary(expected_root)
 
 
@@ -150,7 +168,45 @@ def test_boundary_smoke_is_python38_compatible():
     assert "list[" not in source
     assert "dict[" not in source
     assert " | None" not in source
-    compile(source, str(SMOKE_PATH), "exec")
+    try:
+        tree = ast.parse(source, filename=str(SMOKE_PATH), feature_version=(3, 8))
+    except TypeError:
+        tree = ast.parse(source, filename=str(SMOKE_PATH), feature_version=8)
+    assert not any(isinstance(node, ast.Assert) for node in ast.walk(tree))
+
+
+def test_optimized_smoke_rejects_foreign_origin(tmp_path):
+    code = (
+        "import importlib.util, sys; "
+        "spec = importlib.util.spec_from_file_location('smoke', sys.argv[1]); "
+        "smoke = importlib.util.module_from_spec(spec); "
+        "spec.loader.exec_module(smoke); "
+        "smoke._assert_installed_origin('mpi4py', sys.argv[2], sys.argv[3])"
+    )
+    result = subprocess.run(
+        [
+            sys.executable, "-O", "-c", code, str(SMOKE_PATH),
+            str(tmp_path / "foreign" / "mpi4py.py"), str(tmp_path / "venv"),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "outside the install environment" in result.stderr
+
+
+def test_smoke_main_reports_controlled_boundary_failure(monkeypatch, capsys):
+    smoke = _load_smoke_module()
+
+    def fail(_argv):
+        raise smoke.BoundaryError("sentinel boundary failure")
+
+    monkeypatch.setattr(smoke, "_main", fail)
+    assert smoke.main([]) == 1
+    captured = capsys.readouterr()
+    assert "sentinel boundary failure" in captured.err
+    assert "Traceback" not in captured.err
 
 
 def test_ci_has_endpoint_dcore_failure_domains_and_retains_diagnostics():
