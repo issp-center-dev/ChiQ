@@ -65,7 +65,14 @@ _ZIP_UTF8 = 0x800
 _ZIP_DEFLATE_OPTIONS = 0x6
 _ZIP_OUTPUT_CHUNK = 1024 * 1024
 _NATIVE_MODULE_NAME = re.compile(
-    r"^_bse_solver(?:\.[A-Za-z0-9][A-Za-z0-9_-]*)*\.(?:so|pyd|dylib)$"
+    r"^_bse_solver(?:"
+    r"\.(?:so|pyd|dylib)"
+    r"|\.abi3\.(?:so|pyd|dylib)"
+    r"|\.cpython-[0-9]+[dt]?-(?:darwin|"
+    r"(?:(?:x86_64|aarch64|powerpc64le|s390x|i386|riscv64|loongarch64)-"
+    r"(?:linux-gnu|linux-musl)|arm-linux-gnueabihf))\.so"
+    r"|\.cp[0-9]+[dt]?-(?:win32|win_amd64|win_arm64)\.pyd"
+    r")$"
 )
 _CORE_REQUIREMENTS = ("numpy>=1.23", "scipy", "more-itertools", "h5py", "toml")
 _EXTRA_REQUIREMENTS = {
@@ -1584,11 +1591,7 @@ def _validate_entry_points(data):
 
 
 def _valid_native_module_name(basename):
-    if _NATIVE_MODULE_NAME.fullmatch(basename) is None:
-        return False
-    middle = basename[len("_bse_solver."):].split(".")[:-1]
-    native_tokens = {suffix.lstrip(".") for suffix in NATIVE_SUFFIXES}
-    return not any(component in native_tokens for component in middle)
+    return _NATIVE_MODULE_NAME.fullmatch(basename) is not None
 
 
 def _validate_wheel_control(data, filename_tags):
