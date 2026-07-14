@@ -1,26 +1,34 @@
-#!/bin/bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
-SAFE_PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
-
-# The wrapper performs no command lookup and starts no Python. It captures only
-# literal caller values before replacing the complete exported environment.
-if [[ ${CHIQ_VERIFIER_INTERNAL:-0} != 1 ]]; then
-  PYTHON_REQUEST=${PYTHON:-python3}
-  clean=(
-    "CHIQ_VERIFIER_INTERNAL=1"
-    "HOME=${HOME:-}"
-    "PATH=$SAFE_PATH"
-    "TMPDIR=${TMPDIR:-/tmp}"
-    "PYTHON_REQUEST=$PYTHON_REQUEST"
-  )
-  for name in LANG LC_ALL LC_CTYPE CC CXX SDKROOT CMAKE_ARGS EIGEN3_INCLUDE_DIR; do
-    if [[ -n ${!name:-} ]]; then
-      clean+=("$name=${!name}")
-    fi
-  done
-  exec /usr/bin/env -i "${clean[@]}" /bin/bash "$0" "$@"
+# POSIX bootstrap: /bin/sh does not read Bash's BASH_ENV startup hook. This
+# branch performs no command lookup and starts no Python before env -i.
+if [ "${CHIQ_VERIFIER_INTERNAL:-0}" != 1 ]; then
+  exec /usr/bin/env -i \
+    CHIQ_VERIFIER_INTERNAL=1 \
+    "HOME=${HOME:-}" \
+    "PATH=/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin" \
+    "TMPDIR=${TMPDIR:-/tmp}" \
+    "PYTHON_REQUEST=${PYTHON:-python3}" \
+    "LANG=${LANG:-}" \
+    "LC_ALL=${LC_ALL:-}" \
+    "LC_CTYPE=${LC_CTYPE:-}" \
+    "CC=${CC:-}" \
+    "CXX=${CXX:-}" \
+    "SDKROOT=${SDKROOT:-}" \
+    "CMAKE_ARGS=${CMAKE_ARGS:-}" \
+    "EIGEN3_INCLUDE_DIR=${EIGEN3_INCLUDE_DIR:-}" \
+    /bin/bash "$0" "$@"
+  exit 127
 fi
+
+# Everything below is parsed and executed only by the clean Bash child.
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "internal verifier requires Bash" >&2
+  exit 2
+fi
+set -euo pipefail
+SAFE_PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
 
 # Direct access to the internal branch fails closed under any ambient state.
 # Bash itself may export PWD/SHLVL/_, but every other name is explicit.
@@ -65,6 +73,20 @@ PYTHON="$($PYTHON_CANDIDATE -I -c 'import os, sys; print(os.path.realpath(sys.ex
 
 REPO="$(cd "$(/usr/bin/dirname "$0")/../../../.." && pwd)"
 PACKAGING="$REPO/tests/python/non-mpi/packaging"
+TMPDIR="$($PYTHON -I - "$TMPDIR" "$REPO" <<'PY'
+import os
+import sys
+
+requested = os.path.realpath(sys.argv[1])
+repository = os.path.realpath(sys.argv[2])
+try:
+    inside = os.path.commonpath((requested, repository)) == repository
+except ValueError:
+    inside = True
+print(os.path.realpath("/tmp") if inside else requested)
+PY
+)"
+export TMPDIR
 
 print_environment_policy() {
   echo "Environment policy: env -i explicit allowlist"

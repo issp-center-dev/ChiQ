@@ -4,6 +4,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[4]
 
@@ -120,6 +122,8 @@ def test_verifier_executes_no_python_before_empty_environment_boundary():
     assert " -c " not in wrapper
     assert "command -v" not in wrapper
     assert "dirname" not in wrapper
+    assert "[[" not in wrapper
+    assert "clean=(" not in wrapper
 
 
 def test_verifier_normal_wrapper_scrubs_sitecustomize_before_python(tmp_path):
@@ -127,6 +131,9 @@ def test_verifier_normal_wrapper_scrubs_sitecustomize_before_python(tmp_path):
     poison = tmp_path / "poison"
     poison.mkdir()
     marker = tmp_path / "sitecustomize-ran"
+    startup_marker = tmp_path / "bash-env-ran"
+    bash_env = tmp_path / "bash-env.sh"
+    bash_env.write_text("/usr/bin/touch %s\n" % startup_marker)
     (poison / "sitecustomize.py").write_text(
         "from pathlib import Path\nPath(%r).write_text('ran')\n" % str(marker)
     )
@@ -137,11 +144,12 @@ def test_verifier_normal_wrapper_scrubs_sitecustomize_before_python(tmp_path):
         "PYTHONPATH": str(poison),
         "PIP_INDEX_URL": "https://poison.invalid/simple",
         "GIT_DIR": str(tmp_path / "poison.git"),
+        "BASH_ENV": str(bash_env),
         "TMPDIR": str(tmp_path),
     }
 
     result = subprocess.run(
-        ["/bin/bash", str(script), "--audit-environment-only"],
+        [str(script), "--audit-environment-only"],
         cwd=str(ROOT),
         env=env,
         capture_output=True,
@@ -152,6 +160,38 @@ def test_verifier_normal_wrapper_scrubs_sitecustomize_before_python(tmp_path):
     assert "Environment policy: env -i explicit allowlist" in result.stdout
     assert "Environment audit OK" in result.stdout
     assert not marker.exists()
+    assert not startup_marker.exists()
+
+
+@pytest.mark.parametrize("through_symlink", [False, True])
+def test_verifier_rehomes_tmpdir_outside_source_tree(tmp_path, through_symlink):
+    script = ROOT / "tests/python/non-mpi/packaging/verify_pip_install.sh"
+    if through_symlink:
+        link = tmp_path / "source-link"
+        link.symlink_to(ROOT, target_is_directory=True)
+        requested = link / "nested-diagnostics"
+    else:
+        requested = ROOT / "nested-diagnostics"
+    env = {
+        "HOME": os.environ.get("HOME", str(tmp_path)),
+        "PATH": "/usr/bin:/bin",
+        "PYTHON": sys.executable,
+        "TMPDIR": str(requested),
+    }
+
+    result = subprocess.run(
+        [str(script), "--audit-environment-only"],
+        cwd=str(ROOT),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "TMPDIR=%s\n" % Path("/tmp").resolve() in result.stdout
+    assert str(ROOT) not in next(
+        line for line in result.stdout.splitlines() if line.startswith("TMPDIR=")
+    )
 
 
 def test_verifier_rejects_poisoned_direct_internal_mode_before_work(tmp_path):
