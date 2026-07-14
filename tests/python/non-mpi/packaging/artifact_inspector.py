@@ -7,9 +7,12 @@ archive graph before creating an extraction destination.
 """
 
 import argparse
+import bz2
 from email import policy
 from email.parser import BytesParser
+import gzip
 import json
+import lzma
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -34,6 +37,8 @@ _REGULAR_TYPES = (tarfile.REGTYPE, tarfile.AREGTYPE)
 _VERSION_PROVIDER = "scikit_build_core.metadata.regex"
 _VERSION_INPUT = "python/package/chiq/__init__.py"
 _DRIVE = re.compile(r"^[A-Za-z]:")
+_ZERO_BLOCK = b"\0" * tarfile.BLOCKSIZE
+_PAX_TYPES = (tarfile.XHDTYPE, tarfile.XGLTYPE)
 
 
 class ArtifactError(RuntimeError):
@@ -87,6 +92,195 @@ def _checked_archive_size(path):
     if size < 0 or size > MAX_ARCHIVE:
         raise ArtifactError("archive physical size exceeds 512 MiB limit")
     return size
+
+
+def _read_stream_exact(stream, size, description):
+    chunks = []
+    remaining = size
+    while remaining:
+        chunk = stream.read(min(1024 * 1024, remaining))
+        if not chunk:
+            raise ArtifactError("truncated %s" % description)
+        chunks.append(chunk)
+        remaining -= len(chunk)
+    return b"".join(chunks)
+
+
+def _discard_exact(stream, size, description="tar payload"):
+    remaining = size
+    while remaining:
+        chunk = stream.read(min(1024 * 1024, remaining))
+        if not chunk:
+            raise ArtifactError("truncated %s" % description)
+        remaining -= len(chunk)
+
+
+def _strict_raw_string(field, description):
+    terminator = field.find(b"\0")
+    value = field if terminator < 0 else field[:terminator]
+    if terminator >= 0 and any(field[terminator + 1:]):
+        raise ArtifactError("ambiguous raw %s has non-NUL padding" % description)
+    try:
+        return value.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ArtifactError("raw tar %s must be UTF-8" % description) from error
+
+
+def _tar_number(field, description):
+    try:
+        value = tarfile.nti(field)
+    except (ValueError, tarfile.InvalidHeaderError) as error:
+        raise ArtifactError("malformed tar %s" % description) from error
+    if value is None or value < 0:
+        raise ArtifactError("malformed tar %s" % description)
+    return value
+
+
+def _validate_header_checksum(header):
+    expected = _tar_number(header[148:156], "checksum")
+    check_header = header[:148] + b" " * 8 + header[156:]
+    unsigned = sum(check_header)
+    signed = sum(value if value < 128 else value - 256 for value in check_header)
+    if expected not in (unsigned, signed):
+        raise ArtifactError("invalid tar header checksum")
+
+
+def _raw_header(header):
+    _validate_header_checksum(header)
+    type_ = header[156:157]
+    name = _strict_raw_string(header[0:100], "name")
+    linkname = _strict_raw_string(header[157:257], "linkname")
+    prefix = _strict_raw_string(header[345:500], "prefix")
+    path = prefix + "/" + name if prefix else name
+    if type_ == tarfile.DIRTYPE and path.endswith("/") and not path.endswith("//"):
+        path = path[:-1]
+    if type_ in _PAX_TYPES:
+        if path not in ("PaxHeader", "././@PaxHeader", "pax_global_header"):
+            canonical_member_path(path)
+    else:
+        canonical_member_path(path)
+    if linkname:
+        canonical_member_path(linkname)
+    return type_, _tar_number(header[124:136], "size")
+
+
+def _parse_pax(payload):
+    records = {}
+    position = 0
+    while position < len(payload):
+        separator = payload.find(b" ", position)
+        if separator < 0:
+            raise ArtifactError("malformed PAX record length")
+        raw_length = payload[position:separator]
+        if not raw_length.isdigit() or raw_length.startswith(b"0"):
+            raise ArtifactError("malformed PAX record length")
+        length = int(raw_length)
+        end = position + length
+        if end > len(payload) or end <= separator + 2:
+            raise ArtifactError("malformed PAX record length")
+        record = payload[separator + 1:end]
+        if not record.endswith(b"\n"):
+            raise ArtifactError("malformed PAX record framing")
+        raw_key, marker, raw_value = record[:-1].partition(b"=")
+        if not marker or not raw_key:
+            raise ArtifactError("malformed PAX record")
+        try:
+            key = raw_key.decode("utf-8")
+            value = raw_value.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise ArtifactError("PAX records must be UTF-8") from error
+        if key in records:
+            raise ArtifactError("duplicate PAX key: %s" % key)
+        if any(character in key for character in "\x00\r\n="):
+            raise ArtifactError("malformed PAX record key")
+        records[key] = value
+        position = end
+    for key in ("path", "linkpath"):
+        if key in records:
+            canonical_member_path(records[key])
+    return records
+
+
+def _compression_stream(raw_file):
+    raw_file.seek(0)
+    magic = raw_file.read(6)
+    raw_file.seek(0)
+    if magic.startswith(b"\x1f\x8b"):
+        return gzip.GzipFile(fileobj=raw_file, mode="rb")
+    if magic.startswith(b"BZh"):
+        return bz2.BZ2File(raw_file, mode="rb")
+    if magic.startswith(b"\xfd7zXZ\x00"):
+        return lzma.LZMAFile(raw_file, mode="rb")
+    return raw_file
+
+
+def _merge_pax(target, incoming, other, description):
+    for key, value in incoming.items():
+        if key in target:
+            raise ArtifactError("duplicate PAX key across %s headers: %s" % (description, key))
+        if key in other and other[key] != value:
+            raise ArtifactError("conflicting global/per-file PAX metadata: %s" % key)
+        target[key] = value
+
+
+def _preflight_tar(raw_file, archive_size):
+    """Bound and disambiguate raw tar headers before semantic parsing."""
+    stream = _compression_stream(raw_file)
+    global_pax = {}
+    local_pax = {}
+    count = 0
+    total = 0
+    zero_blocks = 0
+    try:
+        while zero_blocks < 2:
+            header = _read_stream_exact(stream, tarfile.BLOCKSIZE, "tar header")
+            if header == _ZERO_BLOCK:
+                zero_blocks += 1
+                continue
+            if zero_blocks:
+                raise ArtifactError("nonzero tar header after end marker")
+            type_, size = _raw_header(header)
+            count += 1
+            if count > MAX_MEMBERS:
+                raise ArtifactError("archive member count exceeds limit")
+            if type_ in _REGULAR_TYPES and size > MAX_FILE:
+                raise ArtifactError("regular file size exceeds limit")
+            if type_ in _PAX_TYPES and size > MAX_FILE:
+                raise ArtifactError("PAX metadata size exceeds limit")
+            if type_ == tarfile.DIRTYPE and size:
+                raise ArtifactError("directory has nonzero file size")
+            if type_ not in _REGULAR_TYPES + (tarfile.DIRTYPE,) + _PAX_TYPES:
+                raise ArtifactError("tar members must be regular files or directories; special member found")
+            total += size
+            if total > MAX_TOTAL:
+                raise ArtifactError("total uncompressed size exceeds limit")
+            if archive_size == 0 or total > MAX_RATIO * archive_size:
+                raise ArtifactError("aggregate compression ratio exceeds limit")
+
+            padded_size = (size + tarfile.BLOCKSIZE - 1) // tarfile.BLOCKSIZE * tarfile.BLOCKSIZE
+            if type_ in _PAX_TYPES:
+                payload = _read_stream_exact(stream, size, "PAX payload")
+                records = _parse_pax(payload)
+                _discard_exact(stream, padded_size - size, "PAX padding")
+                if type_ == tarfile.XGLTYPE:
+                    _merge_pax(global_pax, records, {}, "global")
+                else:
+                    _merge_pax(local_pax, records, global_pax, "per-file")
+                continue
+
+            if local_pax:
+                for key, value in local_pax.items():
+                    if key in global_pax and global_pax[key] != value:
+                        raise ArtifactError("conflicting global/per-file PAX metadata: %s" % key)
+                local_pax = {}
+            _discard_exact(stream, padded_size)
+        if local_pax:
+            raise ArtifactError("orphan per-file PAX metadata")
+    except (OSError, EOFError, gzip.BadGzipFile, lzma.LZMAError) as error:
+        raise ArtifactError("malformed or truncated compressed tar archive") from error
+    finally:
+        if stream is not raw_file:
+            stream.close()
 
 
 def _check_member_kind(member):
@@ -343,18 +537,31 @@ def _validate_metadata(path, root, archive, members):
 
 def _inspect_open(path):
     archive_size = _checked_archive_size(path)
+    raw_file = None
+    archive = None
     try:
-        archive = tarfile.open(os.fspath(path), "r:*")
+        raw_file = open(os.fspath(path), "rb")
+        opened_size = os.fstat(raw_file.fileno()).st_size
+        if opened_size != archive_size or opened_size > MAX_ARCHIVE:
+            raise ArtifactError("archive changed before parsing")
+        _preflight_tar(raw_file, archive_size)
+        raw_file.seek(0)
+        archive = tarfile.open(fileobj=raw_file, mode="r:*")
+        archive._artifact_raw_file = raw_file
         members = archive.getmembers()
         root, manifest_members, total = _validated_graph(members, archive_size)
         version = _validate_metadata(path, root, archive, members)
     except ArtifactError:
-        if "archive" in locals():
-            archive.close()
+        if archive is not None:
+            _close_archive(archive)
+        elif raw_file is not None:
+            raw_file.close()
         raise
     except (OSError, EOFError, tarfile.TarError, UnicodeError, ValueError) as error:
-        if "archive" in locals():
-            archive.close()
+        if archive is not None:
+            _close_archive(archive)
+        elif raw_file is not None:
+            raw_file.close()
         raise ArtifactError("malformed tar archive") from error
     manifest = {
         "kind": "sdist",
@@ -368,10 +575,19 @@ def _inspect_open(path):
     return archive, members, manifest
 
 
+def _close_archive(archive):
+    raw_file = getattr(archive, "_artifact_raw_file", None)
+    try:
+        archive.close()
+    finally:
+        if raw_file is not None and not raw_file.closed:
+            raw_file.close()
+
+
 def validate_sdist(path):
     """Return a validated manifest without extracting any member."""
     archive, _members, manifest = _inspect_open(path)
-    archive.close()
+    _close_archive(archive)
     return manifest
 
 
@@ -473,7 +689,7 @@ def extract_sdist(path, destination):
     try:
         _mkdir(os.fspath(destination), 0o700)
     except (FileExistsError, OSError, TypeError, NotImplementedError) as error:
-        archive.close()
+        _close_archive(archive)
         raise ArtifactError("extraction destination must be new and non-symlink") from error
     root_fd = None
     try:
@@ -502,7 +718,7 @@ def extract_sdist(path, destination):
     finally:
         if root_fd is not None:
             os.close(root_fd)
-        archive.close()
+        _close_archive(archive)
     return manifest
 
 

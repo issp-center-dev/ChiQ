@@ -1,4 +1,5 @@
 import io
+import gzip
 import json
 from pathlib import Path
 import stat
@@ -75,6 +76,40 @@ def tar_info(name, data=b"", type_=tarfile.REGTYPE, mode=0o644):
     return info, data
 
 
+def checksum_header(header):
+    header[148:156] = b"        "
+    header[148:156] = ("%06o\0 " % sum(header)).encode("ascii")
+    return bytes(header)
+
+
+def raw_archive(path):
+    return bytearray(gzip.decompress(path.read_bytes()))
+
+
+def write_raw_archive(path, raw):
+    path.write_bytes(gzip.compress(bytes(raw)))
+    return path
+
+
+def pax_record(key, value):
+    body = (key + "=" + value + "\n").encode("utf-8")
+    length = len(body) + 2
+    while True:
+        record = str(length).encode("ascii") + b" " + body
+        if len(record) == length:
+            return record
+        length = len(record)
+
+
+def extension_header(type_, payload):
+    info = tarfile.TarInfo("PaxHeader")
+    info.type = type_
+    info.size = len(payload)
+    header = info.tobuf(format=tarfile.USTAR_FORMAT)
+    padding = b"\0" * ((-len(payload)) % tarfile.BLOCKSIZE)
+    return header + payload + padding
+
+
 def replace_file(files, path, data):
     changed = dict(files)
     changed[path] = data
@@ -122,6 +157,100 @@ def test_accepts_explicit_root_directory(tmp_path):
 def test_canonical_path_rejects_unsafe_spelling(path):
     with pytest.raises(artifact_inspector.ArtifactError, match="path"):
         artifact_inspector.canonical_member_path(path)
+
+
+@pytest.mark.parametrize(
+    "start,end,description",
+    [(0, 100, "name"), (157, 257, "linkname"), (345, 500, "prefix")],
+)
+def test_rejects_nonpadding_bytes_after_raw_path_field_nul(
+    tmp_path, start, end, description
+):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    terminator = raw[start:end].index(0) + start
+    raw[terminator + 1] = ord("X")
+    raw[:512] = checksum_header(raw[:512])
+    write_raw_archive(archive, raw)
+
+    with pytest.raises(
+        artifact_inspector.ArtifactError,
+        match="padding|raw.*%s|ambiguous" % description,
+    ):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_preflight_rejects_invalid_raw_header_checksum(tmp_path):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    raw[100] ^= 1
+    write_raw_archive(archive, raw)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="checksum"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_accepts_canonical_raw_header_nul_padding(tmp_path):
+    archive = make_sdist(tmp_path)
+
+    assert artifact_inspector.validate_sdist(archive)["root"] == ROOT
+
+
+@pytest.mark.parametrize("key", ["path", "linkpath"])
+def test_rejects_duplicate_pax_path_keys_before_tarfile_collapse(tmp_path, key):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    safe = ROOT + "/pyproject.toml"
+    payload = pax_record(key, "../unsafe") + pax_record(key, safe)
+    write_raw_archive(archive, extension_header(tarfile.XHDTYPE, payload) + raw)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="duplicate.*PAX|PAX.*duplicate"):
+        artifact_inspector.validate_sdist(archive)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"99 path=safe\n",
+        b"4 x\n",
+        b"x path=safe\n",
+        b"12 path=\xffxx\n",
+    ],
+)
+def test_rejects_malformed_pax_record_framing_length_or_utf8(tmp_path, payload):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    write_raw_archive(archive, extension_header(tarfile.XHDTYPE, payload) + raw)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="PAX.*(record|length|UTF-8)|malformed PAX"):
+        artifact_inspector.validate_sdist(archive)
+
+
+@pytest.mark.parametrize("key", ["path", "linkpath"])
+def test_rejects_unsafe_value_in_every_pax_path_occurrence(tmp_path, key):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    payload = pax_record(key, "../unsafe")
+    write_raw_archive(archive, extension_header(tarfile.XHDTYPE, payload) + raw)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="path"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_rejects_conflicting_global_and_per_file_pax_metadata(tmp_path):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    global_payload = pax_record("comment", "global")
+    local_payload = pax_record("comment", "local")
+    prefixed = (
+        extension_header(tarfile.XGLTYPE, global_payload)
+        + extension_header(tarfile.XHDTYPE, local_payload)
+        + raw
+    )
+    write_raw_archive(archive, prefixed)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="conflicting.*PAX|PAX.*conflict"):
+        artifact_inspector.validate_sdist(archive)
 
 
 @pytest.mark.parametrize(
@@ -197,6 +326,54 @@ def test_rejects_physical_archive_limit_before_tar_parsing(tmp_path, monkeypatch
     )
 
     with pytest.raises(artifact_inspector.ArtifactError, match="archive.*size|512"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_preflight_rejects_oversized_truncated_member_at_header(tmp_path, monkeypatch):
+    archive = tmp_path / (ROOT + ".tar.gz")
+    info = tarfile.TarInfo(ROOT + "/huge")
+    info.size = artifact_inspector.MAX_FILE + 1
+    archive.write_bytes(gzip.compress(info.tobuf(format=tarfile.USTAR_FORMAT)))
+    monkeypatch.setattr(
+        artifact_inspector,
+        "_discard_exact",
+        lambda *args, **kwargs: pytest.fail("oversized payload must not be consumed"),
+        raising=False,
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="file.*limit|size.*limit"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_preflight_enforces_member_count_before_tarfile_getmembers(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    monkeypatch.setattr(artifact_inspector, "MAX_MEMBERS", 1)
+    monkeypatch.setattr(
+        artifact_inspector.tarfile,
+        "open",
+        lambda *args, **kwargs: pytest.fail("tarfile must not enumerate over-limit archive"),
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="member"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_preflight_enforces_ratio_before_payload_consumption(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    monkeypatch.setattr(artifact_inspector, "MAX_RATIO", 0)
+    monkeypatch.setattr(
+        artifact_inspector,
+        "_discard_exact",
+        lambda *args, **kwargs: pytest.fail("over-ratio payload must not be consumed"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        artifact_inspector.tarfile,
+        "open",
+        lambda *args, **kwargs: pytest.fail("tarfile must not parse over-ratio archive"),
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="ratio"):
         artifact_inspector.validate_sdist(archive)
 
 
