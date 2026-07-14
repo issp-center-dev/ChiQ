@@ -56,14 +56,19 @@ def _check_import_boundary(expected_root):
 
     for module_name, names in REQUIRED_CALLABLES.items():
         module = importlib.import_module(module_name)
+        _assert_installed_origin(module_name, module.__file__, expected_root)
         for name in names:
             value = getattr(module, name, None)
             assert callable(value), "%s.%s must be callable" % (module_name, name)
 
     for module_name, names in REQUIRED_MEMBERS.items():
         module = importlib.import_module(module_name)
+        _assert_installed_origin(module_name, module.__file__, expected_root)
         for name in names:
             assert hasattr(module, name), "%s.%s is missing" % (module_name, name)
+
+    mpi4py_version = importlib.metadata.version("mpi4py")
+    assert mpi4py_version, "mpi4py distribution has no version"
 
     impurity_solvers = importlib.import_module("dcore.impurity_solvers")
     assert callable(impurity_solvers.compute_basis_rot)

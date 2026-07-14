@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -78,6 +79,72 @@ def test_boundary_smoke_checks_every_private_dcore_symbol_used_by_cli():
     }
 
 
+def _load_smoke_module():
+    spec = importlib.util.spec_from_file_location("dcore_boundary_smoke", str(SMOKE_PATH))
+    assert spec is not None and spec.loader is not None
+    smoke = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(smoke)
+    return smoke
+
+
+def _fake_boundary_modules(root):
+    modules = {
+        "dcore": SimpleNamespace(__file__=str(root / "dcore" / "__init__.py")),
+    }
+    for module_name, names in _load_smoke_module().REQUIRED_CALLABLES.items():
+        values = {name: (lambda: None) for name in names}
+        values["__file__"] = str(root / (module_name.replace(".", "/") + ".py"))
+        modules[module_name] = SimpleNamespace(**values)
+    modules["dcore.impurity_solvers"] = SimpleNamespace(
+        __file__=str(root / "dcore" / "impurity_solvers.py"),
+        solver_classes={},
+        compute_basis_rot=lambda: None,
+    )
+    modules["mpi4py"] = SimpleNamespace(
+        __file__=str(root / "mpi4py" / "__init__.py"),
+        MPI=object(),
+    )
+    return modules
+
+
+def test_installed_boundary_checks_dependency_versions_and_all_module_origins(
+        tmp_path, monkeypatch):
+    smoke = _load_smoke_module()
+    expected_root = tmp_path / "venv"
+    modules = _fake_boundary_modules(expected_root)
+    versions = {"dcore": "4.2.0", "mpi4py": "4.1.1"}
+    seen_versions = []
+
+    monkeypatch.setattr(smoke.importlib, "import_module", modules.__getitem__)
+
+    def version(name):
+        seen_versions.append(name)
+        return versions[name]
+
+    monkeypatch.setattr(smoke.importlib.metadata, "version", version)
+    smoke._check_import_boundary(expected_root)
+
+    assert seen_versions == ["dcore", "mpi4py"]
+
+
+@pytest.mark.parametrize("outside", ["mpi4py", "dcore.tools"])
+def test_installed_boundary_rejects_dependency_module_outside_environment(
+        tmp_path, monkeypatch, outside):
+    smoke = _load_smoke_module()
+    expected_root = tmp_path / "venv"
+    modules = _fake_boundary_modules(expected_root)
+    modules[outside].__file__ = str(tmp_path / "foreign" / "module.py")
+    monkeypatch.setattr(smoke.importlib, "import_module", modules.__getitem__)
+    monkeypatch.setattr(
+        smoke.importlib.metadata,
+        "version",
+        lambda name: {"dcore": "4.2.0", "mpi4py": "4.1.1"}[name],
+    )
+
+    with pytest.raises(AssertionError, match="outside the install environment"):
+        smoke._check_import_boundary(expected_root)
+
+
 def test_boundary_smoke_is_python38_compatible():
     source = SMOKE_PATH.read_text()
     assert "list[" not in source
@@ -100,6 +167,29 @@ def test_ci_has_endpoint_dcore_failure_domains_and_retains_diagnostics():
     assert "actions/upload-artifact@v4" in workflow
     assert "if: failure()" in workflow
     assert "chiq-pip-verification.*" in workflow
+
+
+def test_ci_boundary_install_and_smoke_pipelines_fail_closed_and_retain_logs():
+    workflow = (ROOT / ".github/workflows/main.yml").read_text()
+    core = workflow.split("  core-boundary:", 1)[1].split(
+        "\n  dcore-boundary:", 1
+    )[0]
+    dcore = workflow.split("  dcore-boundary:", 1)[1].split("\n  legacy:", 1)[0]
+
+    for block, mode, log_prefix in (
+        (core, "missing-extra", "core-boundary"),
+        (dcore, "installed", "dcore-boundary"),
+    ):
+        assert block.count("set -o pipefail") >= 2
+        smoke_pipeline = next(
+            line for line in block.splitlines()
+            if "dcore_boundary_smoke.py" in line
+        )
+        assert "--mode %s" % mode in smoke_pipeline
+        assert '| tee "$RUNNER_TEMP/%s.log"' % log_prefix in smoke_pipeline
+        assert 'tee "$RUNNER_TEMP/%s-install.log"' % log_prefix in block
+        assert "${{ runner.temp }}/%s-install.log" % log_prefix in block
+    assert "if-no-files-found: warn" in dcore
 
 
 def test_ci_retains_endpoint_scientific_and_cpp_regressions():

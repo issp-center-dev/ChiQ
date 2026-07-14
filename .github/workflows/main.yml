@@ -153,12 +153,16 @@ jobs:
           sudo apt install libeigen3-dev
       - name: Install core only
         run: |
-          if [ "${{ matrix.python-version }}" = "3.8" ]; then
-            python -m pip install --no-cache-dir 'pip<25.1'
-          fi
-          python -m pip install --no-cache-dir .
+          set -o pipefail
+          {
+            if [ "${{ matrix.python-version }}" = "3.8" ]; then
+              python -m pip install --no-cache-dir 'pip<25.1'
+            fi
+            python -m pip install --no-cache-dir .
+          } 2>&1 | tee "$RUNNER_TEMP/core-boundary-install.log"
       - name: Verify missing DCore extra behavior
         run: |
+          set -o pipefail
           mkdir -p "$RUNNER_TEMP/core-boundary-cwd"
           cd "$RUNNER_TEMP/core-boundary-cwd"
           python "$GITHUB_WORKSPACE/tests/python/non-mpi/packaging/dcore_boundary_smoke.py" --mode missing-extra --expected-root "$pythonLocation" 2>&1 | tee "$RUNNER_TEMP/core-boundary.log"
@@ -167,7 +171,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: core-boundary-${{ matrix.python-version }}
-          path: ${{ runner.temp }}/core-boundary.log
+          path: |
+            ${{ runner.temp }}/core-boundary-install.log
+            ${{ runner.temp }}/core-boundary.log
+          if-no-files-found: warn
 
   dcore-boundary:
     strategy:
@@ -190,13 +197,17 @@ jobs:
           sudo apt install libeigen3-dev openmpi-bin libopenmpi-dev
       - name: Install exact DCore extra
         run: |
-          if [ "${{ matrix.python-version }}" = "3.8" ]; then
-            python -m pip install --no-cache-dir 'pip<25.1'
-          fi
-          python -m pip install --no-cache-dir '.[dcore]'
-          python -m pip freeze > "$RUNNER_TEMP/dcore-boundary-freeze.txt"
+          set -o pipefail
+          {
+            if [ "${{ matrix.python-version }}" = "3.8" ]; then
+              python -m pip install --no-cache-dir 'pip<25.1'
+            fi
+            python -m pip install --no-cache-dir '.[dcore]'
+            python -m pip freeze > "$RUNNER_TEMP/dcore-boundary-freeze.txt"
+          } 2>&1 | tee "$RUNNER_TEMP/dcore-boundary-install.log"
       - name: Verify imported private API and command boundary
         run: |
+          set -o pipefail
           mkdir -p "$RUNNER_TEMP/dcore-boundary-cwd"
           cd "$RUNNER_TEMP/dcore-boundary-cwd"
           python "$GITHUB_WORKSPACE/tests/python/non-mpi/packaging/dcore_boundary_smoke.py" --mode installed --expected-root "$pythonLocation" 2>&1 | tee "$RUNNER_TEMP/dcore-boundary.log"
@@ -206,8 +217,10 @@ jobs:
         with:
           name: dcore-boundary-${{ matrix.python-version }}
           path: |
+            ${{ runner.temp }}/dcore-boundary-install.log
             ${{ runner.temp }}/dcore-boundary.log
             ${{ runner.temp }}/dcore-boundary-freeze.txt
+          if-no-files-found: warn
 
   legacy:
     name: Legacy CMake layout
