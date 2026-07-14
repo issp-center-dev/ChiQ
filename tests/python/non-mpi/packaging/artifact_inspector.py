@@ -24,6 +24,7 @@ import sys
 import tarfile
 import tempfile
 import unicodedata
+import warnings
 
 from packaging.utils import canonicalize_name, parse_sdist_filename
 from packaging.version import InvalidVersion, Version
@@ -62,6 +63,7 @@ _write = os.write
 _close = os.close
 _capability_override = None
 _after_directory_mkdir = lambda parent_fd, name: None
+_before_publish_identity = lambda parent_fd, staging, destination: None
 
 
 def _require_capabilities():
@@ -827,7 +829,11 @@ def _open_directory_chain(root_fd, components):
     try:
         for component in components:
             next_descriptor = _open_bound_directory(component, descriptor, component)
-            _close_descriptors([descriptor])
+            try:
+                _close_descriptors([descriptor])
+            except BaseException:
+                _close_descriptors([next_descriptor])
+                raise
             descriptor = next_descriptor
         return descriptor
     except BaseException:
@@ -926,17 +932,36 @@ def _cleanup_tree(descriptor):
             pass
 
 
-def _cleanup_staging(parent_fd, name, staging_fd):
-    if staging_fd is not None:
-        _cleanup_tree(staging_fd)
+def _require_entry_identity(parent_fd, name, descriptor, description):
     try:
-        entry = _safe_stat(name, parent_fd, "staging entry")
-        if stat.S_ISDIR(entry.st_mode):
-            os.rmdir(name, dir_fd=parent_fd)
-        else:
-            os.unlink(name, dir_fd=parent_fd)
-    except BaseException:
-        pass
+        current = _safe_stat(name, parent_fd, description)
+    except ArtifactError as error:
+        raise ArtifactError(
+            "%s identity is unavailable; manual cleanup may be required" % description
+        ) from error
+    try:
+        opened = _fstat(descriptor)
+    except (OSError, TypeError, NotImplementedError) as error:
+        raise ArtifactError("cannot fstat %s" % description) from error
+    if not stat.S_ISDIR(opened.st_mode) or not _same_identity(opened, current):
+        raise ArtifactError(
+            "%s identity mismatch; manual cleanup may be required" % description
+        )
+    return opened
+
+
+def _cleanup_staging(parent_fd, name, staging_fd):
+    if staging_fd is None:
+        raise ArtifactError(
+            "staging ownership is unavailable; manual cleanup may be required"
+        )
+    _require_entry_identity(parent_fd, name, staging_fd, "staging cleanup entry")
+    _cleanup_tree(staging_fd)
+    _require_entry_identity(parent_fd, name, staging_fd, "staging cleanup entry")
+    try:
+        os.rmdir(name, dir_fd=parent_fd)
+    except OSError as error:
+        raise ArtifactError("cannot remove owned staging entry; manual cleanup may be required") from error
 
 
 def _entry_exists(parent_fd, name):
@@ -985,7 +1010,8 @@ def extract_sdist(path, destination):
     destination = Path(destination)
     parent_fd = None
     staging_fd = None
-    published = False
+    renamed = False
+    committed = False
     staging_name = None
     try:
         parent = _resolve_path(destination.parent)
@@ -1014,10 +1040,26 @@ def extract_sdist(path, destination):
         for member in members:
             if member.type in _REGULAR_TYPES:
                 _copy_member(archive, member, staging_fd, canonical_member_path(member.name))
+        # Every archive/member/private-copy resource is closed before the
+        # directory publication commit point.
+        _close_archive(archive)
+        archive = None
         if _entry_exists(parent_fd, destination.name):
             raise ArtifactError("extraction destination already exists")
+        _before_publish_identity(parent_fd, staging_name, destination.name)
+        _require_entry_identity(
+            parent_fd, staging_name, staging_fd, "staging publication source"
+        )
+        # renameatx_np/renameat2 prevent replacement of the destination, but
+        # pathname rename APIs cannot prevent a same-UID attacker from swapping
+        # the source name.  The pre/post descriptor identity checks ensure such
+        # a swap can never be reported as successful publication.
         _publish_noreplace(parent_fd, staging_name, destination.name)
-        published = True
+        renamed = True
+        _require_entry_identity(
+            parent_fd, destination.name, staging_fd, "published destination"
+        )
+        committed = True
     except ArtifactError:
         raise
     except (OSError, RuntimeError, TypeError, NotImplementedError) as error:
@@ -1025,18 +1067,27 @@ def extract_sdist(path, destination):
     finally:
         primary_error = sys.exc_info()[1]
         cleanup_error = None
-        if not published and parent_fd is not None and staging_name is not None:
-            _cleanup_staging(parent_fd, staging_name, staging_fd)
+        if not renamed and parent_fd is not None and staging_name is not None:
+            try:
+                _cleanup_staging(parent_fd, staging_name, staging_fd)
+            except BaseException as error:
+                cleanup_error = error
+                if primary_error is not None:
+                    warnings.warn(str(error), RuntimeWarning)
         try:
             _close_descriptors([staging_fd, parent_fd])
         except BaseException as error:
-            cleanup_error = error
-        try:
-            _close_archive(archive)
-        except BaseException as error:
             if cleanup_error is None:
                 cleanup_error = error
-        if primary_error is None and cleanup_error is not None:
+        if archive is not None:
+            try:
+                _close_archive(archive)
+            except BaseException as error:
+                if cleanup_error is None:
+                    cleanup_error = error
+        # Once destination identity is verified, publication is committed.
+        # Cleanup-only close failures cannot truthfully turn that into failure.
+        if not committed and primary_error is None and cleanup_error is not None:
             raise cleanup_error
     return manifest
 

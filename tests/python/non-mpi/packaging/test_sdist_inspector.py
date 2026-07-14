@@ -663,8 +663,9 @@ def test_staging_root_replacement_does_not_chmod_or_write_attacker(tmp_path, mon
         raising=False,
     )
 
-    with pytest.raises(artifact_inspector.ArtifactError, match="identity|symlink|race|directory"):
-        artifact_inspector.extract_sdist(archive, tmp_path / "extract")
+    with pytest.warns(RuntimeWarning, match="manual cleanup"):
+        with pytest.raises(artifact_inspector.ArtifactError, match="identity|symlink|race|directory"):
+            artifact_inspector.extract_sdist(archive, tmp_path / "extract")
 
     assert stat.S_IMODE(attacker.stat().st_mode) == original_mode
     assert not any(attacker.iterdir())
@@ -728,6 +729,128 @@ def test_short_write_leaves_destination_absent(tmp_path, monkeypatch):
 
     assert not destination.exists()
     assert not list(tmp_path.glob(".extract.tmp-*"))
+
+
+def test_swap_during_publish_cannot_return_false_success_or_touch_replacement(
+    tmp_path, monkeypatch
+):
+    archive = make_sdist(tmp_path)
+    destination = tmp_path / "extract"
+    real_publish = artifact_inspector._publish_noreplace
+    replacement_mode = 0o711
+
+    def swapping_publish(parent_fd, source, target):
+        os.rename(source, source + ".owned", src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+        os.mkdir(source, replacement_mode, dir_fd=parent_fd)
+        replacement_fd = os.open(source, os.O_RDONLY | os.O_DIRECTORY, dir_fd=parent_fd)
+        try:
+            marker_fd = os.open(
+                "marker",
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                0o600,
+                dir_fd=replacement_fd,
+            )
+            os.write(marker_fd, b"attacker")
+            os.close(marker_fd)
+        finally:
+            os.close(replacement_fd)
+        return real_publish(parent_fd, source, target)
+
+    monkeypatch.setattr(artifact_inspector, "_publish_noreplace", swapping_publish)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="identity|false success|published"):
+        artifact_inspector.extract_sdist(archive, destination)
+
+    assert (destination / "marker").read_bytes() == b"attacker"
+    assert stat.S_IMODE(destination.stat().st_mode) == replacement_mode
+
+
+def test_cleanup_leaves_mismatched_staging_entry_untouched(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    destination = tmp_path / "extract"
+    replacement = []
+
+    def swap_before_identity(parent_fd, staging, target):
+        os.rename(staging, staging + ".owned", src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+        os.mkdir(staging, 0o711, dir_fd=parent_fd)
+        replacement.append(staging)
+
+    monkeypatch.setattr(
+        artifact_inspector,
+        "_before_publish_identity",
+        swap_before_identity,
+        raising=False,
+    )
+
+    with pytest.warns(RuntimeWarning, match="manual cleanup"):
+        with pytest.raises(artifact_inspector.ArtifactError, match="identity|manual cleanup"):
+            artifact_inspector.extract_sdist(archive, destination)
+
+    replacement_path = tmp_path / replacement[0]
+    assert replacement_path.is_dir()
+    assert stat.S_IMODE(replacement_path.stat().st_mode) == 0o711
+    assert not destination.exists()
+
+
+def test_post_publish_close_failure_does_not_reverse_committed_success(
+    tmp_path, monkeypatch
+):
+    archive = make_sdist(tmp_path)
+    destination = tmp_path / "extract"
+    real_publish = artifact_inspector._publish_noreplace
+    real_close = os.close
+    committed = []
+
+    def tracking_publish(parent_fd, source, target):
+        result = real_publish(parent_fd, source, target)
+        committed.append(True)
+        return result
+
+    def failing_close(descriptor):
+        real_close(descriptor)
+        if committed:
+            raise OSError("post-publish close failure")
+
+    monkeypatch.setattr(artifact_inspector, "_publish_noreplace", tracking_publish)
+    monkeypatch.setattr(artifact_inspector, "_close", failing_close)
+
+    manifest = artifact_inspector.extract_sdist(archive, destination)
+
+    assert manifest["root"] == ROOT
+    assert (destination / ROOT / "README.md").is_file()
+
+
+def test_directory_chain_close_failure_closes_new_descriptor(tmp_path, monkeypatch):
+    root = tmp_path / "root"
+    (root / "child").mkdir(parents=True)
+    root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+    real_open = artifact_inspector._open
+    real_close = os.close
+    opened = []
+
+    def tracking_open(path, flags, *args, **kwargs):
+        descriptor = real_open(path, flags, *args, **kwargs)
+        if path == "child":
+            opened.append(descriptor)
+        return descriptor
+
+    def failing_close(descriptor):
+        real_close(descriptor)
+        raise OSError("injected close failure")
+
+    monkeypatch.setattr(artifact_inspector, "_open", tracking_open)
+    monkeypatch.setattr(artifact_inspector, "_close", failing_close)
+    try:
+        with pytest.raises(artifact_inspector.ArtifactError, match="close"):
+            artifact_inspector._open_directory_chain(root_fd, ("child",))
+    finally:
+        os.close(root_fd)
+
+    assert opened
+    for descriptor in opened:
+        with pytest.raises(OSError) as caught:
+            os.fstat(descriptor)
+        assert caught.value.errno == artifact_inspector.errno.EBADF
 
 
 def test_fchmod_failure_leaves_destination_absent_and_retryable(tmp_path, monkeypatch):
