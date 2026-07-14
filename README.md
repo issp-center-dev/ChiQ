@@ -45,12 +45,39 @@ python3 -m pip install -e .
 Optional runtime dependencies are available as extras:
 
 ``` bash
-python3 -m pip install ".[plot]"
-python3 -m pip install ".[mpi,dcore]"
+python3 -m pip install "chiq[plot]"
 ```
+
+Plotting commands require the `chiq[plot]` extra. ChiQ imports private DCore APIs, so use a
+fresh, isolated environment for the `chiq[dcore]` extra; it pins the reviewed boundary to
+DCore 4.2.0 and also installs `mpi4py`:
+
+``` bash
+python3 -m venv .venv-chiq-dcore
+. .venv-chiq-dcore/bin/activate
+python3 -m pip install "chiq[dcore]"
+```
+
+When installing from this checkout rather than from a package index, replace `chiq` in those
+commands with `.` (for example, `python3 -m pip install ".[dcore]"`). Review compatibility
+before changing the DCore pin.
 
 The pip build compiles the C++ extension as `chiq._bse_solver` and installs console commands
 such as `chiq_main` and `chiq_post`.
+
+### Supported installation and verification matrix
+
+ChiQ supports Python >=3.8. Although Python 3.8 is upstream end-of-life, CI continuously
+verifies Python 3.8 and 3.13. The packaging checks cover wheel, sdist, editable, and legacy
+CMake installations; pip and legacy CMake remain supported side by side. Endpoint CI uses
+fresh environments and intentionally reports dependency drift instead of silently relaxing
+version bounds.
+
+These checks do not promise every platform-specific filesystem operation. Portable
+wheel-member validation recognizes Windows `.pyd` extension names, but Windows snapshot
+no-follow behavior and Windows legacy cleanup are not acceptance targets. The snapshot verifier
+fails closed when a platform cannot provide the required no-follow file operation, and cleanup
+rules are never broadened to work around Windows locked files.
 
 ### Download
 

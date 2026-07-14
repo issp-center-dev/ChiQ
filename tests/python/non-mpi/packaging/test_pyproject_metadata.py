@@ -20,6 +20,11 @@ else:
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
 
 
+def _read_user_doc(path):
+    with open(os.path.join(ROOT, path), encoding="utf-8") as stream:
+        return " ".join(stream.read().lower().split())
+
+
 def test_pyproject_core_metadata():
     d = _load(os.path.join(ROOT, "pyproject.toml"))
     assert d["build-system"]["build-backend"] == "scikit_build_core.build"
@@ -101,3 +106,27 @@ def test_pyproject_excludes_source_artifacts_without_hiding_built_extension():
     assert "__pycache__" in wheel_exclude
     assert "*.pyc" in wheel_exclude
     assert "_bse_solver" not in wheel_exclude
+
+
+def test_user_docs_describe_supported_installation_and_verification_matrix():
+    for path in ("README.md", "doc/install.rst"):
+        text = _read_user_doc(path)
+        assert "python >=3.8" in text
+        assert "python 3.8 and 3.13" in text
+        for install_mode in ("wheel", "sdist", "editable", "legacy cmake"):
+            assert install_mode in text
+        assert "isolated environment" in text
+        assert "chiq[dcore]" in text
+        assert "dcore 4.2.0" in text
+        assert "chiq[plot]" in text
+
+
+def test_user_docs_state_portability_and_dependency_drift_limits():
+    for path in ("README.md", "doc/install.rst"):
+        text = _read_user_doc(path)
+        assert ".pyd" in text
+        assert "windows snapshot no-follow" in text
+        assert "windows legacy cleanup" in text
+        assert "not acceptance targets" in text
+        assert "fails closed" in text
+        assert "dependency drift" in text
