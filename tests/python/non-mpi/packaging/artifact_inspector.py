@@ -8,17 +8,21 @@ archive graph before creating an extraction destination.
 
 import argparse
 import bz2
+import ctypes
 from email import policy
 from email.parser import BytesParser
+import errno
 import gzip
 import json
 import lzma
 import os
 from pathlib import Path, PurePosixPath
 import re
+import secrets
 import stat
 import sys
 import tarfile
+import tempfile
 import unicodedata
 
 from packaging.utils import canonicalize_name, parse_sdist_filename
@@ -51,6 +55,28 @@ _physical_size = os.path.getsize
 _resolve_path = lambda path: Path(path).resolve(strict=False)
 _open = os.open
 _mkdir = os.mkdir
+_stat = os.stat
+_fstat = os.fstat
+_fchmod = os.fchmod
+_write = os.write
+_close = os.close
+_capability_override = None
+_after_directory_mkdir = lambda parent_fd, name: None
+
+
+def _require_capabilities():
+    if _capability_override is not None:
+        raise ArtifactError("unsupported POSIX descriptor capability: %s" % _capability_override)
+    if os.name != "posix" or not hasattr(os, "O_DIRECTORY") or not hasattr(os, "O_NOFOLLOW"):
+        raise ArtifactError("unsupported POSIX descriptor capabilities")
+    if os.open not in getattr(os, "supports_dir_fd", set()):
+        raise ArtifactError("unsupported open(dir_fd) capability")
+    if os.stat not in getattr(os, "supports_dir_fd", set()):
+        raise ArtifactError("unsupported stat(dir_fd) capability")
+    if os.mkdir not in getattr(os, "supports_dir_fd", set()):
+        raise ArtifactError("unsupported mkdir(dir_fd) capability")
+    if os.stat not in getattr(os, "supports_follow_symlinks", set()):
+        raise ArtifactError("unsupported no-follow stat capability")
 
 
 def _identity_component(component):
@@ -93,6 +119,52 @@ def _checked_archive_size(path):
     if size < 0 or size > MAX_ARCHIVE:
         raise ArtifactError("archive physical size exceeds 512 MiB limit")
     return size
+
+
+def _copy_private_artifact(path, expected_size):
+    source = None
+    private = None
+    primary_error = None
+    try:
+        source = open(os.fspath(path), "rb")
+        opened_size = _fstat(source.fileno()).st_size
+        if opened_size != expected_size or opened_size > MAX_ARCHIVE:
+            raise ArtifactError("archive changed before private copy")
+        private = tempfile.TemporaryFile(mode="w+b")
+        remaining = expected_size
+        while remaining:
+            chunk = source.read(min(1024 * 1024, remaining))
+            if not chunk:
+                raise ArtifactError("archive is shorter than physical size")
+            written = private.write(chunk)
+            if written != len(chunk):
+                raise ArtifactError("short write to private artifact copy")
+            remaining -= len(chunk)
+        if source.read(1):
+            raise ArtifactError("archive grew during private copy")
+        private.flush()
+        private.seek(0)
+        return private
+    except BaseException as error:
+        primary_error = error
+        if private is not None:
+            try:
+                private.close()
+            except BaseException:
+                pass
+        raise
+    finally:
+        if source is not None:
+            try:
+                source.close()
+            except BaseException as error:
+                if primary_error is None:
+                    if private is not None:
+                        try:
+                            private.close()
+                        except BaseException:
+                            pass
+                    raise ArtifactError("cannot close source artifact") from error
 
 
 def _read_stream_exact(stream, size, description):
@@ -403,17 +475,28 @@ def _read_exact(archive, member):
     stream = archive.extractfile(member)
     if stream is None:
         raise ArtifactError("cannot read regular member: %s" % member.name)
-    remaining = member.size
-    chunks = []
-    while remaining:
-        chunk = stream.read(min(1024 * 1024, remaining))
-        if not chunk:
-            raise ArtifactError("archive member is shorter than declared")
-        chunks.append(chunk)
-        remaining -= len(chunk)
-    if stream.read(1):
-        raise ArtifactError("archive member is longer than declared")
-    return b"".join(chunks)
+    primary_error = None
+    try:
+        remaining = member.size
+        chunks = []
+        while remaining:
+            chunk = stream.read(min(1024 * 1024, remaining))
+            if not chunk:
+                raise ArtifactError("archive member is shorter than declared")
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        if stream.read(1):
+            raise ArtifactError("archive member is longer than declared")
+        return b"".join(chunks)
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        try:
+            stream.close()
+        except BaseException as error:
+            if primary_error is None:
+                raise ArtifactError("cannot close archive member stream") from error
 
 
 def _member_map(members):
@@ -425,7 +508,7 @@ def _require_file(paths, relative):
         raise ArtifactError("missing required sdist content: %s" % relative)
 
 
-def _validate_content(relative_files):
+def _validate_content(relative_files, relative_entries):
     paths = set(relative_files)
     for required in (
         "pyproject.toml",
@@ -453,14 +536,14 @@ def _validate_content(relative_files):
         if not any(predicate(path) for path in paths):
             raise ArtifactError("missing required %s content" % description)
 
-    for path in paths:
+    for path, kind in relative_entries.items():
         components = [_identity_component(item) for item in path.split("/")]
         basename = components[-1]
         if basename.endswith(_NATIVE_SUFFIXES):
             raise ArtifactError("forbidden native binary in sdist: %s" % path)
         if "__pycache__" in components or basename.endswith(".pyc"):
             raise ArtifactError("forbidden cache artifact in sdist: %s" % path)
-        build_directories = components[:-1]
+        build_directories = components if kind == "directory" else components[:-1]
         if any(
             component == "build"
             or component.startswith("build-")
@@ -545,7 +628,14 @@ def _validate_metadata(path, root, archive, members):
         for name, member in files.items()
         if name.startswith(prefix)
     }
-    _validate_content(relative_files)
+    relative_entries = {
+        member.name[len(prefix):]: (
+            "directory" if member.type == tarfile.DIRTYPE else "file"
+        )
+        for member in members
+        if member.name.startswith(prefix)
+    }
+    _validate_content(relative_files, relative_entries)
     pkg_name, pkg_version = _parse_pkg_info(_read_exact(archive, relative_files["PKG-INFO"]))
     project_name, source_version = _parse_project_metadata(
         _read_exact(archive, relative_files["pyproject.toml"]),
@@ -573,10 +663,7 @@ def _inspect_open(path):
     raw_file = None
     archive = None
     try:
-        raw_file = open(os.fspath(path), "rb")
-        opened_size = os.fstat(raw_file.fileno()).st_size
-        if opened_size != archive_size or opened_size > MAX_ARCHIVE:
-            raise ArtifactError("archive changed before parsing")
+        raw_file = _copy_private_artifact(path, archive_size)
         _preflight_tar(raw_file, archive_size)
         raw_file.seek(0)
         archive = tarfile.open(fileobj=raw_file, mode="r:*")
@@ -610,11 +697,20 @@ def _inspect_open(path):
 
 def _close_archive(archive):
     raw_file = getattr(archive, "_artifact_raw_file", None)
+    primary_error = sys.exc_info()[1]
+    close_error = None
     try:
         archive.close()
-    finally:
-        if raw_file is not None and not raw_file.closed:
+    except BaseException as error:
+        close_error = error
+    if raw_file is not None and not raw_file.closed:
+        try:
             raw_file.close()
+        except BaseException as error:
+            if close_error is None:
+                close_error = error
+    if primary_error is None and close_error is not None:
+        raise ArtifactError("cannot close archive resources") from close_error
 
 
 def validate_sdist(path):
@@ -636,54 +732,137 @@ def _same_identity(left, right):
     )
 
 
-def _require_root_identity(destination, root_fd):
-    opened = os.fstat(root_fd)
-    current = os.stat(os.fspath(destination), follow_symlinks=False)
-    if not _same_identity(opened, current) or not stat.S_ISDIR(current.st_mode):
-        raise ArtifactError("extraction destination changed during extraction")
+def _close_descriptors(descriptors):
+    primary_error = sys.exc_info()[1]
+    close_error = None
+    for descriptor in descriptors:
+        if descriptor is None:
+            continue
+        try:
+            _close(descriptor)
+        except BaseException as error:
+            if close_error is None:
+                close_error = error
+    if primary_error is None and close_error is not None:
+        raise ArtifactError("cannot close extraction descriptor") from close_error
+
+
+def _safe_stat(name, parent_fd, description):
+    try:
+        return _stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except (OSError, TypeError, NotImplementedError) as error:
+        raise ArtifactError("cannot no-follow stat %s" % description) from error
+
+
+def _open_bound_directory(name, parent_fd, description):
+    before = _safe_stat(name, parent_fd, description)
+    if not stat.S_ISDIR(before.st_mode):
+        raise ArtifactError("%s is not a directory" % description)
+    descriptor = None
+    try:
+        descriptor = _open(name, _directory_flags(), dir_fd=parent_fd)
+        opened = _fstat(descriptor)
+        current = _safe_stat(name, parent_fd, description)
+        if not _same_identity(before, opened) or not _same_identity(opened, current):
+            raise ArtifactError("directory identity race for %s" % description)
+        if not stat.S_ISDIR(opened.st_mode):
+            raise ArtifactError("%s is not a directory" % description)
+        return descriptor
+    except ArtifactError:
+        if descriptor is not None:
+            _close_descriptors([descriptor])
+        raise
+    except (OSError, TypeError, NotImplementedError) as error:
+        if descriptor is not None:
+            _close_descriptors([descriptor])
+        raise ArtifactError("cannot safely open %s" % description) from error
+
+
+def _open_validated_parent(path):
+    descriptor = None
+    try:
+        before = _stat(os.fspath(path), follow_symlinks=False)
+        if not stat.S_ISDIR(before.st_mode):
+            raise ArtifactError("destination parent is not a directory")
+        descriptor = _open(os.fspath(path), _directory_flags())
+        opened = _fstat(descriptor)
+        current = _stat(os.fspath(path), follow_symlinks=False)
+        if not _same_identity(before, opened) or not _same_identity(opened, current):
+            raise ArtifactError("destination parent identity race")
+        return descriptor
+    except ArtifactError:
+        if descriptor is not None:
+            _close_descriptors([descriptor])
+        raise
+    except (OSError, TypeError, NotImplementedError) as error:
+        if descriptor is not None:
+            _close_descriptors([descriptor])
+        raise ArtifactError("cannot safely open destination parent") from error
+
+
+def _create_bound_directory(parent_fd, name, mode, description):
+    descriptor = None
+    try:
+        _mkdir(name, mode, dir_fd=parent_fd)
+        _after_directory_mkdir(parent_fd, name)
+        descriptor = _open_bound_directory(name, parent_fd, description)
+        _fchmod(descriptor, mode)
+        current = _safe_stat(name, parent_fd, description)
+        opened = _fstat(descriptor)
+        if not _same_identity(opened, current):
+            raise ArtifactError("directory identity race for %s" % description)
+        return descriptor
+    except ArtifactError:
+        if descriptor is not None:
+            _close_descriptors([descriptor])
+        raise
+    except (OSError, TypeError, NotImplementedError) as error:
+        if descriptor is not None:
+            _close_descriptors([descriptor])
+        raise ArtifactError("cannot safely create %s" % description) from error
 
 
 def _open_directory_chain(root_fd, components):
     descriptor = os.dup(root_fd)
     try:
         for component in components:
-            next_descriptor = _open(component, _directory_flags(), dir_fd=descriptor)
-            os.close(descriptor)
+            next_descriptor = _open_bound_directory(component, descriptor, component)
+            _close_descriptors([descriptor])
             descriptor = next_descriptor
         return descriptor
-    except (OSError, TypeError, NotImplementedError) as error:
-        try:
-            os.close(descriptor)
-        except OSError:
-            pass
-        raise ArtifactError("unsafe directory race during extraction") from error
+    except BaseException:
+        _close_descriptors([descriptor])
+        raise
 
 
 def _make_directory(root_fd, components):
     parent_fd = _open_directory_chain(root_fd, components[:-1])
+    descriptor = None
     try:
         try:
-            _mkdir(components[-1], 0o755, dir_fd=parent_fd)
+            descriptor = _create_bound_directory(
+                parent_fd,
+                components[-1],
+                0o755,
+                "/".join(components),
+            )
         except FileExistsError:
-            existing = os.stat(components[-1], dir_fd=parent_fd, follow_symlinks=False)
-            if not stat.S_ISDIR(existing.st_mode):
-                raise ArtifactError("file/directory collision during extraction")
-        descriptor = _open(components[-1], _directory_flags(), dir_fd=parent_fd)
-        try:
-            os.fchmod(descriptor, 0o755)
-        finally:
-            os.close(descriptor)
+            descriptor = _open_bound_directory(
+                components[-1], parent_fd, "/".join(components)
+            )
+            _fchmod(descriptor, 0o755)
     except ArtifactError:
         raise
     except (OSError, TypeError, NotImplementedError) as error:
         raise ArtifactError("unsafe directory creation during extraction") from error
     finally:
-        os.close(parent_fd)
+        _close_descriptors([descriptor, parent_fd])
 
 
 def _copy_member(archive, member, root_fd, components):
     parent_fd = _open_directory_chain(root_fd, components[:-1])
     descriptor = None
+    source = None
     try:
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
         descriptor = _open(components[-1], flags, 0o600, dir_fd=parent_fd)
@@ -697,61 +876,168 @@ def _copy_member(archive, member, root_fd, components):
                 raise ArtifactError("extraction byte-count mismatch")
             view = memoryview(chunk)
             while view:
-                written = os.write(descriptor, view)
+                written = _write(descriptor, view)
                 if written <= 0:
                     raise ArtifactError("short write during extraction")
                 view = view[written:]
             remaining -= len(chunk)
         if source.read(1):
             raise ArtifactError("extraction byte-count mismatch")
-        os.fchmod(descriptor, 0o755 if member.mode & stat.S_IXUSR else 0o644)
+        _fchmod(descriptor, 0o755 if member.mode & stat.S_IXUSR else 0o644)
     except ArtifactError:
         raise
     except (OSError, TypeError, NotImplementedError) as error:
         raise ArtifactError("unsafe exclusive file creation during extraction") from error
     finally:
-        if descriptor is not None:
-            os.close(descriptor)
-        os.close(parent_fd)
+        primary_error = sys.exc_info()[1]
+        close_error = None
+        if source is not None:
+            try:
+                source.close()
+            except BaseException as error:
+                close_error = error
+        try:
+            _close_descriptors([descriptor, parent_fd])
+        except BaseException as error:
+            if close_error is None:
+                close_error = error
+        if primary_error is None and close_error is not None:
+            raise ArtifactError("cannot close extracted member") from close_error
+
+
+def _cleanup_tree(descriptor):
+    try:
+        names = os.listdir(descriptor)
+    except OSError:
+        return
+    for name in names:
+        try:
+            entry = _safe_stat(name, descriptor, "staging cleanup entry")
+            if stat.S_ISDIR(entry.st_mode):
+                child = _open_bound_directory(name, descriptor, "staging cleanup directory")
+                try:
+                    _cleanup_tree(child)
+                finally:
+                    _close_descriptors([child])
+                os.rmdir(name, dir_fd=descriptor)
+            else:
+                os.unlink(name, dir_fd=descriptor)
+        except BaseException:
+            pass
+
+
+def _cleanup_staging(parent_fd, name, staging_fd):
+    if staging_fd is not None:
+        _cleanup_tree(staging_fd)
+    try:
+        entry = _safe_stat(name, parent_fd, "staging entry")
+        if stat.S_ISDIR(entry.st_mode):
+            os.rmdir(name, dir_fd=parent_fd)
+        else:
+            os.unlink(name, dir_fd=parent_fd)
+    except BaseException:
+        pass
+
+
+def _entry_exists(parent_fd, name):
+    try:
+        _stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        return True
+    except FileNotFoundError:
+        return False
+    except (OSError, TypeError, NotImplementedError) as error:
+        raise ArtifactError("cannot check extraction destination") from error
+
+
+def _publish_noreplace(parent_fd, source, destination):
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":
+        function = getattr(libc, "renameatx_np", None)
+        flags = 0x00000004
+    elif sys.platform.startswith("linux"):
+        function = getattr(libc, "renameat2", None)
+        flags = 1
+    else:
+        function = None
+        flags = 0
+    if function is None:
+        raise ArtifactError("atomic no-replace directory publication is unsupported")
+    function.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+    function.restype = ctypes.c_int
+    result = function(
+        parent_fd,
+        os.fsencode(source),
+        parent_fd,
+        os.fsencode(destination),
+        flags,
+    )
+    if result != 0:
+        number = ctypes.get_errno()
+        if number in (errno.EEXIST, errno.ENOTEMPTY):
+            raise ArtifactError("extraction destination already exists")
+        raise ArtifactError("cannot atomically publish extraction destination") from OSError(number, os.strerror(number))
 
 
 def extract_sdist(path, destination):
     """Validate the complete graph, then manually extract regular files."""
+    _require_capabilities()
     archive, members, manifest = _inspect_open(path)
     destination = Path(destination)
+    parent_fd = None
+    staging_fd = None
+    published = False
+    staging_name = None
     try:
-        _mkdir(os.fspath(destination), 0o700)
-    except (FileExistsError, OSError, TypeError, NotImplementedError) as error:
-        _close_archive(archive)
-        raise ArtifactError("extraction destination must be new and non-symlink") from error
-    root_fd = None
-    try:
-        root_fd = _open(os.fspath(destination), _directory_flags())
-        os.fchmod(root_fd, 0o700)
-        _require_root_identity(destination, root_fd)
-        resolved_root = _resolve_path(destination)
+        parent = _resolve_path(destination.parent)
+        if not destination.name or destination.name in (".", ".."):
+            raise ArtifactError("invalid extraction destination")
+        _require_contained(parent, parent / destination.name)
+        parent_fd = _open_validated_parent(parent)
+        if _entry_exists(parent_fd, destination.name):
+            raise ArtifactError("extraction destination already exists")
+        staging_name = ".%s.tmp-%s" % (
+            destination.name,
+            secrets.token_hex(8),
+        )
+        staging_fd = _create_bound_directory(
+            parent_fd, staging_name, 0o700, "private extraction staging root"
+        )
         directories = set()
         for member in members:
             components = canonical_member_path(member.name)
-            _require_contained(resolved_root, destination.joinpath(*components))
             if member.type == tarfile.DIRTYPE:
                 directories.add(components)
             for index in range(1, len(components)):
                 directories.add(components[:index])
         for components in sorted(directories, key=lambda item: (len(item), item)):
-            _make_directory(root_fd, components)
+            _make_directory(staging_fd, components)
         for member in members:
             if member.type in _REGULAR_TYPES:
-                _copy_member(archive, member, root_fd, canonical_member_path(member.name))
-        _require_root_identity(destination, root_fd)
+                _copy_member(archive, member, staging_fd, canonical_member_path(member.name))
+        if _entry_exists(parent_fd, destination.name):
+            raise ArtifactError("extraction destination already exists")
+        _publish_noreplace(parent_fd, staging_name, destination.name)
+        published = True
     except ArtifactError:
         raise
     except (OSError, RuntimeError, TypeError, NotImplementedError) as error:
         raise ArtifactError("unsafe extraction destination or race") from error
     finally:
-        if root_fd is not None:
-            os.close(root_fd)
-        _close_archive(archive)
+        primary_error = sys.exc_info()[1]
+        cleanup_error = None
+        if not published and parent_fd is not None and staging_name is not None:
+            _cleanup_staging(parent_fd, staging_name, staging_fd)
+        try:
+            _close_descriptors([staging_fd, parent_fd])
+        except BaseException as error:
+            cleanup_error = error
+        try:
+            _close_archive(archive)
+        except BaseException as error:
+            if cleanup_error is None:
+                cleanup_error = error
+        if primary_error is None and cleanup_error is not None:
+            raise cleanup_error
     return manifest
 
 

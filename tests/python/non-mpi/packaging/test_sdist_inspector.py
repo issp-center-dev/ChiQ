@@ -3,6 +3,7 @@ import bz2
 import gzip
 import json
 import lzma
+import os
 from pathlib import Path
 import stat
 import subprocess
@@ -558,6 +559,50 @@ def test_invalid_complete_graph_writes_nothing(tmp_path):
     assert not destination.exists()
 
 
+def test_source_mutation_during_destination_creation_cannot_change_extracted_bytes(
+    tmp_path, monkeypatch
+):
+    archive = make_sdist(tmp_path)
+    original = bytes(raw_archive(archive))
+    archive.write_bytes(original)
+    mutated = original.replace(b"readme\n", b"mutate\n", 1)
+    assert len(mutated) == len(original)
+    real_mkdir = artifact_inspector._mkdir
+    changed = []
+
+    def mutating_mkdir(path, *args, **kwargs):
+        if not changed:
+            archive.write_bytes(mutated)
+            changed.append(True)
+        return real_mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(artifact_inspector, "_mkdir", mutating_mkdir)
+    destination = tmp_path / "extract"
+
+    manifest = artifact_inspector.extract_sdist(archive, destination)
+
+    assert manifest["version"] == VERSION
+    assert (destination / ROOT / "README.md").read_bytes() == b"readme\n"
+
+
+def test_source_mutation_between_raw_and_semantic_passes_is_ignored(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    original = bytes(raw_archive(archive))
+    archive.write_bytes(original)
+    mutated = original.replace(b"Version: 1.2.3", b"Version: 9.9.9", 1)
+    assert len(mutated) == len(original)
+    real_preflight = artifact_inspector._preflight_tar
+
+    def mutating_preflight(raw_file, archive_size):
+        result = real_preflight(raw_file, archive_size)
+        archive.write_bytes(mutated)
+        return result
+
+    monkeypatch.setattr(artifact_inspector, "_preflight_tar", mutating_preflight)
+
+    assert artifact_inspector.validate_sdist(archive)["version"] == VERSION
+
+
 def test_extracts_with_sanitized_modes(tmp_path):
     files = required_files()
     executable = tar_info(ROOT + "/python/tool.py", b"#!/usr/bin/env python\n", mode=0o6771)
@@ -585,6 +630,200 @@ def test_root_permissions_are_applied_through_open_descriptor(tmp_path, monkeypa
     artifact_inspector.extract_sdist(archive, tmp_path / "extract")
 
 
+def test_rejects_missing_posix_descriptor_capabilities(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    monkeypatch.setattr(
+        artifact_inspector,
+        "_capability_override",
+        "O_NOFOLLOW unavailable",
+        raising=False,
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="capabil|O_NOFOLLOW"):
+        artifact_inspector.extract_sdist(archive, tmp_path / "extract")
+
+    assert not (tmp_path / "extract").exists()
+
+
+def test_staging_root_replacement_does_not_chmod_or_write_attacker(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    attacker = tmp_path / "attacker"
+    attacker.mkdir(mode=0o711)
+    original_mode = stat.S_IMODE(attacker.stat().st_mode)
+
+    def replace_root(parent_fd, name):
+        if name.startswith(".extract.tmp-"):
+            os.rename(name, name + ".moved", src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+            os.symlink(str(attacker), name, dir_fd=parent_fd)
+
+    monkeypatch.setattr(
+        artifact_inspector,
+        "_after_directory_mkdir",
+        replace_root,
+        raising=False,
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="identity|symlink|race|directory"):
+        artifact_inspector.extract_sdist(archive, tmp_path / "extract")
+
+    assert stat.S_IMODE(attacker.stat().st_mode) == original_mode
+    assert not any(attacker.iterdir())
+    assert not (tmp_path / "extract").exists()
+
+
+def test_nested_directory_replacement_does_not_write_attacker(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    attacker = tmp_path / "attacker"
+    attacker.mkdir()
+
+    def replace_nested(parent_fd, name):
+        if name == "python":
+            os.rename(name, name + ".moved", src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+            os.symlink(str(attacker), name, dir_fd=parent_fd)
+
+    monkeypatch.setattr(
+        artifact_inspector,
+        "_after_directory_mkdir",
+        replace_nested,
+        raising=False,
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="identity|symlink|race|directory"):
+        artifact_inspector.extract_sdist(archive, tmp_path / "extract")
+
+    assert not any(attacker.iterdir())
+    assert not (tmp_path / "extract").exists()
+
+
+def test_write_failure_leaves_destination_absent_and_retryable(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    destination = tmp_path / "extract"
+    real_write = os.write
+    calls = []
+
+    def failing_write(descriptor, data):
+        calls.append(True)
+        if len(calls) == 2:
+            raise OSError("injected write failure")
+        return real_write(descriptor, data)
+
+    monkeypatch.setattr(artifact_inspector, "_write", failing_write, raising=False)
+    with pytest.raises(artifact_inspector.ArtifactError, match="write|extraction"):
+        artifact_inspector.extract_sdist(archive, destination)
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".extract.tmp-*"))
+
+    monkeypatch.setattr(artifact_inspector, "_write", real_write)
+    artifact_inspector.extract_sdist(archive, destination)
+    assert (destination / ROOT / "README.md").is_file()
+
+
+def test_short_write_leaves_destination_absent(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    destination = tmp_path / "extract"
+    monkeypatch.setattr(artifact_inspector, "_write", lambda descriptor, data: 0)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="short write"):
+        artifact_inspector.extract_sdist(archive, destination)
+
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".extract.tmp-*"))
+
+
+def test_fchmod_failure_leaves_destination_absent_and_retryable(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    destination = tmp_path / "extract"
+    real_fchmod = os.fchmod
+    failed = []
+
+    def failing_fchmod(descriptor, mode):
+        if mode == 0o644 and not failed:
+            failed.append(True)
+            raise OSError("injected fchmod failure")
+        return real_fchmod(descriptor, mode)
+
+    monkeypatch.setattr(artifact_inspector, "_fchmod", failing_fchmod)
+    with pytest.raises(artifact_inspector.ArtifactError, match="extraction|file|create"):
+        artifact_inspector.extract_sdist(archive, destination)
+    assert not destination.exists()
+    assert not list(tmp_path.glob(".extract.tmp-*"))
+
+    monkeypatch.setattr(artifact_inspector, "_fchmod", real_fchmod)
+    artifact_inspector.extract_sdist(archive, destination)
+
+
+def test_fstat_failure_leaves_destination_absent(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    destination = tmp_path / "extract"
+    real_fstat = os.fstat
+    calls = []
+
+    def failing_fstat(descriptor):
+        calls.append(True)
+        if len(calls) == 2:
+            raise OSError("injected fstat failure")
+        return real_fstat(descriptor)
+
+    monkeypatch.setattr(artifact_inspector, "_fstat", failing_fstat)
+    with pytest.raises(artifact_inspector.ArtifactError, match="destination|open|safe|malformed"):
+        artifact_inspector.extract_sdist(archive, destination)
+    assert not destination.exists()
+
+
+def test_close_helper_attempts_every_descriptor_without_masking_primary(monkeypatch):
+    descriptors = os.pipe()
+    real_close = os.close
+    closed = []
+
+    def failing_close(descriptor):
+        closed.append(descriptor)
+        real_close(descriptor)
+        raise OSError("injected close failure")
+
+    monkeypatch.setattr(artifact_inspector, "_close", failing_close)
+    with pytest.raises(artifact_inspector.ArtifactError, match="close"):
+        artifact_inspector._close_descriptors(descriptors)
+    assert closed == list(descriptors)
+
+    second = os.pipe()
+    closed[:] = []
+    with pytest.raises(ValueError, match="primary"):
+        try:
+            raise ValueError("primary")
+        finally:
+            artifact_inspector._close_descriptors(second)
+    assert closed == list(second)
+
+
+def test_validation_explicitly_closes_tar_member_streams(tmp_path, monkeypatch):
+    archive = make_sdist(tmp_path)
+    real_extractfile = tarfile.TarFile.extractfile
+    opened = []
+    closed = []
+
+    class Proxy:
+        def __init__(self, stream):
+            self.stream = stream
+            opened.append(self)
+
+        def read(self, size=-1):
+            return self.stream.read(size)
+
+        def close(self):
+            closed.append(self)
+            self.stream.close()
+
+    def tracking_extractfile(instance, member):
+        stream = real_extractfile(instance, member)
+        return None if stream is None else Proxy(stream)
+
+    monkeypatch.setattr(tarfile.TarFile, "extractfile", tracking_extractfile)
+    artifact_inspector.validate_sdist(archive)
+
+    assert opened
+    assert closed == opened
+
+
 def test_requires_new_destination_and_rejects_symlink_collision(tmp_path):
     archive = make_sdist(tmp_path)
     destination = tmp_path / "extract"
@@ -594,6 +833,18 @@ def test_requires_new_destination_and_rejects_symlink_collision(tmp_path):
         artifact_inspector.extract_sdist(archive, destination)
 
     assert not (tmp_path / "elsewhere").exists()
+
+
+def test_does_not_overwrite_preexisting_empty_destination(tmp_path):
+    archive = make_sdist(tmp_path)
+    destination = tmp_path / "extract"
+    destination.mkdir()
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="destination|exist"):
+        artifact_inspector.extract_sdist(archive, destination)
+
+    assert destination.is_dir()
+    assert not any(destination.iterdir())
 
 
 def test_file_creation_is_exclusive_and_nofollow(tmp_path, monkeypatch):
@@ -689,6 +940,24 @@ def test_rejects_forbidden_built_or_installed_artifacts(tmp_path, forbidden):
     archive = make_sdist(tmp_path, entries=[tar_info(ROOT + "/" + forbidden, b"bad")])
 
     with pytest.raises(artifact_inspector.ArtifactError, match="forbidden|native|cache|build|installed"):
+        artifact_inspector.validate_sdist(archive)
+
+
+@pytest.mark.parametrize(
+    "forbidden",
+    [
+        "build",
+        "python/package/chiq/__pycache__",
+        "prefix/lib/bse-python",
+    ],
+)
+def test_rejects_empty_forbidden_directories(tmp_path, forbidden):
+    archive = make_sdist(
+        tmp_path,
+        entries=[tar_info(ROOT + "/" + forbidden, type_=tarfile.DIRTYPE)],
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="forbidden|cache|build|installed"):
         artifact_inspector.validate_sdist(archive)
 
 
