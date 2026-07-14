@@ -39,6 +39,7 @@ _VERSION_INPUT = "python/package/chiq/__init__.py"
 _DRIVE = re.compile(r"^[A-Za-z]:")
 _ZERO_BLOCK = b"\0" * tarfile.BLOCKSIZE
 _PAX_TYPES = (tarfile.XHDTYPE, tarfile.XGLTYPE)
+_MAX_TAR_PADDING = tarfile.RECORDSIZE
 
 
 class ArtifactError(RuntimeError):
@@ -198,6 +199,15 @@ def _parse_pax(payload):
     for key in ("path", "linkpath"):
         if key in records:
             canonical_member_path(records[key])
+    if "size" in records:
+        value = records["size"]
+        if not value.isascii() or not value.isdecimal():
+            raise ArtifactError("PAX size must be a nonnegative canonical decimal")
+        if value != "0" and value.startswith("0"):
+            raise ArtifactError("PAX size must be a nonnegative canonical decimal")
+        parsed_size = int(value)
+        if parsed_size > sys.maxsize:
+            raise ArtifactError("PAX size exceeds representable bounds")
     return records
 
 
@@ -223,6 +233,24 @@ def _merge_pax(target, incoming, other, description):
         target[key] = value
 
 
+def _effective_size(raw_size, global_pax, local_pax):
+    value = local_pax.get("size", global_pax.get("size"))
+    return raw_size if value is None else int(value)
+
+
+def _validate_trailing_padding(stream):
+    total = 0
+    while True:
+        chunk = stream.read(min(4096, _MAX_TAR_PADDING - total + 1))
+        if not chunk:
+            return
+        if any(chunk):
+            raise ArtifactError("trailing nonzero bytes after tar end marker")
+        total += len(chunk)
+        if total > _MAX_TAR_PADDING:
+            raise ArtifactError("excessive tar padding exceeds limit")
+
+
 def _preflight_tar(raw_file, archive_size):
     """Bound and disambiguate raw tar headers before semantic parsing."""
     stream = _compression_stream(raw_file)
@@ -239,18 +267,22 @@ def _preflight_tar(raw_file, archive_size):
                 continue
             if zero_blocks:
                 raise ArtifactError("nonzero tar header after end marker")
-            type_, size = _raw_header(header)
+            type_, raw_size = _raw_header(header)
             count += 1
             if count > MAX_MEMBERS:
                 raise ArtifactError("archive member count exceeds limit")
-            if type_ in _REGULAR_TYPES and size > MAX_FILE:
-                raise ArtifactError("regular file size exceeds limit")
-            if type_ in _PAX_TYPES and size > MAX_FILE:
-                raise ArtifactError("PAX metadata size exceeds limit")
-            if type_ == tarfile.DIRTYPE and size:
-                raise ArtifactError("directory has nonzero file size")
             if type_ not in _REGULAR_TYPES + (tarfile.DIRTYPE,) + _PAX_TYPES:
                 raise ArtifactError("tar members must be regular files or directories; special member found")
+            if type_ in _PAX_TYPES:
+                size = raw_size
+                if size > MAX_FILE:
+                    raise ArtifactError("PAX metadata size exceeds limit")
+            else:
+                size = _effective_size(raw_size, global_pax, local_pax)
+                if type_ in _REGULAR_TYPES and size > MAX_FILE:
+                    raise ArtifactError("regular file size exceeds limit")
+                if type_ == tarfile.DIRTYPE and size:
+                    raise ArtifactError("directory has nonzero file size")
             total += size
             if total > MAX_TOTAL:
                 raise ArtifactError("total uncompressed size exceeds limit")
@@ -276,6 +308,7 @@ def _preflight_tar(raw_file, archive_size):
             _discard_exact(stream, padded_size)
         if local_pax:
             raise ArtifactError("orphan per-file PAX metadata")
+        _validate_trailing_padding(stream)
     except (OSError, EOFError, gzip.BadGzipFile, lzma.LZMAError) as error:
         raise ArtifactError("malformed or truncated compressed tar archive") from error
     finally:

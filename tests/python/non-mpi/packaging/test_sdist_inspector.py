@@ -1,6 +1,8 @@
 import io
+import bz2
 import gzip
 import json
+import lzma
 from pathlib import Path
 import stat
 import subprocess
@@ -108,6 +110,12 @@ def extension_header(type_, payload):
     header = info.tobuf(format=tarfile.USTAR_FORMAT)
     padding = b"\0" * ((-len(payload)) % tarfile.BLOCKSIZE)
     return header + payload + padding
+
+
+def zero_raw_header_size(header):
+    changed = bytearray(header)
+    changed[124:136] = b"00000000000\0"
+    return checksum_header(changed)
 
 
 def replace_file(files, path, data):
@@ -253,6 +261,89 @@ def test_rejects_conflicting_global_and_per_file_pax_metadata(tmp_path):
         artifact_inspector.validate_sdist(archive)
 
 
+@pytest.mark.parametrize("type_", [tarfile.XHDTYPE, tarfile.XGLTYPE])
+def test_pax_effective_size_limit_precedes_raw_zero_payload(tmp_path, monkeypatch, type_):
+    archive = tmp_path / (ROOT + ".tar.gz")
+    payload = pax_record("size", str(artifact_inspector.MAX_FILE + 1))
+    member = tarfile.TarInfo(ROOT + "/huge")
+    member.size = 0
+    raw = extension_header(type_, payload) + member.tobuf(format=tarfile.USTAR_FORMAT)
+    raw += b"\0" * (2 * tarfile.BLOCKSIZE)
+    write_raw_archive(archive, raw)
+    monkeypatch.setattr(
+        artifact_inspector.tarfile,
+        "open",
+        lambda *args, **kwargs: pytest.fail("over-limit effective size must preflight"),
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="file.*size|size.*limit"):
+        artifact_inspector.validate_sdist(archive)
+
+
+@pytest.mark.parametrize("value", ["-1", "01", "+1", "1.0", "x", str(1 << 100)])
+def test_rejects_noncanonical_or_unrepresentable_pax_size(tmp_path, value):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    payload = pax_record("size", value)
+    write_raw_archive(archive, extension_header(tarfile.XHDTYPE, payload) + raw)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="PAX.*size|size.*PAX"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_rejects_duplicate_pax_size_key(tmp_path):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    payload = pax_record("size", "1") + pax_record("size", "2")
+    write_raw_archive(archive, extension_header(tarfile.XHDTYPE, payload) + raw)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="duplicate.*PAX"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_rejects_conflicting_global_and_local_pax_size(tmp_path):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    prefixed = (
+        extension_header(tarfile.XGLTYPE, pax_record("size", "1"))
+        + extension_header(tarfile.XHDTYPE, pax_record("size", "2"))
+        + raw
+    )
+    write_raw_archive(archive, prefixed)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="conflicting.*PAX"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_accepts_safe_local_pax_size_override_with_raw_zero(tmp_path):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    first_size = len(required_files()["pyproject.toml"])
+    raw[:512] = zero_raw_header_size(raw[:512])
+    prefixed = extension_header(
+        tarfile.XHDTYPE,
+        pax_record("size", str(first_size)),
+    ) + raw
+    write_raw_archive(archive, prefixed)
+
+    assert artifact_inspector.validate_sdist(archive)["root"] == ROOT
+
+
+def test_pending_size_override_does_not_resize_following_pax_carrier(tmp_path):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    first_size = len(required_files()["pyproject.toml"])
+    raw[:512] = zero_raw_header_size(raw[:512])
+    prefixed = (
+        extension_header(tarfile.XHDTYPE, pax_record("size", str(first_size)))
+        + extension_header(tarfile.XHDTYPE, pax_record("comment", "safe"))
+        + raw
+    )
+    write_raw_archive(archive, prefixed)
+
+    assert artifact_inspector.validate_sdist(archive)["root"] == ROOT
+
+
 @pytest.mark.parametrize(
     "first,second",
     [
@@ -375,6 +466,41 @@ def test_preflight_enforces_ratio_before_payload_consumption(tmp_path, monkeypat
 
     with pytest.raises(artifact_inspector.ArtifactError, match="ratio"):
         artifact_inspector.validate_sdist(archive)
+
+
+def test_rejects_checksum_valid_header_after_end_marker(tmp_path):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    hidden = tarfile.TarInfo(ROOT + "/hidden")
+    hidden.size = 0
+    raw.extend(hidden.tobuf(format=tarfile.USTAR_FORMAT))
+    write_raw_archive(archive, raw)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="after.*end|trailing.*nonzero"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_rejects_excessive_compressed_zero_padding(tmp_path):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    raw.extend(b"\0" * (2 * tarfile.RECORDSIZE))
+    write_raw_archive(archive, raw)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="padding.*limit|excessive.*padding"):
+        artifact_inspector.validate_sdist(archive)
+
+
+@pytest.mark.parametrize(
+    "compress",
+    [lambda data: data, gzip.compress, bz2.compress, lzma.compress],
+    ids=["plain", "gzip", "bzip2", "xz"],
+)
+def test_accepts_normal_record_padding_for_supported_tar_streams(tmp_path, compress):
+    archive = make_sdist(tmp_path)
+    raw = raw_archive(archive)
+    archive.write_bytes(compress(raw))
+
+    assert artifact_inspector.validate_sdist(archive)["root"] == ROOT
 
 
 def test_accepts_resource_boundaries_and_rejects_overflow(tmp_path, monkeypatch):
