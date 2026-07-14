@@ -3,6 +3,17 @@ project(ChiQ)
 
 option(CHIQ_WHEEL_BUILD "Install layout for a pip/scikit-build-core wheel" OFF)
 
+include(GNUInstallDirs)
+
+if(NOT CHIQ_WHEEL_BUILD)
+  set(CHIQ_LEGACY_CLEANUP_SCRIPT
+      "${CMAKE_CURRENT_BINARY_DIR}/RemoveObsoleteLegacySolver.cmake")
+  configure_file(
+      "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RemoveObsoleteLegacySolver.cmake.in"
+      "${CHIQ_LEGACY_CLEANUP_SCRIPT}"
+      @ONLY)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
