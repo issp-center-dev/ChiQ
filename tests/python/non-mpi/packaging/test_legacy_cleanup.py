@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import subprocess
+import sys
 
 import pytest
 
@@ -249,3 +250,119 @@ def test_legacy_verifier_covers_isolated_build_runtime_and_full_suites():
     assert '--ignore="$BUILD/tests/python/non-mpi/packaging"' in text
     assert '"$REPO/tests/python/non-mpi/packaging"' in text
     assert text.count('-c "$EMPTY_PYTEST_CONFIG"') == 2
+    assert "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in text
+
+
+def test_legacy_verifier_executes_no_commands_before_empty_environment_boundary():
+    script = (
+        REPOSITORY / "tests" / "python" / "non-mpi" / "packaging"
+        / "verify_legacy_install.sh"
+    ).read_text(encoding="utf-8")
+    assert script.startswith("#!/bin/sh\n")
+    wrapper = script.split("exec /usr/bin/env -i", 1)[0]
+    assert " -c " not in wrapper
+    assert "command -v" not in wrapper
+    assert "dirname" not in wrapper
+    assert "$(" not in wrapper
+    assert "[[" not in wrapper
+
+
+def test_legacy_verifier_scrubs_ambient_code_and_tool_configuration(tmp_path):
+    script = (
+        REPOSITORY / "tests" / "python" / "non-mpi" / "packaging"
+        / "verify_legacy_install.sh"
+    )
+    poison = tmp_path / "poison"
+    poison.mkdir()
+    site_marker = tmp_path / "sitecustomize-ran"
+    bash_marker = tmp_path / "bash-env-ran"
+    bash_env = tmp_path / "bash-env.sh"
+    bash_env.write_text("/usr/bin/touch %s\n" % bash_marker, encoding="utf-8")
+    (poison / "sitecustomize.py").write_text(
+        "from pathlib import Path\nPath(%r).write_text('ran')\n" % str(site_marker),
+        encoding="utf-8",
+    )
+    environment = {
+        "HOME": os.environ.get("HOME", str(tmp_path)),
+        "PATH": "/usr/bin:/bin",
+        "TMPDIR": str(tmp_path),
+        "PYTHON": os.fspath(Path(sys.executable).resolve()),
+        "PYTHONPATH": str(poison),
+        "PYTHONOPTIMIZE": "1",
+        "PYTEST_ADDOPTS": "--collect-only",
+        "PYTEST_PLUGINS": "poison_plugin",
+        "PIP_CONFIG_FILE": str(tmp_path / "pip.conf"),
+        "GIT_DIR": str(tmp_path / "invalid.git"),
+        "BASH_ENV": str(bash_env),
+    }
+
+    result = subprocess.run(
+        [os.fspath(script), "--audit-environment-only"],
+        cwd=os.fspath(REPOSITORY),
+        env=environment,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Environment policy: env -i explicit allowlist" in result.stdout
+    assert "Environment audit OK" in result.stdout
+    assert "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1" in result.stdout
+    assert not site_marker.exists()
+    assert not bash_marker.exists()
+
+
+def test_legacy_verifier_runtime_path_starts_with_selected_python(tmp_path):
+    script = (
+        REPOSITORY / "tests" / "python" / "non-mpi" / "packaging"
+        / "verify_legacy_install.sh"
+    )
+    selected = Path(sys.executable).resolve()
+    environment = {
+        "HOME": os.environ.get("HOME", str(tmp_path)),
+        "PATH": "/usr/bin:/bin",
+        "TMPDIR": str(tmp_path),
+        "PYTHON": os.fspath(selected),
+        "GIT_DIR": str(tmp_path / "invalid.git"),
+    }
+
+    result = subprocess.run(
+        [os.fspath(script), "--audit-environment-only"],
+        cwd=os.fspath(REPOSITORY),
+        env=environment,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    path_line = next(
+        line for line in result.stdout.splitlines() if line.startswith("PATH=")
+    )
+    assert path_line.split("=", 1)[1].split(":", 1)[0] == os.fspath(selected.parent)
+    assert "PYTHON=%s\n" % selected in result.stdout
+
+
+def test_legacy_verifier_rejects_forged_internal_environment(tmp_path):
+    script = (
+        REPOSITORY / "tests" / "python" / "non-mpi" / "packaging"
+        / "verify_legacy_install.sh"
+    )
+    environment = {
+        "CHIQ_LEGACY_VERIFIER_INTERNAL": "1",
+        "PATH": "/usr/bin:/bin",
+        "PYTHON_REQUEST": os.fspath(Path(sys.executable).resolve()),
+        "PYTHONPATH": os.fspath(tmp_path),
+        "GIT_DIR": os.fspath(tmp_path / "invalid.git"),
+    }
+
+    result = subprocess.run(
+        ["/bin/bash", os.fspath(script), "--audit-environment-only"],
+        cwd=os.fspath(REPOSITORY),
+        env=environment,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode != 0
+    assert "unsafe internal legacy verifier environment" in result.stderr
+    assert "Environment policy" not in result.stdout
