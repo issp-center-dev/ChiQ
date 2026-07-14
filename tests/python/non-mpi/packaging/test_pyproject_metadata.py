@@ -33,6 +33,19 @@ def test_pyproject_core_metadata():
     assert "dcore" in " ".join(extras["dcore"])
 
 
+def test_pyproject_pins_endpoint_build_frontends_and_dcore_boundary():
+    d = _load(os.path.join(ROOT, "pyproject.toml"))
+    assert d["build-system"]["requires"] == [
+        "scikit-build-core>=0.10,<0.11; python_version < '3.9'",
+        "scikit-build-core>=0.10,<1; python_version >= '3.9'",
+        "pybind11>=2.12,<3",
+        "cmake>=3.15",
+    ]
+    extras = d["project"]["optional-dependencies"]
+    assert extras["dcore"] == ["dcore==4.2.0", "mpi4py"]
+    assert extras["mpi"] == ["mpi4py"]
+
+
 def test_pyproject_has_exact_script_contract():
     d = _load(os.path.join(ROOT, "pyproject.toml"))
     scripts = d["project"]["scripts"]

@@ -150,8 +150,10 @@ cat "$DIAGNOSTICS/sanitized-environment.txt"
 "$PYTHON" -m venv "$FRONTEND_VENV"
 if "$FRONTEND_VENV/bin/python" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3, 8) else 1)'; then
   FRONTEND_REQUIREMENTS=("pip<25.1" "build<1.3" packaging toml)
+  BACKEND_REQUIREMENT="scikit-build-core>=0.10,<0.11"
 else
   FRONTEND_REQUIREMENTS=(pip build packaging toml)
+  BACKEND_REQUIREMENT="scikit-build-core>=0.10,<1"
 fi
 TMPDIR="$DIAGNOSTICS/tmp/frontend" PIP_CACHE_DIR="$DIAGNOSTICS/cache/frontend" \
   "$FRONTEND_VENV/bin/python" -m pip install --no-cache-dir --upgrade \
@@ -159,7 +161,7 @@ TMPDIR="$DIAGNOSTICS/tmp/frontend" PIP_CACHE_DIR="$DIAGNOSTICS/cache/frontend" \
   >"$LOGS/frontend-install.log" 2>&1
 TMPDIR="$DIAGNOSTICS/tmp/frontend" PIP_CACHE_DIR="$DIAGNOSTICS/cache/frontend" \
   "$FRONTEND_VENV/bin/python" -m pip install --no-cache-dir \
-  'scikit-build-core>=0.10,<1.0' 'pybind11>=2.12,<3.0' 'cmake>=3.15' \
+  "$BACKEND_REQUIREMENT" 'pybind11>=2.12,<3' 'cmake>=3.15' \
   >"$LOGS/backend-probe-install.log" 2>&1
 {
   "$FRONTEND_VENV/bin/python" --version

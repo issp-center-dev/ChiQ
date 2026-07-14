@@ -1,5 +1,10 @@
 [build-system]
-requires = ["scikit-build-core>=0.10,<1.0", "pybind11>=2.12,<3.0", "cmake>=3.15"]
+requires = [
+    "scikit-build-core>=0.10,<0.11; python_version < '3.9'",
+    "scikit-build-core>=0.10,<1; python_version >= '3.9'",
+    "pybind11>=2.12,<3",
+    "cmake>=3.15",
+]
 build-backend = "scikit_build_core.build"
 
 [project]
@@ -20,7 +25,7 @@ dependencies = [
 [project.optional-dependencies]
 plot = ["matplotlib"]
 mpi = ["mpi4py"]
-dcore = ["dcore"]
+dcore = ["dcore==4.2.0", "mpi4py"]
 gpu = ["cupy"]
 test = ["pytest"]
 
