@@ -534,6 +534,44 @@ def test_metadata_singletons_and_identity_are_exact(tmp_path, header, value):
         artifact_inspector.validate_wheel(archive)
 
 
+@pytest.mark.parametrize("metadata_version", ["2.1", "2.2", "2.3", "2.4", "2.5"])
+def test_accepts_supported_core_metadata_versions(tmp_path, metadata_version):
+    files = wheel_files()
+    metadata_path = DIST_INFO + "/METADATA"
+    files[metadata_path] = files[metadata_path].replace(
+        b"Metadata-Version: 2.3", ("Metadata-Version: %s" % metadata_version).encode()
+    )
+    archive = make_wheel(tmp_path, files)
+
+    assert artifact_inspector.validate_wheel(archive)["version"] == VERSION
+
+
+@pytest.mark.parametrize("metadata_version", ["1.2", "2.0", "2.6", "3.0", "garbage"])
+def test_rejects_unsupported_core_metadata_versions(tmp_path, metadata_version):
+    files = wheel_files()
+    metadata_path = DIST_INFO + "/METADATA"
+    files[metadata_path] = files[metadata_path].replace(
+        b"Metadata-Version: 2.3", ("Metadata-Version: %s" % metadata_version).encode()
+    )
+    archive = make_wheel(tmp_path, files)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="metadata version"):
+        artifact_inspector.validate_wheel(archive)
+
+
+def test_rejects_duplicate_core_metadata_version(tmp_path):
+    files = wheel_files()
+    metadata_path = DIST_INFO + "/METADATA"
+    files[metadata_path] = files[metadata_path].replace(
+        b"Metadata-Version: 2.3",
+        b"Metadata-Version: 2.2\nMetadata-Version: 2.3",
+    )
+    archive = make_wheel(tmp_path, files)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="duplicate.*Metadata-Version"):
+        artifact_inspector.validate_wheel(archive)
+
+
 @pytest.mark.parametrize("mutation", ["missing-core", "extra-core", "missing-extra", "wrong-marker"])
 def test_dependency_and_extra_contract_is_exact(tmp_path, mutation):
     files = wheel_files()

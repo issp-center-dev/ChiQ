@@ -82,6 +82,7 @@ _EXTRA_REQUIREMENTS = {
     "gpu": ("cupy",),
     "test": ("pytest",),
 }
+_SUPPORTED_CORE_METADATA = frozenset(("2.1", "2.2", "2.3", "2.4", "2.5"))
 _CONSOLE_SCRIPTS = {
     name: "chiq.cli.%s:main" % name for name in CANONICAL_COMMANDS
 }
@@ -1540,7 +1541,7 @@ def _strict_metadata(data):
         if len(all_values) != 1 or not str(all_values[0]).strip():
             raise ArtifactError("malformed or duplicate wheel metadata %s" % name)
         values[name] = str(all_values[0]).strip()
-    if values["Metadata-Version"] != "2.3":
+    if values["Metadata-Version"] not in _SUPPORTED_CORE_METADATA:
         raise ArtifactError("unexpected wheel metadata version")
     try:
         python = SpecifierSet(values["Requires-Python"])
