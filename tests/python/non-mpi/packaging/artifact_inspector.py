@@ -64,6 +64,9 @@ _ZIP_METHODS = (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)
 _ZIP_UTF8 = 0x800
 _ZIP_DEFLATE_OPTIONS = 0x6
 _ZIP_OUTPUT_CHUNK = 1024 * 1024
+_NATIVE_MODULE_NAME = re.compile(
+    r"^_bse_solver(?:\.[A-Za-z0-9][A-Za-z0-9_-]*)*\.(?:so|pyd|dylib)$"
+)
 _CORE_REQUIREMENTS = ("numpy>=1.23", "scipy", "more-itertools", "h5py", "toml")
 _EXTRA_REQUIREMENTS = {
     "plot": ("matplotlib",),
@@ -1564,6 +1567,8 @@ def _strict_metadata(data):
 def _validate_entry_points(data):
     try:
         text = data.decode("utf-8", errors="strict")
+        if re.search(r"(?mi)^\s*\[DEFAULT\]\s*$", text):
+            raise ArtifactError("wheel entry points forbid [DEFAULT]")
         parser = configparser.ConfigParser(
             interpolation=None, strict=True, delimiters=("=",), comment_prefixes=()
         )
@@ -1576,6 +1581,14 @@ def _validate_entry_points(data):
     actual = {name: value.strip() for name, value in parser.items("console_scripts")}
     if actual != _CONSOLE_SCRIPTS:
         raise ArtifactError("wheel console script entry points disagree with pyproject")
+
+
+def _valid_native_module_name(basename):
+    if _NATIVE_MODULE_NAME.fullmatch(basename) is None:
+        return False
+    middle = basename[len("_bse_solver."):].split(".")[:-1]
+    native_tokens = {suffix.lstrip(".") for suffix in NATIVE_SUFFIXES}
+    return not any(component in native_tokens for component in middle)
 
 
 def _validate_wheel_control(data, filename_tags):
@@ -1695,8 +1708,13 @@ def _validate_wheel_content(records, dist_info, entries):
         components = path.split("/")
         folded = [_identity_component(component) for component in components]
         basename = folded[-1]
+        original_basename = components[-1]
         if not entry["directory"] and basename.endswith(NATIVE_SUFFIXES):
-            if len(components) == 2 and components[0] == "chiq" and basename.startswith("_bse_solver"):
+            if (
+                len(components) == 2
+                and components[0] == "chiq"
+                and _valid_native_module_name(original_basename)
+            ):
                 native.append(path)
             else:
                 raise ArtifactError("forbidden native/solver extension in wheel: %s" % path)
@@ -1712,6 +1730,15 @@ def _validate_wheel_content(records, dist_info, entries):
             raise ArtifactError("forbidden source/build material in wheel: %s" % path)
     if len(native) != 1:
         raise ArtifactError("wheel must contain exactly one native chiq/_bse_solver extension")
+
+
+def _close_private_wheel(private):
+    primary_error = sys.exc_info()[1]
+    try:
+        private.close()
+    except BaseException as error:
+        if primary_error is None:
+            raise ArtifactError("cannot close private wheel artifact resource") from error
 
 
 def validate_wheel(path):
@@ -1744,7 +1771,7 @@ def validate_wheel(path):
         raise ArtifactError("malformed wheel ZIP archive") from error
     finally:
         if private is not None:
-            private.close()
+            _close_private_wheel(private)
     return {
         "kind": "wheel",
         "name": "chiq",

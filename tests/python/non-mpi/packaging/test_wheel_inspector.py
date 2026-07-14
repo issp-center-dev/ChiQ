@@ -591,6 +591,18 @@ def test_entry_points_are_exact_and_strict(tmp_path, mutation):
         artifact_inspector.validate_wheel(archive)
 
 
+@pytest.mark.parametrize("defaults", ["", "shadow = wrong.module:main\n"])
+def test_entry_points_forbid_default_section(tmp_path, defaults):
+    files = wheel_files()
+    entry_points = files[DIST_INFO + "/entry_points.txt"]
+    files[DIST_INFO + "/entry_points.txt"] = (
+        "[DEFAULT]\n" + defaults
+    ).encode() + entry_points
+    archive = make_wheel(tmp_path, files)
+    with pytest.raises(artifact_inspector.ArtifactError, match="entry|DEFAULT|section"):
+        artifact_inspector.validate_wheel(archive)
+
+
 @pytest.mark.parametrize("signature", ["RECORD.jws", "RECORD.p7s"])
 def test_forbids_record_signatures(tmp_path, signature):
     files = wheel_files()
@@ -712,12 +724,91 @@ def test_rejects_native_files_outside_exact_solver_allowlist(tmp_path, native):
         artifact_inspector.validate_wheel(archive)
 
 
+def _replace_native(files, basename):
+    native = next(
+        name for name in files
+        if name.startswith("chiq/_bse_solver") and name.endswith((".so", ".pyd", ".dylib"))
+    )
+    files.pop(native)
+    files["chiq/" + basename] = b"native"
+
+
+@pytest.mark.parametrize("basename", [
+    "_bse_solverevil.so",
+    "_bse_solver_evil.so",
+    "_bse_solver-evil.so",
+    "_bse_solver..so",
+    "_bse_solver.-evil.so",
+    "_bse_solver._evil.so",
+    "_bse_solver.so.backup.dylib",
+])
+def test_replacement_native_rejects_invalid_stem_or_tags(tmp_path, basename):
+    files = wheel_files()
+    _replace_native(files, basename)
+    archive = make_wheel(tmp_path, files)
+    with pytest.raises(artifact_inspector.ArtifactError, match="native|solver|extension"):
+        artifact_inspector.validate_wheel(archive)
+
+
+@pytest.mark.parametrize("basename", [
+    "_bse_solver.so",
+    "_bse_solver.cpython-310-x86_64-linux-gnu.so",
+    "_bse_solver.cpython-313-darwin.so",
+    "_bse_solver.cp310-win_amd64.pyd",
+    "_bse_solver.cp310.abi3.win_amd64.pyd",
+    "_bse_solver.abi3.dylib",
+])
+def test_replacement_native_accepts_portable_extension_names(tmp_path, basename):
+    files = wheel_files()
+    _replace_native(files, basename)
+    archive = make_wheel(tmp_path, files)
+    assert artifact_inspector.validate_wheel(archive)["kind"] == "wheel"
+
+
 def test_requires_exactly_one_native_solver(tmp_path):
     files = wheel_files()
     native = next(name for name in files if name.endswith(".so"))
     files.pop(native)
     archive = make_wheel(tmp_path, files)
     with pytest.raises(artifact_inspector.ArtifactError, match="native|solver"):
+        artifact_inspector.validate_wheel(archive)
+
+
+class _CloseFailure:
+    def __init__(self, wrapped):
+        self._wrapped = wrapped
+
+    def __getattr__(self, name):
+        return getattr(self._wrapped, name)
+
+    def close(self):
+        self._wrapped.close()
+        raise OSError("injected private wheel close failure")
+
+
+def _inject_private_close_failure(monkeypatch):
+    real_copy = artifact_inspector._copy_private_artifact
+    monkeypatch.setattr(
+        artifact_inspector,
+        "_copy_private_artifact",
+        lambda path, size: _CloseFailure(real_copy(path, size)),
+    )
+
+
+def test_private_wheel_close_failure_is_wrapped_after_success(tmp_path, monkeypatch):
+    archive = make_wheel(tmp_path)
+    _inject_private_close_failure(monkeypatch)
+    with pytest.raises(artifact_inspector.ArtifactError, match="close|private|resource"):
+        artifact_inspector.validate_wheel(archive)
+
+
+def test_private_wheel_close_failure_preserves_active_artifact_error(tmp_path, monkeypatch):
+    archive = make_wheel(
+        tmp_path,
+        filename="other-1.2.3-cp38-abi3-manylinux_2_17_x86_64.whl",
+    )
+    _inject_private_close_failure(monkeypatch)
+    with pytest.raises(artifact_inspector.ArtifactError, match="filename|name|disagreement"):
         artifact_inspector.validate_wheel(archive)
 
 
