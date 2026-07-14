@@ -100,6 +100,24 @@ def test_scripts_are_thin_wrappers(name):
     assert "from chiq.cli.%s import main" % name in text
 
 
+def test_plot_label_sources_compile_without_invalid_escape_warnings(tmp_path):
+    paths = (
+        os.path.join(ROOT, "python", "package", "chiq", "cli", "plot_chiq_path.py"),
+        os.path.join(ROOT, "python", "package", "chiq", "g2scl_core.py"),
+    )
+    env = dict(os.environ)
+    env["PYTHONPYCACHEPREFIX"] = str(tmp_path / "pycache")
+    result = subprocess.run(
+        [sys.executable, "-Wall", "-m", "py_compile"] + list(paths),
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "SyntaxWarning" not in result.stderr
+
+
 @pytest.mark.parametrize("name", CANONICAL_COMMANDS)
 def test_deprecated_alias_prints_stderr_and_forwards_argv(name, monkeypatch, capsys):
     from chiq.cli import _deprecated

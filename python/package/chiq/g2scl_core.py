@@ -96,7 +96,7 @@ def plot_common(filename):
     from matplotlib import cm
     plt.legend()
     # plt.xlim([-30,30])
-    plt.xlabel("$\omega_n$")
+    plt.xlabel(r"$\omega_n$")
     plt.axhline(0) # y=0
     plt.savefig(filename)
     print(" '%s'" %filename)
@@ -113,8 +113,8 @@ def plot_common_3d(xy, z, filename):
     fig = plt.figure()
     ax = Axes3D(fig)
     ax.plot_surface(x, y, z, cmap=cm.PuBu)
-    plt.xlabel("$\omega_n$")
-    plt.ylabel("$\omega_{n'}$")
+    plt.xlabel(r"$\omega_n$")
+    plt.ylabel(r"$\omega_{n'}$")
     plt.savefig(filename, dpi=200)
     print(" '%s'" %filename)
     plt.close()

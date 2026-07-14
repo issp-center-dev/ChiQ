@@ -29,7 +29,7 @@ def main():
     P.add_argument("file_qpath")
     P.add_argument("file_eigen")
     P.add_argument(
-        "-d", action="store_true", help="replace \chi with \Delta\chi in y-label"
+        "-d", action="store_true", help=r"replace \chi with \Delta\chi in y-label"
     )
     P.add_argument(
         "--mode",
