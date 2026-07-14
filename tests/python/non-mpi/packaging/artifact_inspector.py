@@ -7,12 +7,17 @@ archive graph before creating an extraction destination.
 """
 
 import argparse
+import base64
 import bz2
+import configparser
 import ctypes
+import csv
 from email import policy
 from email.parser import BytesParser
 import errno
 import gzip
+import hashlib
+import io
 import json
 import lzma
 import os
@@ -20,15 +25,21 @@ from pathlib import Path, PurePosixPath
 import re
 import secrets
 import stat
+import struct
 import sys
 import tarfile
 import tempfile
 import unicodedata
 import warnings
+import zipfile
 
-from packaging.utils import canonicalize_name, parse_sdist_filename
+from packaging.requirements import InvalidRequirement, Requirement
+from packaging.specifiers import InvalidSpecifier, SpecifierSet
+from packaging.utils import canonicalize_name, parse_sdist_filename, parse_wheel_filename
 from packaging.version import InvalidVersion, Version
 import toml
+
+from contracts import CANONICAL_COMMANDS, NATIVE_SUFFIXES, POINT_GROUP_MODULES, SHIM_MODULES
 
 
 MAX_ARCHIVE = 512 * 1024 * 1024
@@ -36,8 +47,8 @@ MAX_MEMBERS = 50000
 MAX_FILE = 256 * 1024 * 1024
 MAX_TOTAL = 2 * 1024 * 1024 * 1024
 MAX_RATIO = 200
+MAX_CONTROL_FILE = 16 * 1024 * 1024
 
-_NATIVE_SUFFIXES = (".so", ".pyd", ".dylib")
 _REGULAR_TYPES = (tarfile.REGTYPE, tarfile.AREGTYPE)
 _VERSION_PROVIDER = "scikit_build_core.metadata.regex"
 _VERSION_INPUT = "python/package/chiq/__init__.py"
@@ -45,6 +56,27 @@ _DRIVE = re.compile(r"^[A-Za-z]:")
 _ZERO_BLOCK = b"\0" * tarfile.BLOCKSIZE
 _PAX_TYPES = (tarfile.XHDTYPE, tarfile.XGLTYPE)
 _MAX_TAR_PADDING = tarfile.RECORDSIZE
+_EOCD = struct.Struct("<4s4H2LH")
+_CENTRAL = struct.Struct("<4s6H3L5H2L")
+_LOCAL = struct.Struct("<4s5H3L2H")
+_ZIP_METHODS = (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)
+_ZIP_UTF8 = 0x800
+_ZIP_DEFLATE_OPTIONS = 0x6
+_CORE_REQUIREMENTS = ("numpy>=1.23", "scipy", "more-itertools", "h5py", "toml")
+_EXTRA_REQUIREMENTS = {
+    "plot": ("matplotlib",),
+    "mpi": ("mpi4py",),
+    "dcore": ("dcore",),
+    "gpu": ("cupy",),
+    "test": ("pytest",),
+}
+_CONSOLE_SCRIPTS = {
+    name: "chiq.cli.%s:main" % name for name in CANONICAL_COMMANDS
+}
+_CONSOLE_SCRIPTS.update({
+    name + ".py": "chiq.cli._deprecated:%s_py" % name
+    for name in tuple(_CONSOLE_SCRIPTS)
+})
 
 
 class ArtifactError(RuntimeError):
@@ -64,6 +96,10 @@ _close = os.close
 _capability_override = None
 _after_directory_mkdir = lambda parent_fd, name: None
 _before_publish_identity = lambda parent_fd, staging, destination: None
+
+
+def _zip_entry_ratio_exceeded(size, compressed_size):
+    return bool(size and (not compressed_size or size > MAX_RATIO * compressed_size))
 
 
 def _require_capabilities():
@@ -541,7 +577,7 @@ def _validate_content(relative_files, relative_entries):
     for path, kind in relative_entries.items():
         components = [_identity_component(item) for item in path.split("/")]
         basename = components[-1]
-        if basename.endswith(_NATIVE_SUFFIXES):
+        if basename.endswith(NATIVE_SUFFIXES):
             raise ArtifactError("forbidden native binary in sdist: %s" % path)
         if "__pycache__" in components or basename.endswith(".pyc"):
             raise ArtifactError("forbidden cache artifact in sdist: %s" % path)
@@ -1092,6 +1128,576 @@ def extract_sdist(path, destination):
     return manifest
 
 
+def _zip_read_at(stream, offset, size, description):
+    if offset < 0 or size < 0:
+        raise ArtifactError("negative ZIP range for %s" % description)
+    try:
+        stream.seek(offset)
+        data = stream.read(size)
+    except OSError as error:
+        raise ArtifactError("cannot read ZIP %s" % description) from error
+    if len(data) != size:
+        raise ArtifactError("out-of-range ZIP %s" % description)
+    return data
+
+
+def _zip_extra_fields(data):
+    offset = 0
+    while offset < len(data):
+        if len(data) - offset < 4:
+            raise ArtifactError("malformed ZIP extra field")
+        identifier, size = struct.unpack_from("<HH", data, offset)
+        offset += 4
+        if size > len(data) - offset:
+            raise ArtifactError("malformed ZIP extra field length")
+        if identifier == 1:
+            raise ArtifactError("ZIP64 is unsupported")
+        offset += size
+
+
+def _zip_name(raw_name, flags):
+    if not raw_name or b"\0" in raw_name:
+        raise ArtifactError("invalid ZIP member name")
+    if not flags & _ZIP_UTF8 and any(byte >= 128 for byte in raw_name):
+        raise ArtifactError("non-ASCII ZIP name lacks UTF-8 flag")
+    try:
+        return raw_name.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ArtifactError("ZIP member name is not valid UTF-8") from error
+
+
+def _zip_components(name, is_directory):
+    if is_directory:
+        if not name.endswith("/") or name.endswith("//"):
+            raise ArtifactError("non-canonical ZIP directory path")
+        name = name[:-1]
+    elif name.endswith("/"):
+        raise ArtifactError("ambiguous ZIP file path")
+    return canonical_member_path(name)
+
+
+def _zip_graph(entries):
+    exact = set()
+    nodes = {}
+    spellings = {}
+    result = []
+    for entry in entries:
+        components = entry["components"]
+        path = "/".join(components)
+        kind = "directory" if entry["directory"] else "file"
+        if path in exact:
+            raise ArtifactError("duplicate ZIP archive entry: %s" % path)
+        exact.add(path)
+        normalized = []
+        for index, component in enumerate(components):
+            normalized.append(_identity_component(component))
+            key = tuple(normalized)
+            spelling = "/".join(components[:index + 1])
+            previous = spellings.get(key)
+            if previous is not None and previous != spelling:
+                raise ArtifactError("normalized ZIP path collision/alias")
+            spellings[key] = spelling
+        for index in range(1, len(components)):
+            ancestor = "/".join(components[:index])
+            if nodes.get(ancestor) == "file":
+                raise ArtifactError("ZIP ancestor-file conflict")
+            nodes.setdefault(ancestor, "directory")
+        previous_kind = nodes.get(path)
+        if previous_kind is not None and previous_kind != kind:
+            raise ArtifactError("ZIP file/directory conflict")
+        if kind == "file" and previous_kind == "directory":
+            raise ArtifactError("ZIP file conflicts with directory graph")
+        nodes[path] = kind
+        entry["path"] = path
+        result.append(entry)
+    return result
+
+
+def _preflight_zip(stream, archive_size):
+    tail_size = min(archive_size, 65557)
+    tail_offset = archive_size - tail_size
+    tail = _zip_read_at(stream, tail_offset, tail_size, "EOCD search window")
+    relative = tail.rfind(b"PK\x05\x06")
+    if relative < 0:
+        raise ArtifactError("missing ZIP EOCD")
+    eocd_offset = tail_offset + relative
+    if archive_size - eocd_offset < _EOCD.size:
+        raise ArtifactError("truncated ZIP EOCD")
+    values = _EOCD.unpack(_zip_read_at(stream, eocd_offset, _EOCD.size, "EOCD"))
+    _signature, disk, central_disk, disk_count, count, central_size, central_offset, comment_size = values
+    if any(value == 0xFFFF for value in (disk, central_disk, disk_count, count)) or any(
+        value == 0xFFFFFFFF for value in (central_size, central_offset)
+    ):
+        raise ArtifactError("ZIP64 is unsupported")
+    if disk or central_disk:
+        raise ArtifactError("multi-disk ZIP archives are forbidden")
+    if disk_count != count:
+        raise ArtifactError("inconsistent ZIP EOCD member count")
+    if count > MAX_MEMBERS:
+        raise ArtifactError("ZIP member count exceeds limit")
+    if eocd_offset + _EOCD.size + comment_size != archive_size:
+        raise ArtifactError("inconsistent ZIP EOCD comment size")
+    if comment_size:
+        raise ArtifactError("ZIP archive comments are unsupported")
+    if central_offset + central_size != eocd_offset:
+        raise ArtifactError("inconsistent ZIP central directory offset/size")
+    if central_offset < 0 or central_offset > eocd_offset:
+        raise ArtifactError("out-of-range ZIP central directory")
+
+    entries = []
+    cursor = central_offset
+    total = 0
+    compressed_total = 0
+    local_offsets = set()
+    for _index in range(count):
+        if cursor + _CENTRAL.size > eocd_offset:
+            raise ArtifactError("truncated ZIP central directory")
+        header = _CENTRAL.unpack(_zip_read_at(stream, cursor, _CENTRAL.size, "central header"))
+        if header[0] != b"PK\x01\x02":
+            raise ArtifactError("malformed ZIP central directory signature")
+        flags, method = header[3], header[4]
+        crc, compressed_size, size = header[7], header[8], header[9]
+        name_size, extra_size, member_comment = header[10], header[11], header[12]
+        disk_start, local_offset = header[13], header[16]
+        external_attributes = header[15]
+        variable_size = name_size + extra_size + member_comment
+        variable = _zip_read_at(
+            stream, cursor + _CENTRAL.size, variable_size, "central variable fields"
+        )
+        raw_name = variable[:name_size]
+        extra = variable[name_size:name_size + extra_size]
+        if disk_start:
+            raise ArtifactError("multi-disk ZIP member is forbidden")
+        if member_comment:
+            raise ArtifactError("ZIP member comments are unsupported")
+        if flags & 1:
+            raise ArtifactError("encrypted ZIP entries are forbidden")
+        if flags & 8:
+            raise ArtifactError("ZIP data descriptors are unsupported")
+        allowed_flags = _ZIP_UTF8 | (_ZIP_DEFLATE_OPTIONS if method == zipfile.ZIP_DEFLATED else 0)
+        if flags & ~allowed_flags:
+            raise ArtifactError("unsafe or unsupported ZIP flags")
+        if method not in _ZIP_METHODS:
+            raise ArtifactError("unsupported wheel ZIP compression method")
+        if method == zipfile.ZIP_STORED and compressed_size != size:
+            raise ArtifactError("stored ZIP member has inconsistent sizes")
+        _zip_extra_fields(extra)
+        if local_offset in local_offsets:
+            raise ArtifactError("duplicate ZIP local header offset")
+        local_offsets.add(local_offset)
+        name = _zip_name(raw_name, flags)
+        directory = name.endswith("/")
+        components = _zip_components(name, directory)
+        unix_mode = (external_attributes >> 16) & 0xFFFF
+        file_type = stat.S_IFMT(unix_mode)
+        allowed_type = stat.S_IFDIR if directory else stat.S_IFREG
+        if file_type not in (0, allowed_type):
+            raise ArtifactError("ZIP symlink or special file type is forbidden")
+        if bool(external_attributes & 0x10) != directory:
+            raise ArtifactError("ZIP directory external attributes disagree with name")
+        if directory and (size or crc):
+            raise ArtifactError("ZIP directory has file data")
+        if size > MAX_FILE:
+            raise ArtifactError("ZIP member file size exceeds limit")
+        total += size
+        compressed_total += compressed_size
+        if total > MAX_TOTAL:
+            raise ArtifactError("ZIP total uncompressed size exceeds limit")
+        if _zip_entry_ratio_exceeded(size, compressed_size):
+            raise ArtifactError("ZIP per-entry compression ratio exceeds limit")
+
+        local_raw = _zip_read_at(stream, local_offset, _LOCAL.size, "local header")
+        local = _LOCAL.unpack(local_raw)
+        if local[0] != b"PK\x03\x04":
+            raise ArtifactError("malformed or out-of-range ZIP local header")
+        local_name_size, local_extra_size = local[9], local[10]
+        local_variable = _zip_read_at(
+            stream,
+            local_offset + _LOCAL.size,
+            local_name_size + local_extra_size,
+            "local variable fields",
+        )
+        local_name = local_variable[:local_name_size]
+        local_extra = local_variable[local_name_size:]
+        _zip_extra_fields(local_extra)
+        if (
+            local[2] != flags
+            or local[3] != method
+            or local[6] != crc
+            or local[7] != compressed_size
+            or local[8] != size
+            or local_name != raw_name
+        ):
+            raise ArtifactError("ZIP local/central header disagreement")
+        payload_offset = local_offset + _LOCAL.size + local_name_size + local_extra_size
+        end = payload_offset + compressed_size
+        if local_offset < 0 or end > central_offset:
+            raise ArtifactError("ZIP local header or payload range overlaps central directory")
+        entries.append({
+            "raw_name": raw_name,
+            "zip_name": name,
+            "components": components,
+            "directory": directory,
+            "size": size,
+            "compressed_size": compressed_size,
+            "crc": crc,
+            "method": method,
+            "flags": flags,
+            "local_offset": local_offset,
+            "range": (local_offset, end),
+        })
+        cursor += _CENTRAL.size + variable_size
+    if cursor != eocd_offset or cursor - central_offset != central_size:
+        raise ArtifactError("inconsistent ZIP central directory size/count")
+    if total and (not compressed_total or total > MAX_RATIO * compressed_total):
+        raise ArtifactError("ZIP aggregate compression ratio exceeds limit")
+    ordered = sorted((entry["range"], entry["zip_name"]) for entry in entries)
+    expected = 0
+    for (start, end), _name in ordered:
+        if start != expected:
+            raise ArtifactError("overlapping or ambiguous ZIP local/payload regions")
+        if end < start:
+            raise ArtifactError("invalid ZIP payload range")
+        expected = end
+    if expected != central_offset:
+        raise ArtifactError("ZIP local regions overlap or leave ambiguous data")
+    return _zip_graph(entries), total
+
+
+def _read_zip_members(stream, entries, retained_paths):
+    records = {}
+    retained = {}
+    try:
+        stream.seek(0)
+        with zipfile.ZipFile(stream, mode="r") as archive:
+            infos = archive.infolist()
+            if len(infos) != len(entries):
+                raise ArtifactError("ZIP parser/central member count disagreement")
+            for entry, info in zip(entries, infos):
+                if (
+                    info.filename != entry["zip_name"]
+                    or info.header_offset != entry["local_offset"]
+                    or info.file_size != entry["size"]
+                    or info.compress_size != entry["compressed_size"]
+                    or info.CRC != entry["crc"]
+                ):
+                    raise ArtifactError("ZIP parser/raw header disagreement")
+                keep = entry["path"] in retained_paths
+                if keep and entry["size"] > MAX_CONTROL_FILE:
+                    raise ArtifactError("wheel control file exceeds in-memory validation limit")
+                chunks = [] if keep else None
+                digest = hashlib.sha256()
+                remaining = entry["size"]
+                with archive.open(info, mode="r") as member:
+                    while remaining:
+                        chunk = member.read(min(1024 * 1024, remaining))
+                        if not chunk:
+                            raise ArtifactError("ZIP member is shorter than declared")
+                        digest.update(chunk)
+                        if chunks is not None:
+                            chunks.append(chunk)
+                        remaining -= len(chunk)
+                    if member.read(1):
+                        raise ArtifactError("ZIP member is longer than declared")
+                if entry["directory"]:
+                    if entry["size"]:
+                        raise ArtifactError("ZIP directory decompressed to file data")
+                else:
+                    records[entry["path"]] = {
+                        "size": entry["size"],
+                        "sha256": digest.digest(),
+                    }
+                    if chunks is not None:
+                        retained[entry["path"]] = b"".join(chunks)
+    except ArtifactError:
+        raise
+    except (OSError, EOFError, RuntimeError, NotImplementedError, zipfile.BadZipFile) as error:
+        raise ArtifactError("malformed ZIP member or invalid CRC") from error
+    return records, retained
+
+
+def _wheel_identity(path, entries):
+    try:
+        filename_name, filename_version, _build, tags = parse_wheel_filename(Path(path).name)
+    except Exception as error:
+        raise ArtifactError("malformed wheel filename") from error
+    dist_infos = set()
+    for entry in entries:
+        components = entry["components"]
+        if any(
+            component.casefold().endswith(".dist-info")
+            for component in components[1:]
+        ):
+            raise ArtifactError("nested .dist-info directory is forbidden")
+        first = components[0]
+        if first.casefold().endswith(".dist-info"):
+            dist_infos.add(first)
+    if len(dist_infos) != 1:
+        raise ArtifactError("wheel must contain exactly one .dist-info directory")
+    dist_info = dist_infos.pop()
+    stem = dist_info[:-10]
+    if "-" not in stem:
+        raise ArtifactError("malformed wheel .dist-info identity")
+    dist_name, dist_version_text = stem.rsplit("-", 1)
+    try:
+        dist_version = Version(dist_version_text)
+    except InvalidVersion as error:
+        raise ArtifactError("invalid wheel .dist-info version") from error
+    if canonicalize_name(filename_name) != "chiq" or canonicalize_name(dist_name) != "chiq":
+        raise ArtifactError("wheel filename/dist-info project name disagreement")
+    if filename_version != dist_version:
+        raise ArtifactError("wheel filename/dist-info version disagreement")
+    return dist_info, dist_version, {str(tag) for tag in tags}
+
+
+def _strict_metadata(data):
+    try:
+        message = BytesParser(policy=policy.default).parsebytes(data)
+    except (TypeError, ValueError) as error:
+        raise ArtifactError("malformed wheel METADATA") from error
+    if message.defects:
+        raise ArtifactError("malformed wheel METADATA")
+    values = {}
+    for name in ("Metadata-Version", "Name", "Version", "Requires-Python"):
+        all_values = message.get_all(name, [])
+        if len(all_values) != 1 or not str(all_values[0]).strip():
+            raise ArtifactError("malformed or duplicate wheel metadata %s" % name)
+        values[name] = str(all_values[0]).strip()
+    if values["Metadata-Version"] != "2.3":
+        raise ArtifactError("unexpected wheel metadata version")
+    try:
+        python = SpecifierSet(values["Requires-Python"])
+    except InvalidSpecifier as error:
+        raise ArtifactError("malformed Requires-Python metadata") from error
+    if str(python) != ">=3.8":
+        raise ArtifactError("wheel Requires-Python must be >=3.8")
+    extras = message.get_all("Provides-Extra", [])
+    if len(extras) != len(set(extras)) or set(map(str, extras)) != set(_EXTRA_REQUIREMENTS):
+        raise ArtifactError("wheel dependency extra declarations disagree with pyproject")
+    expected_text = list(_CORE_REQUIREMENTS)
+    expected_text.extend(
+        '%s; extra == "%s"' % (requirement, extra)
+        for extra, requirements in _EXTRA_REQUIREMENTS.items()
+        for requirement in requirements
+    )
+    try:
+        actual = [Requirement(str(value)) for value in message.get_all("Requires-Dist", [])]
+        expected = [Requirement(value) for value in expected_text]
+    except InvalidRequirement as error:
+        raise ArtifactError("malformed wheel Requires-Dist metadata") from error
+    if len(actual) != len(set(actual)) or set(actual) != set(expected):
+        raise ArtifactError("wheel dependency declarations disagree with pyproject")
+    try:
+        version = Version(values["Version"])
+    except InvalidVersion as error:
+        raise ArtifactError("invalid wheel METADATA version") from error
+    return values["Name"], version
+
+
+def _validate_entry_points(data):
+    try:
+        text = data.decode("utf-8", errors="strict")
+        parser = configparser.ConfigParser(
+            interpolation=None, strict=True, delimiters=("=",), comment_prefixes=()
+        )
+        parser.optionxform = str
+        parser.read_string(text)
+    except (UnicodeDecodeError, configparser.Error, ValueError) as error:
+        raise ArtifactError("malformed or duplicate wheel entry points") from error
+    if parser.sections() != ["console_scripts"]:
+        raise ArtifactError("wheel entry points must contain exactly [console_scripts]")
+    actual = {name: value.strip() for name, value in parser.items("console_scripts")}
+    if actual != _CONSOLE_SCRIPTS:
+        raise ArtifactError("wheel console script entry points disagree with pyproject")
+
+
+def _validate_wheel_control(data, filename_tags):
+    try:
+        message = BytesParser(policy=policy.default).parsebytes(data)
+    except (TypeError, ValueError) as error:
+        raise ArtifactError("malformed WHEEL metadata") from error
+    if message.defects:
+        raise ArtifactError("malformed WHEEL metadata")
+    values = {}
+    for name in ("Wheel-Version", "Root-Is-Purelib"):
+        all_values = message.get_all(name, [])
+        if len(all_values) != 1 or not str(all_values[0]).strip():
+            raise ArtifactError("malformed or duplicate WHEEL %s" % name)
+        values[name] = str(all_values[0]).strip()
+    if values["Wheel-Version"] != "1.0":
+        raise ArtifactError("unsupported WHEEL version")
+    if values["Root-Is-Purelib"].casefold() != "false":
+        raise ArtifactError("native ChiQ WHEEL Root-Is-Purelib must be false")
+    tags = [str(value).strip() for value in message.get_all("Tag", [])]
+    if not tags or len(tags) != len(set(tags)) or set(tags) != filename_tags:
+        raise ArtifactError("WHEEL tags disagree with wheel filename")
+
+
+def _validate_record(records, data, dist_info):
+    record_path = dist_info + "/RECORD"
+    for signature in (dist_info + "/RECORD.jws", dist_info + "/RECORD.p7s"):
+        if signature in records:
+            raise ArtifactError("wheel RECORD signatures are forbidden")
+    try:
+        text = data.decode("utf-8", errors="strict")
+        rows = list(csv.reader(io.StringIO(text, newline=""), strict=True))
+    except (UnicodeDecodeError, csv.Error) as error:
+        raise ArtifactError("wheel RECORD must be strict UTF-8 CSV") from error
+    seen = set()
+    aliases = {}
+    for row in rows:
+        if len(row) != 3:
+            raise ArtifactError("wheel RECORD rows must have exactly three columns")
+        name, encoded_hash, encoded_size = row
+        components = canonical_member_path(name)
+        alias = tuple(_identity_component(item) for item in components)
+        previous = aliases.get(alias)
+        if previous is not None and previous != name:
+            raise ArtifactError("wheel RECORD path alias/collision")
+        aliases[alias] = name
+        if name in seen:
+            raise ArtifactError("duplicate wheel RECORD row")
+        seen.add(name)
+        if name == record_path:
+            if encoded_hash or encoded_size:
+                raise ArtifactError("wheel RECORD row must have empty hash and size")
+            continue
+        if name not in records:
+            raise ArtifactError("extra wheel RECORD row")
+        if not re.fullmatch(r"sha256=[A-Za-z0-9_-]{43}", encoded_hash):
+            raise ArtifactError("wheel RECORD hash must be canonical unpadded URL-safe sha256")
+        digest_text = encoded_hash[len("sha256="):]
+        try:
+            digest = base64.b64decode(digest_text + "=", altchars=b"-_", validate=True)
+        except (ValueError, TypeError) as error:
+            raise ArtifactError("malformed wheel RECORD base64 hash") from error
+        expected_digest = records[name]["sha256"]
+        canonical_digest = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
+        if canonical_digest != digest_text:
+            raise ArtifactError("wheel RECORD base64 hash is not canonical")
+        if digest != expected_digest:
+            raise ArtifactError("wheel RECORD hash mismatch")
+        if not re.fullmatch(r"0|[1-9][0-9]*", encoded_size):
+            raise ArtifactError("wheel RECORD size is not canonical decimal")
+        if int(encoded_size) != records[name]["size"]:
+            raise ArtifactError("wheel RECORD size mismatch")
+    if seen != set(records):
+        raise ArtifactError("wheel RECORD has missing or extra file rows")
+
+
+def _validate_wheel_content(records, dist_info, entries):
+    required = (
+        "chiq/__init__.py",
+        "chiq/cli/__init__.py",
+        "chiq/cli/_deprecated.py",
+        "chiq/point_group_data/__init__.py",
+        "chiq/solver/__init__.py",
+        "chiq/solver/cpp.py",
+        "bse/__init__.py",
+        "bse/point_group_data/__init__.py",
+        "bse_solver/__init__.py",
+        dist_info + "/METADATA",
+        dist_info + "/WHEEL",
+        dist_info + "/entry_points.txt",
+        dist_info + "/RECORD",
+    )
+    for path in required:
+        if path not in records:
+            raise ArtifactError("missing required wheel package/content: %s" % path)
+    contract_modules = set(
+        ["chiq/cli/%s.py" % name for name in CANONICAL_COMMANDS]
+        + ["chiq/point_group_data/%s.py" % name for name in POINT_GROUP_MODULES]
+        + ["chiq/%s.py" % name for name in SHIM_MODULES]
+        + ["bse/%s.py" % name for name in SHIM_MODULES]
+        + ["bse/point_group_data/%s.py" % name for name in POINT_GROUP_MODULES]
+        + ["chiq/cli/_common.py", "chiq/cli/_deprecated.py"]
+        + [
+            "chiq/solver/%s.py" % name
+            for name in ("base", "cpp", "numpy", "cupy", "kernels", "layout")
+        ]
+    )
+    missing_modules = contract_modules - set(records)
+    if missing_modules:
+        raise ArtifactError(
+            "missing required wheel contract module: %s" % sorted(missing_modules)[0]
+        )
+
+    native = []
+    for entry in entries:
+        path = entry["path"]
+        components = path.split("/")
+        folded = [_identity_component(component) for component in components]
+        basename = folded[-1]
+        if not entry["directory"] and basename.endswith(NATIVE_SUFFIXES):
+            if len(components) == 2 and components[0] == "chiq" and basename.startswith("_bse_solver"):
+                native.append(path)
+            else:
+                raise ArtifactError("forbidden native/solver extension in wheel: %s" % path)
+        if "__pycache__" in folded or basename.endswith((".pyc", ".pyo")):
+            raise ArtifactError("forbidden cache content in wheel: %s" % path)
+        if not entry["directory"] and basename.endswith((".h5", ".hdf5")):
+            raise ArtifactError("forbidden HDF5 fixture/content in wheel: %s" % path)
+        if components[0] not in ("chiq", "bse", "bse_solver", dist_info):
+            raise ArtifactError("forbidden source/build/legacy wheel content: %s" % path)
+        if any(component in ("tests", "test", "src", "source", "build", "cmake", "lib", "python", "scripts") for component in folded[:-1]):
+            raise ArtifactError("forbidden source/build/legacy wheel layout: %s" % path)
+        if basename in ("cmakelists.txt", "chiqvars.sh", "install_manifest.txt") or basename.endswith((".cpp", ".cc", ".cxx", ".h", ".hpp", ".o", ".a")):
+            raise ArtifactError("forbidden source/build material in wheel: %s" % path)
+    if len(native) != 1:
+        raise ArtifactError("wheel must contain exactly one native chiq/_bse_solver extension")
+
+
+def validate_wheel(path):
+    """Validate ZIP safety, wheel metadata, RECORD, and ChiQ content."""
+    archive_size = _checked_archive_size(path)
+    private = None
+    try:
+        private = _copy_private_artifact(path, archive_size)
+        entries, total = _preflight_zip(private, archive_size)
+        dist_info, version, filename_tags = _wheel_identity(path, entries)
+        metadata_path = dist_info + "/METADATA"
+        wheel_path = dist_info + "/WHEEL"
+        entry_points_path = dist_info + "/entry_points.txt"
+        record_path = dist_info + "/RECORD"
+        controls = (metadata_path, wheel_path, entry_points_path, record_path)
+        records, retained = _read_zip_members(private, entries, set(controls))
+        for required in controls:
+            if required not in records:
+                raise ArtifactError("missing required wheel dist-info file: %s" % required)
+        metadata_name, metadata_version = _strict_metadata(retained[metadata_path])
+        if canonicalize_name(metadata_name) != "chiq" or metadata_version != version:
+            raise ArtifactError("wheel filename/dist-info/METADATA name or version disagreement")
+        _validate_wheel_control(retained[wheel_path], filename_tags)
+        _validate_entry_points(retained[entry_points_path])
+        _validate_record(records, retained[record_path], dist_info)
+        _validate_wheel_content(records, dist_info, entries)
+    except ArtifactError:
+        raise
+    except (OSError, EOFError, UnicodeError, ValueError, struct.error) as error:
+        raise ArtifactError("malformed wheel ZIP archive") from error
+    finally:
+        if private is not None:
+            private.close()
+    return {
+        "kind": "wheel",
+        "name": "chiq",
+        "version": str(version),
+        "archive_size": archive_size,
+        "uncompressed_size": total,
+        "members": sorted(
+            [
+                {
+                    "path": entry["path"],
+                    "type": "directory" if entry["directory"] else "file",
+                    "size": entry["size"],
+                }
+                for entry in entries
+            ],
+            key=lambda row: row["path"],
+        ),
+    }
+
+
 def _write_manifest(path, manifest):
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -1107,19 +1713,25 @@ def main(argv=None):
     sdist.add_argument("archive")
     sdist.add_argument("--extract")
     sdist.add_argument("--manifest")
+    wheel = subparsers.add_parser("wheel")
+    wheel.add_argument("archive")
+    wheel.add_argument("--manifest")
     args = parser.parse_args(argv)
 
-    if args.manifest and args.extract:
+    extract = getattr(args, "extract", None)
+    if args.manifest and extract:
         manifest_path = _resolve_path(args.manifest)
-        extraction_path = _resolve_path(args.extract)
+        extraction_path = _resolve_path(extract)
         try:
             manifest_path.relative_to(extraction_path)
         except ValueError:
             pass
         else:
             parser.error("--manifest must be outside --extract")
-    if args.extract:
-        manifest = extract_sdist(args.archive, args.extract)
+    if args.kind == "wheel":
+        manifest = validate_wheel(args.archive)
+    elif extract:
+        manifest = extract_sdist(args.archive, extract)
     else:
         manifest = validate_sdist(args.archive)
     if args.manifest:
