@@ -312,7 +312,7 @@ def test_legacy_verifier_scrubs_ambient_code_and_tool_configuration(tmp_path):
     assert not bash_marker.exists()
 
 
-def test_legacy_verifier_runtime_path_starts_with_selected_python(tmp_path):
+def test_legacy_verifier_keeps_build_path_safe_and_scopes_python_to_runtime(tmp_path):
     script = (
         REPOSITORY / "tests" / "python" / "non-mpi" / "packaging"
         / "verify_legacy_install.sh"
@@ -338,8 +338,45 @@ def test_legacy_verifier_runtime_path_starts_with_selected_python(tmp_path):
     path_line = next(
         line for line in result.stdout.splitlines() if line.startswith("PATH=")
     )
-    assert path_line.split("=", 1)[1].split(":", 1)[0] == os.fspath(selected.parent)
+    assert path_line.split("=", 1)[1] == "/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
     assert "PYTHON=%s\n" % selected in result.stdout
+    text = script.read_text(encoding="utf-8")
+    assert 'PATH="$PYTHON_BIN:$PREFIX/bin:$SAFE_PATH"' in text
+
+
+def test_legacy_verifier_uses_private_home_and_disables_user_tool_configuration():
+    text = (
+        REPOSITORY / "tests/python/non-mpi/packaging/verify_legacy_install.sh"
+    ).read_text(encoding="utf-8")
+    assert 'HOME="$POLICY_ROOT/home"' in text
+    assert 'GIT_CONFIG_GLOBAL=/dev/null' in text
+    assert 'GIT_CONFIG_NOSYSTEM=1' in text
+    assert '-DCMAKE_FIND_USE_PACKAGE_REGISTRY=FALSE' in text
+
+
+def test_legacy_verifier_does_not_restore_hostile_home(tmp_path):
+    script = (
+        REPOSITORY / "tests/python/non-mpi/packaging/verify_legacy_install.sh"
+    )
+    hostile = tmp_path / "hostile-home"
+    (hostile / ".cmake" / "packages" / "Eigen3").mkdir(parents=True)
+    (hostile / ".gitconfig").write_text("[alias]\ndescribe = !false\n")
+    environment = {
+        "HOME": os.fspath(hostile),
+        "PATH": "/usr/bin:/bin",
+        "TMPDIR": os.fspath(tmp_path),
+        "PYTHON": os.fspath(Path(sys.executable).resolve()),
+    }
+
+    result = subprocess.run(
+        [os.fspath(script), "--audit-environment-only"],
+        cwd=os.fspath(REPOSITORY), env=environment, capture_output=True, text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    home_line = next(line for line in result.stdout.splitlines() if line.startswith("HOME="))
+    assert os.fspath(hostile) not in home_line
+    assert "GIT_CONFIG_GLOBAL=/dev/null" in result.stdout
 
 
 def test_legacy_verifier_rejects_forged_internal_environment(tmp_path):

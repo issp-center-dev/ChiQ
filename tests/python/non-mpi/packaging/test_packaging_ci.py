@@ -55,6 +55,35 @@ def test_pip_verifier_has_four_distinct_venvs_and_exact_installs():
     assert 'cd "$EXTERNAL_CWD"' in script
 
 
+def test_pip_verifier_installs_only_inspector_published_artifacts():
+    script = (ROOT / "tests/python/non-mpi/packaging/verify_pip_install.sh").read_text()
+    create_parent = script.index('mkdir -m 700 "$VALIDATED_ARTIFACTS"')
+    inspect_sdist = script.index('"$PACKAGING/artifact_inspector.py" sdist')
+    assert create_parent < inspect_sdist
+    assert script.count("--publish-directory") == 2
+    assert 'SDIST=$(manifest_value "$DIAGNOSTICS/sdist-manifest.json" published_path)' in script
+    assert 'WHEEL=$(manifest_value "$DIAGNOSTICS/wheel-manifest.json" published_path)' in script
+    assert 'manifest_value "$DIAGNOSTICS/sdist-manifest.json" archive_sha256' in script
+    assert 'manifest_value "$DIAGNOSTICS/wheel-manifest.json" archive_sha256' in script
+    assert 'pip install --no-cache-dir "$WHEEL_BUILD' not in script
+    assert 'pip install --no-cache-dir "$SDIST_BUILD' not in script
+    assert "os.O_RDONLY | os.O_NOFOLLOW" in script
+    assert "path = os.path.abspath(sys.argv[1])" in script
+    assert "trusted_parent = os.path.realpath(os.path.dirname(path))" in script
+    assert "published artifact identity changed before install" in script
+    assert "trusted private directory" in script
+
+
+def test_pip_verifier_uses_private_home_and_disables_user_tool_configuration():
+    script = (ROOT / "tests/python/non-mpi/packaging/verify_pip_install.sh").read_text()
+    assert 'HOME="$POLICY_ROOT/home"' in script
+    assert 'PIP_CONFIG_FILE=/dev/null' in script
+    assert 'GIT_CONFIG_GLOBAL=/dev/null' in script
+    assert 'GIT_CONFIG_NOSYSTEM=1' in script
+    assert 'CMAKE_FIND_USE_PACKAGE_REGISTRY=FALSE' in script
+    assert '-DCMAKE_FIND_USE_PACKAGE_REGISTRY=FALSE' in script
+
+
 def test_pip_verifier_sanitizes_and_separates_mode_state():
     script = (ROOT / "tests/python/non-mpi/packaging/verify_pip_install.sh").read_text()
     assert "env -i" in script
@@ -192,6 +221,32 @@ def test_verifier_rehomes_tmpdir_outside_source_tree(tmp_path, through_symlink):
     assert str(ROOT) not in next(
         line for line in result.stdout.splitlines() if line.startswith("TMPDIR=")
     )
+
+
+def test_verifier_does_not_restore_hostile_home(tmp_path):
+    script = ROOT / "tests/python/non-mpi/packaging/verify_pip_install.sh"
+    hostile = tmp_path / "hostile-home"
+    (hostile / ".config" / "pip").mkdir(parents=True)
+    (hostile / ".config" / "pip" / "pip.conf").write_text("[global]\nno-index=true\n")
+    (hostile / ".gitconfig").write_text("[alias]\nstatus = !false\n")
+    (hostile / ".cmake" / "packages" / "Eigen3").mkdir(parents=True)
+    env = {
+        "HOME": os.fspath(hostile),
+        "PATH": "/usr/bin:/bin",
+        "TMPDIR": os.fspath(tmp_path),
+        "PYTHON": os.fspath(Path(sys.executable).resolve()),
+    }
+
+    result = subprocess.run(
+        [os.fspath(script), "--audit-environment-only"], cwd=os.fspath(ROOT),
+        env=env, capture_output=True, text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    home_line = next(line for line in result.stdout.splitlines() if line.startswith("HOME="))
+    assert os.fspath(hostile) not in home_line
+    assert "PIP_CONFIG_FILE=/dev/null" in result.stdout
+    assert "CMAKE_FIND_USE_PACKAGE_REGISTRY=FALSE" in result.stdout
 
 
 def test_verifier_rejects_poisoned_direct_internal_mode_before_work(tmp_path):

@@ -6,7 +6,6 @@ set -eu
 if [ "${CHIQ_VERIFIER_INTERNAL:-0}" != 1 ]; then
   exec /usr/bin/env -i \
     CHIQ_VERIFIER_INTERNAL=1 \
-    "HOME=${HOME:-}" \
     "PATH=/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin" \
     "TMPDIR=${TMPDIR:-/tmp}" \
     "PYTHON_REQUEST=${PYTHON:-python3}" \
@@ -35,7 +34,7 @@ SAFE_PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin"
 audit_error=""
 while IFS= read -r name; do
   case "$name" in
-    CHIQ_VERIFIER_INTERNAL|HOME|PATH|TMPDIR|PYTHON_REQUEST|LANG|LC_ALL|LC_CTYPE|CC|CXX|SDKROOT|CMAKE_ARGS|EIGEN3_INCLUDE_DIR|PWD|SHLVL|_)
+    CHIQ_VERIFIER_INTERNAL|PATH|TMPDIR|PYTHON_REQUEST|LANG|LC_ALL|LC_CTYPE|CC|CXX|SDKROOT|CMAKE_ARGS|EIGEN3_INCLUDE_DIR|PWD|SHLVL|_)
       ;;
     PYTHONPATH|PYTHONHOME|VIRTUAL_ENV|CONDA_PREFIX|CMAKE_PREFIX_PATH|CMAKE_BUILD_PARALLEL_LEVEL|SKBUILD_*|PIP_*|GIT_*|BASH_ENV|ENV|CDPATH|SHELLOPTS|BASHOPTS|GLOBIGNORE)
       audit_error="forbidden exported variable $name"
@@ -88,12 +87,24 @@ PY
 )"
 export TMPDIR
 
+POLICY_ROOT=$(mktemp -d "$TMPDIR/chiq-verifier-policy.XXXXXX")
+HOME="$POLICY_ROOT/home"
+mkdir "$HOME"
+chmod 700 "$POLICY_ROOT" "$HOME"
+PIP_CONFIG_FILE=/dev/null
+GIT_CONFIG_GLOBAL=/dev/null
+GIT_CONFIG_NOSYSTEM=1
+CMAKE_FIND_USE_PACKAGE_REGISTRY=FALSE
+export HOME PIP_CONFIG_FILE GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM
+export CMAKE_FIND_USE_PACKAGE_REGISTRY
+
 print_environment_policy() {
   echo "Environment policy: env -i explicit allowlist"
   echo "Environment audit OK"
-  echo "Restored names: HOME LANG LC_ALL LC_CTYPE PATH TMPDIR PYTHON CC CXX SDKROOT CMAKE_ARGS EIGEN3_INCLUDE_DIR"
+  echo "Restored names: LANG LC_ALL LC_CTYPE PATH TMPDIR PYTHON CC CXX SDKROOT CMAKE_ARGS EIGEN3_INCLUDE_DIR"
+  echo "Controlled names: HOME(private) PIP_CONFIG_FILE GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM CMAKE_FIND_USE_PACKAGE_REGISTRY"
   echo "Scrubbed names: PYTHONPATH PYTHONHOME VIRTUAL_ENV CONDA_PREFIX CMAKE_PREFIX_PATH CMAKE_BUILD_PARALLEL_LEVEL SKBUILD_* PIP_* GIT_* BASH_ENV ENV CDPATH SHELLOPTS BASHOPTS GLOBIGNORE"
-  for name in HOME LANG LC_ALL LC_CTYPE PATH TMPDIR PYTHON CC CXX SDKROOT CMAKE_ARGS EIGEN3_INCLUDE_DIR; do
+  for name in HOME PIP_CONFIG_FILE GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM CMAKE_FIND_USE_PACKAGE_REGISTRY LANG LC_ALL LC_CTYPE PATH TMPDIR PYTHON CC CXX SDKROOT CMAKE_ARGS EIGEN3_INCLUDE_DIR; do
     if [[ -n ${!name:-} ]]; then
       printf '%s=%q\n' "$name" "${!name}"
     fi
@@ -119,6 +130,9 @@ fi
 if [[ ${CMAKE_ARGS:-} != *EIGEN3_INCLUDE_DIR* ]]; then
   CMAKE_ARGS="${CMAKE_ARGS:-} -DEIGEN3_INCLUDE_DIR=$EIGEN3_INCLUDE_DIR"
 fi
+if [[ ${CMAKE_ARGS:-} != *CMAKE_FIND_USE_PACKAGE_REGISTRY* ]]; then
+  CMAKE_ARGS="$CMAKE_ARGS -DCMAKE_FIND_USE_PACKAGE_REGISTRY=FALSE -DCMAKE_FIND_PACKAGE_NO_PACKAGE_REGISTRY=TRUE"
+fi
 export CMAKE_ARGS EIGEN3_INCLUDE_DIR
 
 DIAGNOSTICS="$(mktemp -d "${TMPDIR:-/tmp}/chiq-pip-verification.XXXXXX")"
@@ -127,6 +141,7 @@ trap 'status=$?; echo "Diagnostics retained at $DIAGNOSTICS"; exit "$status"' EX
 SNAPSHOT="$DIAGNOSTICS/source-snapshot"
 SNAPSHOT_MANIFEST="$DIAGNOSTICS/snapshot-manifest.json"
 ARTIFACTS="$DIAGNOSTICS/artifacts"
+VALIDATED_ARTIFACTS="$DIAGNOSTICS/validated-artifacts"
 LOGS="$DIAGNOSTICS/logs"
 EXTRACT="$DIAGNOSTICS/extracted-sdist"
 EXTERNAL_CWD="$DIAGNOSTICS/external-runtime-cwd"
@@ -135,6 +150,7 @@ WHEEL_VENV="$DIAGNOSTICS/wheel-venv-A"
 SDIST_VENV="$DIAGNOSTICS/sdist-venv-B"
 EDITABLE_VENV="$DIAGNOSTICS/editable-venv-C"
 
+mkdir -m 700 "$VALIDATED_ARTIFACTS"
 mkdir -p "$ARTIFACTS/sdist" "$ARTIFACTS/wheel" "$LOGS" "$EXTERNAL_CWD"
 for mode in frontend sdist-build wheel-build wheel sdist editable; do
   mkdir -p "$DIAGNOSTICS/tmp/$mode" "$DIAGNOSTICS/cache/$mode"
@@ -199,7 +215,7 @@ TMPDIR="$DIAGNOSTICS/tmp/sdist-build" PIP_CACHE_DIR="$DIAGNOSTICS/cache/sdist-bu
 shopt -s nullglob
 sdists=("$ARTIFACTS/sdist"/*.tar.gz)
 [[ ${#sdists[@]} -eq 1 ]] || { echo "expected exactly one sdist" >&2; exit 1; }
-SDIST=${sdists[0]}
+SDIST_BUILD=${sdists[0]}
 
 hash_file() {
   "$FRONTEND_VENV/bin/python" - "$1" <<'PY'
@@ -214,11 +230,24 @@ print(digest.hexdigest())
 PY
 }
 
-SDIST_HASH=$(hash_file "$SDIST")
-printf '%s  %s\n' "$SDIST_HASH" "$SDIST" >"$DIAGNOSTICS/sdist.sha256"
-"$FRONTEND_VENV/bin/python" "$PACKAGING/artifact_inspector.py" sdist "$SDIST" \
-  --extract "$EXTRACT" --manifest "$DIAGNOSTICS/sdist-manifest.json" \
+SDIST_BUILD_HASH=$(hash_file "$SDIST_BUILD")
+"$FRONTEND_VENV/bin/python" "$PACKAGING/artifact_inspector.py" sdist "$SDIST_BUILD" \
+  --extract "$EXTRACT" --publish-directory "$VALIDATED_ARTIFACTS/sdist" \
+  --manifest "$DIAGNOSTICS/sdist-manifest.json" \
   >"$LOGS/sdist-inspection.log" 2>&1
+
+manifest_value() {
+  "$FRONTEND_VENV/bin/python" -I - "$1" "$2" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as stream:
+    print(json.load(stream)[sys.argv[2]])
+PY
+}
+SDIST=$(manifest_value "$DIAGNOSTICS/sdist-manifest.json" published_path)
+SDIST_HASH=$(manifest_value "$DIAGNOSTICS/sdist-manifest.json" archive_sha256)
+[[ "$SDIST_HASH" == "$SDIST_BUILD_HASH" ]] || { echo "sdist inspection digest mismatch" >&2; exit 1; }
+printf '%s  %s\n' "$SDIST_HASH" "$SDIST" >"$DIAGNOSTICS/sdist.sha256"
 
 extracted_roots=("$EXTRACT"/*)
 [[ ${#extracted_roots[@]} -eq 1 && -d ${extracted_roots[0]} ]] || {
@@ -246,20 +275,55 @@ WHEEL_SOURCE="$EXTRACTED_ROOT"
 
 wheels=("$ARTIFACTS/wheel"/*.whl)
 [[ ${#wheels[@]} -eq 1 ]] || { echo "expected exactly one wheel" >&2; exit 1; }
-WHEEL=${wheels[0]}
-WHEEL_HASH=$(hash_file "$WHEEL")
-printf '%s  %s\n' "$WHEEL_HASH" "$WHEEL" >"$DIAGNOSTICS/wheel.sha256"
-"$FRONTEND_VENV/bin/python" "$PACKAGING/artifact_inspector.py" wheel "$WHEEL" \
+WHEEL_BUILD=${wheels[0]}
+WHEEL_BUILD_HASH=$(hash_file "$WHEEL_BUILD")
+"$FRONTEND_VENV/bin/python" "$PACKAGING/artifact_inspector.py" wheel "$WHEEL_BUILD" \
+  --publish-directory "$VALIDATED_ARTIFACTS/wheel" \
   --manifest "$DIAGNOSTICS/wheel-manifest.json" \
   >"$LOGS/wheel-inspection.log" 2>&1
+WHEEL=$(manifest_value "$DIAGNOSTICS/wheel-manifest.json" published_path)
+WHEEL_HASH=$(manifest_value "$DIAGNOSTICS/wheel-manifest.json" archive_sha256)
+[[ "$WHEEL_HASH" == "$WHEEL_BUILD_HASH" ]] || { echo "wheel inspection digest mismatch" >&2; exit 1; }
+printf '%s  %s\n' "$WHEEL_HASH" "$WHEEL" >"$DIAGNOSTICS/wheel.sha256"
 
 verify_hash() {
-  local artifact=$1 expected=$2 actual
-  actual=$(hash_file "$artifact")
-  [[ "$actual" == "$expected" ]] || {
-    echo "artifact hash changed before install: $artifact" >&2
-    exit 1
-  }
+  local artifact=$1 expected=$2
+  "$FRONTEND_VENV/bin/python" -I - "$artifact" "$expected" "$VALIDATED_ARTIFACTS" <<'PY'
+import hashlib
+import os
+import stat
+import sys
+
+path = os.path.abspath(sys.argv[1])
+expected = sys.argv[2]
+trusted_root = os.path.realpath(sys.argv[3])
+trusted_parent = os.path.realpath(os.path.dirname(path))
+# pip accepts only a pathname, not an inherited descriptor.  The remaining
+# boundary is therefore the verifier's private 0700 diagnostics tree.  Bind
+# and hash the 0600 leaf immediately before handing that pathname to pip.
+if os.path.commonpath((trusted_parent, trusted_root)) != trusted_root:
+    raise SystemExit("published artifact escaped the trusted private directory")
+descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+try:
+    before = os.fstat(descriptor)
+    if not stat.S_ISREG(before.st_mode) or stat.S_IMODE(before.st_mode) != 0o600:
+        raise SystemExit("published artifact is not a private regular file")
+    digest = hashlib.sha256()
+    for block in iter(lambda: os.read(descriptor, 1024 * 1024), b""):
+        digest.update(block)
+    after = os.fstat(descriptor)
+    current = os.stat(path, follow_symlinks=False)
+    identity = lambda value: (
+        value.st_dev, value.st_ino, stat.S_IFMT(value.st_mode), value.st_size,
+        value.st_mtime_ns, value.st_ctime_ns,
+    )
+    if identity(before) != identity(after) or identity(after) != identity(current):
+        raise SystemExit("published artifact identity changed before install")
+    if digest.hexdigest() != expected:
+        raise SystemExit("published artifact digest changed before install")
+finally:
+    os.close(descriptor)
+PY
 }
 
 "$PYTHON" -m venv "$WHEEL_VENV"
