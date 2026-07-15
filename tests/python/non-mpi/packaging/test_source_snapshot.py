@@ -116,7 +116,14 @@ def test_git_binding_uses_isolated_exec_helper_without_preexec(repo, tmp_path, m
         calls.append(command)
         assert "preexec_fn" not in kwargs
         assert command[:3] == [sys.executable, "-I", "-c"]
-        assert not any(key.upper().startswith("GIT_") for key in kwargs["env"])
+        git_names = {
+            key: value for key, value in kwargs["env"].items()
+            if key.upper().startswith("GIT_")
+        }
+        assert git_names == {
+            "GIT_CONFIG_GLOBAL": os.devnull,
+            "GIT_CONFIG_NOSYSTEM": "1",
+        }
         return real_run(command, *args, **kwargs)
 
     monkeypatch.setattr(source_snapshot.subprocess, "run", checking_run)
@@ -319,6 +326,72 @@ def test_leaf_mode_change_between_stat_and_open_fails_closed(repo, tmp_path, mon
     monkeypatch.setattr(source_snapshot, "_open", changing_open)
 
     with pytest.raises(source_snapshot.SnapshotError, match="mode.*race|changed.*mode"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+
+@pytest.mark.parametrize("mutation", ["rewrite", "truncate", "chmod"])
+def test_rejects_source_mutation_while_open_file_is_copied(
+    repo, tmp_path, monkeypatch, mutation
+):
+    source = repo / "README"
+    source.write_bytes(b"stable source bytes\n")
+    if mutation == "chmod":
+        git(repo, "update-index", "--chmod=+x", "README")
+        source.chmod(0o755)
+    real_read = source_snapshot._read
+    changed = {"done": False}
+
+    def mutating_read(descriptor, size):
+        block = real_read(descriptor, size)
+        if block and not changed["done"]:
+            changed["done"] = True
+            if mutation == "rewrite":
+                source.write_bytes(b"different bytes but same length\n")
+            elif mutation == "truncate":
+                source.write_bytes(b"")
+            else:
+                source.chmod(0o644)
+        return block
+
+    monkeypatch.setattr(source_snapshot, "_read", mutating_read)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="changed during copy|mutation"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+
+@pytest.mark.parametrize("generation", ["index", "head"])
+def test_rechecks_repository_generation_after_all_copies(
+    repo, tmp_path, monkeypatch, generation
+):
+    real_copy = source_snapshot._copy_open_file
+    changed = {"done": False}
+
+    def copying_then_changing(*args, **kwargs):
+        digest = real_copy(*args, **kwargs)
+        if not changed["done"]:
+            changed["done"] = True
+            if generation == "index":
+                blob = git(repo, "hash-object", "-w", "--stdin", input_data=b"next\n")
+                git(
+                    repo,
+                    "update-index",
+                    "--cacheinfo",
+                    "100644,%s,README" % blob.decode().strip(),
+                )
+            else:
+                git(repo, "commit", "--allow-empty", "-qm", "next generation")
+        return digest
+
+    monkeypatch.setattr(source_snapshot, "_copy_open_file", copying_then_changing)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="index|HEAD|generation"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+
+def test_zero_destination_write_fails_closed(repo, tmp_path, monkeypatch):
+    monkeypatch.setattr(source_snapshot, "_write", lambda descriptor, data: 0)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="write"):
         source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
 
 

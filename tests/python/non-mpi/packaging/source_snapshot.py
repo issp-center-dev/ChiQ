@@ -32,6 +32,8 @@ class SnapshotError(RuntimeError):
 _open = os.open
 _stat = os.stat
 _mkdir = os.mkdir
+_read = os.read
+_write = os.write
 _capability_override = None
 
 
@@ -46,17 +48,22 @@ environment = {
     for key, value in os.environ.items()
     if not key.upper().startswith("GIT_")
 }
+environment["GIT_CONFIG_GLOBAL"] = os.devnull
+environment["GIT_CONFIG_NOSYSTEM"] = "1"
 os.execvpe("git", ["git"] + sys.argv[2:], environment)
 """
 
 
 def _sanitized_git_environment():
     """Remove every inherited Git override at the checkout trust boundary."""
-    return {
+    environment = {
         key: value
         for key, value in os.environ.items()
         if not key.upper().startswith("GIT_")
     }
+    environment["GIT_CONFIG_GLOBAL"] = os.devnull
+    environment["GIT_CONFIG_NOSYSTEM"] = "1"
+    return environment
 
 
 def _git(repo_fd, *args):
@@ -214,6 +221,19 @@ def _same_identity(left, right):
         left.st_dev == right.st_dev
         and left.st_ino == right.st_ino
         and stat.S_IFMT(left.st_mode) == stat.S_IFMT(right.st_mode)
+    )
+
+
+def _source_state(value):
+    """Return all source attributes whose change invalidates copied bytes."""
+    return (
+        value.st_dev,
+        value.st_ino,
+        stat.S_IFMT(value.st_mode),
+        bool(value.st_mode & 0o111),
+        value.st_size,
+        value.st_mtime_ns,
+        value.st_ctime_ns,
     )
 
 
@@ -427,6 +447,9 @@ def _copy_open_file(source_fd, destination_root_fd, path, output_mode):
     output_fd = None
     digest = hashlib.sha256()
     try:
+        before = os.fstat(source_fd)
+        if not stat.S_ISREG(before.st_mode):
+            raise SnapshotError("tracked source is not regular during copy: %s" % path)
         try:
             output_fd = _open(
                 components[-1],
@@ -438,13 +461,19 @@ def _copy_open_file(source_fd, destination_root_fd, path, output_mode):
             raise SnapshotError("cannot create destination file %s exclusively" % path) from error
         os.fchmod(output_fd, output_mode)
         while True:
-            block = os.read(source_fd, 1024 * 1024)
+            block = _read(source_fd, 1024 * 1024)
             if not block:
                 break
             digest.update(block)
             offset = 0
             while offset < len(block):
-                offset += os.write(output_fd, block[offset:])
+                written = _write(output_fd, block[offset:])
+                if written <= 0:
+                    raise SnapshotError("destination write made no progress for %s" % path)
+                offset += written
+        after = os.fstat(source_fd)
+        if _source_state(before) != _source_state(after):
+            raise SnapshotError("tracked source changed during copy: %s" % path)
         return digest.hexdigest()
     finally:
         _close_all([output_fd, parent_fd])
@@ -463,8 +492,10 @@ def create_snapshot(repo, destination, stderr):
     destination_root_fd = None
     rows = []
     try:
-        entries = _parse_index(_git(source_root_fd, "ls-files", "--stage", "-z"))
-        head = _git(source_root_fd, "rev-parse", "HEAD").decode("ascii").strip()
+        initial_index = _git(source_root_fd, "ls-files", "--stage", "-z")
+        entries = _parse_index(initial_index)
+        initial_head = _git(source_root_fd, "rev-parse", "HEAD")
+        head = initial_head.decode("ascii").strip()
 
         tracked_artifacts = sorted(
             path
@@ -502,6 +533,10 @@ def create_snapshot(repo, destination, stderr):
             finally:
                 _close_all([source_fd])
             rows.append({"path": path, "index_mode": index_mode, "sha256": digest})
+        final_index = _git(source_root_fd, "ls-files", "--stage", "-z")
+        final_head = _git(source_root_fd, "rev-parse", "HEAD")
+        if final_index != initial_index or final_head != initial_head:
+            raise SnapshotError("Git index/HEAD generation changed during snapshot")
         diff_stat = _git(source_root_fd, "diff", "HEAD", "--stat").decode("utf-8")
     finally:
         _close_all([destination_root_fd, source_root_fd])
