@@ -4,6 +4,7 @@ import hashlib
 import io
 from pathlib import Path
 import struct
+import stat
 import subprocess
 import sys
 import zipfile
@@ -278,10 +279,27 @@ def test_rejects_incomplete_or_trailing_deflate_stream(tmp_path, stream):
 
 def test_physical_size_is_checked_before_zip_parsing(tmp_path, monkeypatch):
     archive = make_wheel(tmp_path)
-    monkeypatch.setattr(artifact_inspector, "_physical_size", lambda path: artifact_inspector.MAX_ARCHIVE + 1)
+    monkeypatch.setattr(artifact_inspector, "MAX_ARCHIVE", archive.stat().st_size - 1)
     monkeypatch.setattr(artifact_inspector.zipfile, "ZipFile", lambda *args, **kwargs: pytest.fail("parsed ZIP"))
     with pytest.raises(artifact_inspector.ArtifactError, match="size|512"):
         artifact_inspector.validate_wheel(archive)
+
+
+def test_validated_wheel_is_published_from_private_bytes_with_digest(tmp_path):
+    archive = make_wheel(tmp_path)
+    expected = hashlib.sha256(archive.read_bytes()).hexdigest()
+    published_directory = tmp_path / "validated-wheel"
+
+    manifest = artifact_inspector.validate_wheel(
+        archive, publish_directory=published_directory
+    )
+    published = Path(manifest["published_path"])
+    archive.write_bytes(b"attacker replacement")
+
+    assert manifest["archive_sha256"] == expected
+    assert hashlib.sha256(published.read_bytes()).hexdigest() == expected
+    assert stat.S_IMODE(published_directory.stat().st_mode) == 0o700
+    assert stat.S_IMODE(published.stat().st_mode) == 0o600
 
 
 @pytest.mark.parametrize("field", [1, 2, 3, 4])
@@ -851,7 +869,7 @@ def _inject_private_close_failure(monkeypatch):
     monkeypatch.setattr(
         artifact_inspector,
         "_copy_private_artifact",
-        lambda path, size: _CloseFailure(real_copy(path, size)),
+        lambda path: _CloseFailure(real_copy(path)),
     )
 
 

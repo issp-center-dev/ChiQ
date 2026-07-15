@@ -1,6 +1,7 @@
 import io
 import bz2
 import gzip
+import hashlib
 import json
 import lzma
 import os
@@ -410,7 +411,7 @@ def test_rejects_links_sparse_and_special_members(tmp_path, type_):
 
 def test_rejects_physical_archive_limit_before_tar_parsing(tmp_path, monkeypatch):
     archive = make_sdist(tmp_path)
-    monkeypatch.setattr(artifact_inspector, "_physical_size", lambda path: artifact_inspector.MAX_ARCHIVE + 1)
+    monkeypatch.setattr(artifact_inspector, "MAX_ARCHIVE", archive.stat().st_size - 1)
     monkeypatch.setattr(
         artifact_inspector.tarfile,
         "open",
@@ -419,6 +420,164 @@ def test_rejects_physical_archive_limit_before_tar_parsing(tmp_path, monkeypatch
 
     with pytest.raises(artifact_inspector.ArtifactError, match="archive.*size|512"):
         artifact_inspector.validate_sdist(archive)
+
+
+def test_archive_input_rejects_symlink_and_fifo_without_opening_parser(
+    tmp_path, monkeypatch
+):
+    archive = make_sdist(tmp_path)
+    link = tmp_path / "linked.tar.gz"
+    link.symlink_to(archive)
+    fifo = tmp_path / "fifo.tar.gz"
+    os.mkfifo(fifo)
+    monkeypatch.setattr(
+        artifact_inspector.tarfile,
+        "open",
+        lambda *args, **kwargs: pytest.fail("unsafe input reached tar parser"),
+    )
+
+    for unsafe in (link, fifo):
+        with pytest.raises(artifact_inspector.ArtifactError, match="regular|symlink|archive"):
+            artifact_inspector.validate_sdist(unsafe)
+
+
+def test_archive_validation_fails_closed_without_posix_descriptor_capability(
+    tmp_path, monkeypatch
+):
+    archive = make_sdist(tmp_path)
+    monkeypatch.setattr(artifact_inspector, "_capability_override", "no-follow")
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="unsupported.*capability"):
+        artifact_inspector.validate_sdist(archive)
+
+
+@pytest.mark.parametrize("attack", ["rewrite", "chmod", "replacement"])
+def test_archive_input_rejects_mutation_or_replacement_during_private_copy(
+    tmp_path, monkeypatch, attack
+):
+    archive = make_sdist(tmp_path)
+    opened_inode = archive.stat().st_ino
+    real_fstat = artifact_inspector._fstat
+    calls = {"source": 0}
+
+    def attacking_fstat(descriptor):
+        value = real_fstat(descriptor)
+        if value.st_ino == opened_inode:
+            calls["source"] += 1
+            if calls["source"] == 2:
+                if attack == "rewrite":
+                    archive.write_bytes(archive.read_bytes() + b"x")
+                elif attack == "chmod":
+                    archive.chmod(0o600)
+                else:
+                    archive.rename(tmp_path / "opened.tar.gz")
+                    archive.write_bytes(b"replacement")
+                value = real_fstat(descriptor)
+        return value
+
+    monkeypatch.setattr(artifact_inspector, "_fstat", attacking_fstat)
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="changed|replacement|identity"):
+        artifact_inspector.validate_sdist(archive)
+
+
+def test_validated_sdist_is_published_from_private_bytes_with_digest(tmp_path):
+    archive = make_sdist(tmp_path)
+    expected = hashlib.sha256(archive.read_bytes()).hexdigest()
+    published_directory = tmp_path / "validated-sdist"
+
+    manifest = artifact_inspector.validate_sdist(
+        archive, publish_directory=published_directory
+    )
+    published = Path(manifest["published_path"])
+    archive.write_bytes(b"attacker replacement")
+
+    assert manifest["archive_sha256"] == expected
+    assert published.parent == published_directory
+    assert hashlib.sha256(published.read_bytes()).hexdigest() == expected
+    assert stat.S_IMODE(published_directory.stat().st_mode) == 0o700
+    assert stat.S_IMODE(published.stat().st_mode) == 0o600
+
+
+@pytest.mark.parametrize("attack", ["directory", "leaf"])
+def test_validated_artifact_swap_cannot_publish_attacker_path(
+    tmp_path, monkeypatch, attack
+):
+    archive = make_sdist(tmp_path)
+    published_directory = tmp_path / "validated-sdist"
+    attacker_bytes = b"attacker artifact"
+
+    def swap_artifact(parent_fd, name, directory_fd, basename):
+        if attack == "directory":
+            os.rename(name, "detached-validated", src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+            os.mkdir(name, 0o700, dir_fd=parent_fd)
+            relative = name + "/" + basename
+            target_fd = parent_fd
+        else:
+            os.unlink(basename, dir_fd=directory_fd)
+            relative = basename
+            target_fd = directory_fd
+        replacement_fd = os.open(
+            relative, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600,
+            dir_fd=target_fd,
+        )
+        try:
+            os.write(replacement_fd, attacker_bytes)
+        finally:
+            os.close(replacement_fd)
+
+    monkeypatch.setattr(
+        artifact_inspector,
+        "_before_artifact_publish_identity",
+        swap_artifact,
+        raising=False,
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="identity|race"):
+        artifact_inspector.validate_sdist(
+            archive, publish_directory=published_directory
+        )
+
+    if attack == "directory":
+        assert (published_directory / archive.name).read_bytes() == attacker_bytes
+    else:
+        assert (tmp_path / "validated-sdist" / archive.name).read_bytes() == attacker_bytes
+
+
+@pytest.mark.parametrize("operation", ["validate", "extract"])
+def test_publish_failure_closes_private_sdist_copy(
+    tmp_path, monkeypatch, operation
+):
+    archive_path = make_sdist(tmp_path)
+    captured = {}
+    real_inspect = artifact_inspector._inspect_open
+
+    def recording_inspect(path):
+        result = real_inspect(path)
+        captured["private"] = result[0]._artifact_raw_file
+        return result
+
+    monkeypatch.setattr(artifact_inspector, "_inspect_open", recording_inspect)
+    monkeypatch.setattr(
+        artifact_inspector,
+        "_publish_private_artifact",
+        lambda *args: (_ for _ in ()).throw(
+            artifact_inspector.ArtifactError("injected publish failure")
+        ),
+    )
+
+    with pytest.raises(artifact_inspector.ArtifactError, match="publish failure"):
+        if operation == "validate":
+            artifact_inspector.validate_sdist(
+                archive_path, publish_directory=tmp_path / "published"
+            )
+        else:
+            artifact_inspector.extract_sdist(
+                archive_path, tmp_path / "extract",
+                publish_directory=tmp_path / "published",
+            )
+
+    assert captured["private"].closed
 
 
 def test_preflight_rejects_oversized_truncated_member_at_header(tmp_path, monkeypatch):

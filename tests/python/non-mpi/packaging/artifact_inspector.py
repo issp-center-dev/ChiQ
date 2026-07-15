@@ -97,7 +97,6 @@ class ArtifactError(RuntimeError):
 
 
 # Small seams used by limit, platform-resolution, and race tests.
-_physical_size = os.path.getsize
 _resolve_path = lambda path: Path(path).resolve(strict=False)
 _open = os.open
 _mkdir = os.mkdir
@@ -109,6 +108,9 @@ _close = os.close
 _capability_override = None
 _after_directory_mkdir = lambda parent_fd, name: None
 _before_publish_identity = lambda parent_fd, staging, destination: None
+_before_artifact_publish_identity = (
+    lambda parent_fd, name, directory_fd, basename: None
+)
 
 
 def _zip_entry_ratio_exceeded(size, compressed_size):
@@ -162,39 +164,63 @@ def _require_contained(root, candidate):
     return resolved_candidate
 
 
-def _checked_archive_size(path):
-    try:
-        size = _physical_size(os.fspath(path))
-    except OSError as error:
-        raise ArtifactError("cannot stat archive") from error
-    if size < 0 or size > MAX_ARCHIVE:
-        raise ArtifactError("archive physical size exceeds 512 MiB limit")
-    return size
+def _artifact_state(value):
+    return (
+        value.st_dev,
+        value.st_ino,
+        stat.S_IFMT(value.st_mode),
+        value.st_size,
+        value.st_mtime_ns,
+        value.st_ctime_ns,
+    )
 
 
-def _copy_private_artifact(path, expected_size):
-    source = None
+def _copy_private_artifact(path, _expected_size=None):
+    _require_capabilities()
+    source_fd = None
     private = None
     primary_error = None
     try:
-        source = open(os.fspath(path), "rb")
-        opened_size = _fstat(source.fileno()).st_size
-        if opened_size != expected_size or opened_size > MAX_ARCHIVE:
-            raise ArtifactError("archive changed before private copy")
+        try:
+            source_fd = _open(
+                os.fspath(path),
+                os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0),
+            )
+        except (OSError, TypeError, NotImplementedError) as error:
+            raise ArtifactError("cannot safely open archive input") from error
+        opened = _fstat(source_fd)
+        if not stat.S_ISREG(opened.st_mode):
+            raise ArtifactError("archive input must be a regular file")
+        expected_size = opened.st_size
+        if expected_size < 0 or expected_size > MAX_ARCHIVE:
+            raise ArtifactError("archive physical size exceeds 512 MiB limit")
         private = tempfile.TemporaryFile(mode="w+b")
+        digest = hashlib.sha256()
         remaining = expected_size
         while remaining:
-            chunk = source.read(min(1024 * 1024, remaining))
+            chunk = os.read(source_fd, min(1024 * 1024, remaining))
             if not chunk:
                 raise ArtifactError("archive is shorter than physical size")
+            digest.update(chunk)
             written = private.write(chunk)
             if written != len(chunk):
                 raise ArtifactError("short write to private artifact copy")
             remaining -= len(chunk)
-        if source.read(1):
+        if os.read(source_fd, 1):
             raise ArtifactError("archive grew during private copy")
+        copied = _fstat(source_fd)
+        try:
+            current = _stat(os.fspath(path), follow_symlinks=False)
+        except (OSError, TypeError, NotImplementedError) as error:
+            raise ArtifactError("archive path changed during private copy") from error
+        if _artifact_state(opened) != _artifact_state(copied):
+            raise ArtifactError("archive changed during private copy")
+        if _artifact_state(copied) != _artifact_state(current):
+            raise ArtifactError("archive path replacement or identity change")
         private.flush()
         private.seek(0)
+        private._artifact_size = expected_size
+        private._artifact_sha256 = digest.hexdigest()
         return private
     except BaseException as error:
         primary_error = error
@@ -205,9 +231,9 @@ def _copy_private_artifact(path, expected_size):
                 pass
         raise
     finally:
-        if source is not None:
+        if source_fd is not None:
             try:
-                source.close()
+                _close(source_fd)
             except BaseException as error:
                 if primary_error is None:
                     if private is not None:
@@ -710,11 +736,11 @@ def _validate_metadata(path, root, archive, members):
 
 
 def _inspect_open(path):
-    archive_size = _checked_archive_size(path)
     raw_file = None
     archive = None
     try:
-        raw_file = _copy_private_artifact(path, archive_size)
+        raw_file = _copy_private_artifact(path)
+        archive_size = raw_file._artifact_size
         _preflight_tar(raw_file, archive_size)
         raw_file.seek(0)
         archive = tarfile.open(fileobj=raw_file, mode="r:*")
@@ -740,6 +766,7 @@ def _inspect_open(path):
         "version": version,
         "root": root,
         "archive_size": archive_size,
+        "archive_sha256": raw_file._artifact_sha256,
         "uncompressed_size": total,
         "members": manifest_members,
     }
@@ -764,11 +791,89 @@ def _close_archive(archive):
         raise ArtifactError("cannot close archive resources") from close_error
 
 
-def validate_sdist(path):
+def _publish_private_artifact(private, original_path, directory):
+    """Publish validated bytes into one newly-created private directory.
+
+    Consumers trust this private directory against same-UID pathname attacks;
+    descriptor identity and the digest are rechecked before publication returns.
+    """
+    _require_capabilities()
+    directory = Path(directory)
+    if not directory.name or directory.name in (".", ".."):
+        raise ArtifactError("invalid validated artifact directory")
+    parent_fd = None
+    directory_fd = None
+    output_fd = None
+    try:
+        parent_fd = _open_validated_parent(_resolve_path(directory.parent))
+        directory_fd = _create_bound_directory(
+            parent_fd, directory.name, 0o700, "validated artifact directory"
+        )
+        basename = Path(original_path).name
+        if basename in ("", ".", "..") or "/" in basename:
+            raise ArtifactError("invalid artifact filename")
+        output_fd = _open(
+            basename,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+            0o600,
+            dir_fd=directory_fd,
+        )
+        _fchmod(output_fd, 0o600)
+        before = _fstat(private.fileno())
+        private.seek(0)
+        digest = hashlib.sha256()
+        while True:
+            block = private.read(1024 * 1024)
+            if not block:
+                break
+            digest.update(block)
+            offset = 0
+            while offset < len(block):
+                written = _write(output_fd, block[offset:])
+                if written <= 0:
+                    raise ArtifactError("short write publishing validated artifact")
+                offset += written
+        after = _fstat(private.fileno())
+        if _artifact_state(before) != _artifact_state(after):
+            raise ArtifactError("private artifact changed during publication")
+        if digest.hexdigest() != private._artifact_sha256:
+            raise ArtifactError("private artifact digest changed during publication")
+        published = _fstat(output_fd)
+        _before_artifact_publish_identity(
+            parent_fd, directory.name, directory_fd, basename
+        )
+        _require_entry_identity(
+            parent_fd,
+            directory.name,
+            directory_fd,
+            "validated artifact directory",
+        )
+        current = _safe_stat(basename, directory_fd, "validated artifact")
+        if not stat.S_ISREG(published.st_mode) or not _same_identity(published, current):
+            raise ArtifactError("validated artifact publication identity race")
+        if published.st_size != private._artifact_size:
+            raise ArtifactError("validated artifact publication size mismatch")
+        private.seek(0)
+        return os.fspath(_resolve_path(directory.parent) / directory.name / basename)
+    except ArtifactError:
+        raise
+    except (OSError, TypeError, NotImplementedError) as error:
+        raise ArtifactError("cannot safely publish validated artifact") from error
+    finally:
+        _close_descriptors([output_fd, directory_fd, parent_fd])
+
+
+def validate_sdist(path, publish_directory=None):
     """Return a validated manifest without extracting any member."""
     archive, _members, manifest = _inspect_open(path)
-    _close_archive(archive)
-    return manifest
+    try:
+        if publish_directory is not None:
+            manifest["published_path"] = _publish_private_artifact(
+                archive._artifact_raw_file, path, publish_directory
+            )
+        return manifest
+    finally:
+        _close_archive(archive)
 
 
 def _directory_flags():
@@ -1047,7 +1152,7 @@ def _publish_noreplace(parent_fd, source, destination):
         raise ArtifactError("cannot atomically publish extraction destination") from OSError(number, os.strerror(number))
 
 
-def extract_sdist(path, destination):
+def extract_sdist(path, destination, publish_directory=None):
     """Validate the complete graph, then manually extract regular files."""
     _require_capabilities()
     archive, members, manifest = _inspect_open(path)
@@ -1059,6 +1164,10 @@ def extract_sdist(path, destination):
     staging_name = None
     staging_populated = False
     try:
+        if publish_directory is not None:
+            manifest["published_path"] = _publish_private_artifact(
+                archive._artifact_raw_file, path, publish_directory
+            )
         parent = _resolve_path(destination.parent)
         if not destination.name or destination.name in (".", ".."):
             raise ArtifactError("invalid extraction destination")
@@ -1745,12 +1854,12 @@ def _close_private_wheel(private):
             raise ArtifactError("cannot close private wheel artifact resource") from error
 
 
-def validate_wheel(path):
+def validate_wheel(path, publish_directory=None):
     """Validate ZIP safety, wheel metadata, RECORD, and ChiQ content."""
-    archive_size = _checked_archive_size(path)
     private = None
     try:
-        private = _copy_private_artifact(path, archive_size)
+        private = _copy_private_artifact(path)
+        archive_size = private._artifact_size
         entries, total = _preflight_zip(private, archive_size)
         dist_info, version, filename_tags = _wheel_identity(path, entries)
         metadata_path = dist_info + "/METADATA"
@@ -1769,6 +1878,11 @@ def validate_wheel(path):
         _validate_entry_points(retained[entry_points_path])
         _validate_record(records, retained[record_path], dist_info)
         _validate_wheel_content(records, dist_info, entries)
+        published_path = None
+        if publish_directory is not None:
+            published_path = _publish_private_artifact(
+                private, path, publish_directory
+            )
     except ArtifactError:
         raise
     except (OSError, EOFError, UnicodeError, ValueError, struct.error) as error:
@@ -1776,11 +1890,12 @@ def validate_wheel(path):
     finally:
         if private is not None:
             _close_private_wheel(private)
-    return {
+    manifest = {
         "kind": "wheel",
         "name": "chiq",
         "version": str(version),
         "archive_size": archive_size,
+        "archive_sha256": private._artifact_sha256 if private is not None else "",
         "uncompressed_size": total,
         "members": sorted(
             [
@@ -1794,6 +1909,9 @@ def validate_wheel(path):
             key=lambda row: row["path"],
         ),
     }
+    if published_path is not None:
+        manifest["published_path"] = published_path
+    return manifest
 
 
 def _write_manifest(path, manifest):
@@ -1811,9 +1929,11 @@ def main(argv=None):
     sdist.add_argument("archive")
     sdist.add_argument("--extract")
     sdist.add_argument("--manifest")
+    sdist.add_argument("--publish-directory")
     wheel = subparsers.add_parser("wheel")
     wheel.add_argument("archive")
     wheel.add_argument("--manifest")
+    wheel.add_argument("--publish-directory")
     args = parser.parse_args(argv)
 
     extract = getattr(args, "extract", None)
@@ -1827,11 +1947,17 @@ def main(argv=None):
         else:
             parser.error("--manifest must be outside --extract")
     if args.kind == "wheel":
-        manifest = validate_wheel(args.archive)
+        manifest = validate_wheel(
+            args.archive, publish_directory=args.publish_directory
+        )
     elif extract:
-        manifest = extract_sdist(args.archive, extract)
+        manifest = extract_sdist(
+            args.archive, extract, publish_directory=args.publish_directory
+        )
     else:
-        manifest = validate_sdist(args.archive)
+        manifest = validate_sdist(
+            args.archive, publish_directory=args.publish_directory
+        )
     if args.manifest:
         _write_manifest(args.manifest, manifest)
     else:
