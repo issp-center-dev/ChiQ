@@ -22,11 +22,62 @@ Features:
 ### Requirements
 
 - CMake (>= 3.5)
-- C++ compiler compatible with C++11
+- C++ compiler compatible with C++17
 - [Eigen3](https://eigen.tuxfamily.org/index.php?title=Main_Page) (>= 3.1)
 - Python
   - more-itertools package
     - `python3 -m pip install more-itertools`
+
+### Quick install (pip)
+
+For a standard Python environment or CI job, install ChiQ directly with pip:
+
+``` bash
+python3 -m pip install .
+```
+
+For development, use an editable install:
+
+``` bash
+python3 -m pip install -e .
+```
+
+Optional runtime dependencies are available as extras:
+
+``` bash
+python3 -m pip install "chiq[plot]"
+```
+
+Plotting commands require the `chiq[plot]` extra. ChiQ imports private DCore APIs, so use a
+fresh, isolated environment for the `chiq[dcore]` extra; it pins the reviewed boundary to
+DCore 4.2.0 and also installs `mpi4py`:
+
+``` bash
+python3 -m venv .venv-chiq-dcore
+. .venv-chiq-dcore/bin/activate
+python3 -m pip install "chiq[dcore]"
+```
+
+When installing from this checkout rather than from a package index, replace `chiq` in those
+commands with `.` (for example, `python3 -m pip install ".[dcore]"`). Review compatibility
+before changing the DCore pin.
+
+The pip build compiles the C++ extension as `chiq._bse_solver` and installs console commands
+such as `chiq_main` and `chiq_post`.
+
+### Supported installation and verification matrix
+
+ChiQ supports Python >=3.8. Although Python 3.8 is upstream end-of-life, CI continuously
+verifies Python 3.8 and 3.13. The packaging checks cover wheel, sdist, editable, and legacy
+CMake installations; pip and legacy CMake remain supported side by side. Endpoint CI uses
+fresh environments and intentionally reports dependency drift instead of silently relaxing
+version bounds.
+
+These checks do not promise every platform-specific filesystem operation. Portable
+wheel-member validation recognizes Windows `.pyd` extension names, but Windows snapshot
+no-follow behavior and Windows legacy cleanup are not acceptance targets. The snapshot verifier
+fails closed when a platform cannot provide the required no-follow file operation, and cleanup
+rules are never broadened to work around Windows locked files.
 
 ### Download
 
@@ -76,15 +127,16 @@ make test  # when -DTesting=ON is activated in cmake
 make install
 ```
 
-Python scripts such as `chiq_main.py` are installed in **$HOME/local/bin**.
-A python package **chiq** and a shared library **bse_solver.cpython-XXX-YYY.so** (XXX is the python version, and YYY is the os info) is installed in **$Home/local/lib/bse-python** (or **lib64/bse-python**).
+Both suffix-free commands such as `chiq_main` and deprecated `.py` wrappers such as
+`chiq_main.py` are installed in **$HOME/local/bin**.
+A python package **chiq** and a shared library **_bse_solver.cpython-XXX-YYY.so** (XXX is the python version, and YYY is the os info) is installed in **$HOME/local/lib/bse-python/chiq** (or **lib64/bse-python/chiq**).
 A configurations file **chiqvars.sh** is installed in **$HOME/local/share**, see the next section.
 
 You can build the documentation as follows.
 
 ``` bash
 pip3 install sphinx wild_sphinx_theme matplotlib
-sphinx-build -b html ../bse/doc html
+sphinx-build -b html ../ChiQ/doc html
 ```
 
 ### Environment variables
@@ -116,8 +168,8 @@ pytest tests/python/non-mpi/bsetool_BSE/test_bsetool_BSE.py
 ## How to use
 
 ``` bash
-mpiexec -np 4 chiq_main.py chiq.toml
-chiq_post.py chiq.toml
+mpiexec -np 4 chiq_main chiq.toml
+chiq_post chiq.toml
 ```
 
 ### Input parameters

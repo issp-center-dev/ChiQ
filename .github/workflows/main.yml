@@ -6,47 +6,271 @@ on:
   schedule:
     - cron: '0 0 1,15 * *' # JST 9:00 on 1st and 15th every month
 
+env:
+  PIP_NO_CACHE_DIR: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+
 jobs:
-  main:
+  scientific:
     strategy:
       matrix:
         python-version: ['3.8', '3.13']
       fail-fast: false
-
-    name: Run tests with Python ${{ matrix.python-version }}
-    runs-on: 'ubuntu-24.04'
-    # runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
-
+    name: Scientific and C++ regressions (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+        with:
+          submodules: recursive
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: apt
+      - name: Install system and Python dependencies
         run: |
           sudo apt update
           sudo apt install hdf5-tools libeigen3-dev openmpi-bin libopenmpi-dev
-
-      - name: pip
+          if [ "${{ matrix.python-version }}" = "3.8" ]; then
+            python -m pip install --no-cache-dir 'pip<25.1'
+          fi
+          python -m pip install --no-cache-dir 'dcore==4.2.0' mpi4py more-itertools pytest
+          python -m pip freeze
+      - name: Build and run scientific regressions
         run: |
-          python -m pip install -U pip
-          python -m pip install mpi4py
-          python -m pip install dcore more-itertools pytest
-          python -m pip freeze # for debugging
-
-      - name: run
-        run: |
-          git submodule init
-          git submodule update
+          set -o pipefail
           mkdir build
           cd build
           cmake .. -DTesting=ON
           make
           source ./chiqvars.sh
           ctest -V
-          python -m pytest -v
+          python -m pytest -v 2>&1 | tee "$RUNNER_TEMP/scientific.log"
+      - name: Retain scientific diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scientific-${{ matrix.python-version }}
+          path: ${{ runner.temp }}/scientific.log
+
+  packaging-unit:
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.13']
+      fail-fast: false
+    name: Packaging unit contracts (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install archive-test dependencies
+        run: |
+          if [ "${{ matrix.python-version }}" = "3.8" ]; then
+            python -m pip install --no-cache-dir 'pip<25.1'
+          else
+            python -m pip install --no-cache-dir --upgrade pip
+          fi
+          python -m pip install --no-cache-dir pytest packaging toml numpy scipy more-itertools h5py mpi4py
+      - name: Run packaging unit contracts
+        run: |
+          set -o pipefail
+          python -m pytest \
+            tests/python/non-mpi/packaging/test_source_snapshot.py \
+            tests/python/non-mpi/packaging/test_sdist_inspector.py \
+            tests/python/non-mpi/packaging/test_wheel_inspector.py \
+            tests/python/non-mpi/packaging/test_legacy_cleanup.py \
+            tests/python/non-mpi/packaging/test_runtime_smoke.py \
+            tests/python/non-mpi/packaging/test_packaging_ci.py \
+            tests/python/non-mpi/packaging/test_pyproject_metadata.py \
+            tests/python/non-mpi/packaging/test_dcore_boundary.py \
+            -q 2>&1 | tee "$RUNNER_TEMP/packaging-unit.log"
+      - name: Retain packaging unit diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaging-unit-${{ matrix.python-version }}
+          path: ${{ runner.temp }}/packaging-unit.log
+
+  pip-artifacts:
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.13']
+      fail-fast: false
+    name: Authoritative pip artifacts (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install build system dependencies
+        run: |
+          sudo apt update
+          sudo apt install hdf5-tools libeigen3-dev openmpi-bin libopenmpi-dev
+      - name: Run authoritative wheel, sdist, and editable flow
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: tests/python/non-mpi/packaging/verify_pip_install.sh
+      - name: Retain pip manifests, artifacts, and verbose logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-artifacts-${{ matrix.python-version }}
+          path: ${{ runner.temp }}/chiq-pip-verification.*
+          include-hidden-files: true
+
+  core-boundary:
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.13']
+      fail-fast: false
+    name: Core-only DCore UX (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Eigen
+        run: |
+          sudo apt update
+          sudo apt install libeigen3-dev
+      - name: Install core only
+        run: |
+          set -o pipefail
+          {
+            if [ "${{ matrix.python-version }}" = "3.8" ]; then
+              python -m pip install --no-cache-dir 'pip<25.1'
+            fi
+            python -m pip install --no-cache-dir .
+          } 2>&1 | tee "$RUNNER_TEMP/core-boundary-install.log"
+      - name: Verify missing DCore extra behavior
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/core-boundary-cwd"
+          cd "$RUNNER_TEMP/core-boundary-cwd"
+          python "$GITHUB_WORKSPACE/tests/python/non-mpi/packaging/dcore_boundary_smoke.py" --mode missing-extra --expected-root "$pythonLocation" 2>&1 | tee "$RUNNER_TEMP/core-boundary.log"
+      - name: Retain core-only diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: core-boundary-${{ matrix.python-version }}
+          path: |
+            ${{ runner.temp }}/core-boundary-install.log
+            ${{ runner.temp }}/core-boundary.log
+          if-no-files-found: warn
+
+  dcore-boundary:
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.13']
+      fail-fast: false
+    name: DCore 4.2.0/OpenMPI boundary (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Eigen and OpenMPI
+        run: |
+          sudo apt update
+          sudo apt install libeigen3-dev openmpi-bin libopenmpi-dev
+      - name: Install exact DCore extra
+        run: |
+          set -o pipefail
+          {
+            if [ "${{ matrix.python-version }}" = "3.8" ]; then
+              python -m pip install --no-cache-dir 'pip<25.1'
+            fi
+            python -m pip install --no-cache-dir '.[dcore]'
+            python -m pip freeze > "$RUNNER_TEMP/dcore-boundary-freeze.txt"
+          } 2>&1 | tee "$RUNNER_TEMP/dcore-boundary-install.log"
+      - name: Verify imported private API and command boundary
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/dcore-boundary-cwd"
+          cd "$RUNNER_TEMP/dcore-boundary-cwd"
+          python "$GITHUB_WORKSPACE/tests/python/non-mpi/packaging/dcore_boundary_smoke.py" --mode installed --expected-root "$pythonLocation" 2>&1 | tee "$RUNNER_TEMP/dcore-boundary.log"
+      - name: Retain DCore boundary diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dcore-boundary-${{ matrix.python-version }}
+          path: |
+            ${{ runner.temp }}/dcore-boundary-install.log
+            ${{ runner.temp }}/dcore-boundary.log
+            ${{ runner.temp }}/dcore-boundary-freeze.txt
+          if-no-files-found: warn
+
+  legacy:
+    name: Legacy CMake layout
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install legacy dependencies
+        run: |
+          sudo apt update
+          sudo apt install hdf5-tools libeigen3-dev openmpi-bin libopenmpi-dev
+          python -m pip install --no-cache-dir pytest packaging toml numpy scipy more-itertools h5py mpi4py
+      - name: Verify legacy install layout
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: tests/python/non-mpi/packaging/verify_legacy_install.sh
+      - name: Retain legacy diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-layout
+          path: ${{ runner.temp }}/chiq-legacy-verification.*
+          include-hidden-files: true
+
+  pip-import-smoke:
+    name: Pip import smoke with Python 3.11
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Eigen
+        run: |
+          sudo apt update
+          sudo apt install libeigen3-dev
+      - name: Install and import
+        run: |
+          python -m pip install --no-cache-dir .
+          cd /tmp
+          python -c "import chiq, chiq._bse_solver; print('import OK')"
+          python -W ignore::FutureWarning -c "import bse, bse_solver"
+          chiq_main --version

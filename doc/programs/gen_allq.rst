@@ -3,12 +3,12 @@ gen_allq
 
 .. code-block:: bash
 
-    gen_allq.py [-h] [-o OUTFILE] file_param
+    gen_allq [-h] [-o OUTFILE] file_param
 
 Description
 -----------
 
-``gen_allq.py`` is a script for generating a list of all q-points in the Brillouin zone.
+``gen_allq`` is a script for generating a list of all q-points in the Brillouin zone.
 
 Positional Arguments
 ---------------------
@@ -35,13 +35,13 @@ Basic usage:
 
 .. code-block:: console
 
-    $ gen_allq.py dcore.in
+    $ gen_allq dcore.in
 
 Example of the standard output:
 
 .. code-block:: console
 
-    $ gen_allq.py dmft_square.in
+    $ gen_allq dmft_square.in
 
     Read k-grid from file 'dmft_square.in'.
     [model]
