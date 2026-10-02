@@ -7,9 +7,9 @@ Necessary input to this package can be generated using [DCore](https://github.co
 
 Features:
 
-- Computes the momentum-dependent spin/charge/orbital susceptibility $\chi_{ijkl}(\boldsymbol{q}, i\nu_m)$ in Matsubara-frequency domain (see [algorightm in doc](doc/algorithms.rst) for the explicit definition).
+- Computes the momentum-dependent spin/charge/orbital susceptibility $\chi_{ijkl}(\boldsymbol{q}, i\nu_m)$ in Matsubara-frequency domain (see [algorithm in doc](doc/algorithms.rst) for the explicit definition).
 
-- Provides several approximation schemes, including BSE, SCL, RPA, and RRPA (see [algorithms in doc](doc/altorithms.rst) for details).
+- Provides several approximation schemes, including BSE, SCL, RPA, and RRPA (see [algorithms in doc](doc/algorithms.rst) for details).
 
 - Runs as a post-processing step of DCore.
 
