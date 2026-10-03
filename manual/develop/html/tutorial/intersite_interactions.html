@@ -6,13 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Intersite interactions &#8212; ChiQ  documentation</title>
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5349f25f" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=0fc419ee" />
     <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
     <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
     <script src="../_static/documentation_options.js?v=5929fcd5"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <link rel="author" title="About these documents" href="../about.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Multiple band Hubbard model" href="multiple_orb.html" />
@@ -59,7 +59,7 @@ The input file of DCore is <code class="docutils literal notranslate"><span clas
 <span class="na">nk2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1</span>
 
 <span class="c1">#[mpi]</span>
-<span class="c1">#command = &quot;mpirun -n #&quot;</span>
+<span class="c1">#command = "mpirun -n #"</span>
 
 <span class="k">[system]</span>
 <span class="na">T</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">0.5</span>
@@ -82,7 +82,7 @@ The input file of DCore is <code class="docutils literal notranslate"><span clas
 <span class="k">[bse]</span>
 <span class="na">num_wb</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">1</span>
 <span class="na">num_wf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">20</span>
-<span class="na">X0q_qpoints_saved</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;q_fbz.dat&quot;</span>
+<span class="na">X0q_qpoints_saved</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">"q_fbz.dat"</span>
 </pre></div>
 </div>
 <p>Compared to the previous example, the <code class="docutils literal notranslate"><span class="pre">X0q_qpoints_saved</span></code> parameter in the <code class="docutils literal notranslate"><span class="pre">[bse]</span></code> section is set to <code class="docutils literal notranslate"><span class="pre">q_fbz.dat</span></code> from <code class="docutils literal notranslate"><span class="pre">q_path.dat</span></code>.
@@ -108,26 +108,26 @@ mpiexec<span class="w"> </span>-np<span class="w"> </span><span class="m">4</spa
 </div>
 <p>The input file of ChiQ tools, <code class="docutils literal notranslate"><span class="pre">bse.in</span></code>, is also the same as in the previous tutorial:</p>
 <div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[chiq_common]</span>
-<span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dmft_bse.h5&quot;</span>
-<span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;dmft_bse.out.h5&quot;</span>
-<span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;chi0&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;bse&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># &quot;chi0&quot;, &quot;bse&quot;, &quot;scl&quot;, &quot;rpa&quot;, &quot;rrpa&quot;</span>
-<span class="n">omega_q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;q_fbz.dat&quot;</span>
+<span class="n">input</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"dmft_bse.h5"</span>
+<span class="n">output</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"dmft_bse.out.h5"</span>
+<span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"chi0"</span><span class="p">,</span><span class="w"> </span><span class="s2">"bse"</span><span class="p">]</span><span class="w">  </span><span class="c1"># "chi0", "bse", "scl", "rpa", "rrpa"</span>
+<span class="n">omega_q</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"q_fbz.dat"</span>
 
 <span class="k">[chiq_main]</span>
-<span class="n">work_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;work/chiq&quot;</span>
+<span class="n">work_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"work/chiq"</span>
 <span class="c1"># num_wf = 20  # If not specified, the value is determined from X_loc</span>
 
 <span class="k">[chiq_post]</span>
-<span class="n">output_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;bse&quot;</span>
-<span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eigen&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># &quot;matrix_element&quot;, &quot;eigen&quot;, &quot;linear_combination&quot;</span>
+<span class="n">output_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"bse"</span>
+<span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">"eigen"</span><span class="p">]</span><span class="w">  </span><span class="c1"># "matrix_element", "eigen", "linear_combination"</span>
 
-<span class="c1"># for mode=&quot;eigen&quot;</span>
+<span class="c1"># for mode="eigen"</span>
 <span class="c1">#vector = true  # output eigenvectors</span>
-<span class="n">order</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;file&quot;</span><span class="w">  </span><span class="c1"># &quot;descend&quot; (default), &quot;overlap&quot;, &quot;file&quot;</span>
-<span class="n">order_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;eigenvec.in&quot;</span><span class="w">  </span><span class="c1"># for order=&quot;file&quot;</span>
+<span class="n">order</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"file"</span><span class="w">  </span><span class="c1"># "descend" (default), "overlap", "file"</span>
+<span class="n">order_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"eigenvec.in"</span><span class="w">  </span><span class="c1"># for order="file"</span>
 
-<span class="c1"># for mode=&quot;linear_combination&quot;</span>
-<span class="c1"># coefs_file = &quot;/path/to/coefs.in&quot;</span>
+<span class="c1"># for mode="linear_combination"</span>
+<span class="c1"># coefs_file = "/path/to/coefs.in"</span>
 </pre></div>
 </div>
 <p>The only difference is that the <code class="docutils literal notranslate"><span class="pre">q_fbz.dat</span></code> file is used instead of <code class="docutils literal notranslate"><span class="pre">q_path.dat</span></code> in <code class="docutils literal notranslate"><span class="pre">omega_q</span></code> parameter in the <code class="docutils literal notranslate"><span class="pre">[chiq_common]</span></code> section.</p>

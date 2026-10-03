@@ -6,13 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>plot_chiq_path &#8212; ChiQ  documentation</title>
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5349f25f" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=0fc419ee" />
     <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
     <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
     <script src="../_static/documentation_options.js?v=5929fcd5"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <link rel="author" title="About these documents" href="../about.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="plot_Ir" href="plot_Ir.html" />
@@ -97,12 +97,12 @@ The default is <code class="docutils literal notranslate"><span class="pre">pdf<
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>plot_chiq_path.py<span class="w"> </span>q_path.dat<span class="w"> </span>chi_q_eigen.dat
 
 <span class="go">Running plot_chiq_path.py</span>
-<span class="go">Namespace(file_qpath=&#39;../q_path.dat&#39;, file_eigen=&#39;chi_q_eigen.dat&#39;, d=False, mode=&#39;chi&#39;, data_out=None, label=None, subfigures=None, ymin=None, ymax=None, sharey=False)</span>
-<span class="go">qlabels = [(0.0, &#39;X&#39;), (0.5, &#39;Gamma&#39;), (1.20711, &#39;M&#39;), (1.70711, &#39;X&#39;), (2.06066, &quot;M&#39;&quot;)]</span>
+<span class="go">Namespace(file_qpath='../q_path.dat', file_eigen='chi_q_eigen.dat', d=False, mode='chi', data_out=None, label=None, subfigures=None, ymin=None, ymax=None, sharey=False)</span>
+<span class="go">qlabels = [(0.0, 'X'), (0.5, 'Gamma'), (1.20711, 'M'), (1.70711, 'X'), (2.06066, "M'")]</span>
 <span class="gp"># </span>of<span class="w"> </span>q<span class="w"> </span>points<span class="w"> </span><span class="m">57</span>
 <span class="gp"># </span>of<span class="w"> </span>columns<span class="w"> </span><span class="m">4</span>
-<span class="go">&#39;chi_q_eigen_path.pdf&#39;</span>
-<span class="go">&#39;chi_q_eigen_path_inv.pdf&#39;</span>
+<span class="go">'chi_q_eigen_path.pdf'</span>
+<span class="go">'chi_q_eigen_path_inv.pdf'</span>
 </pre></div>
 </div>
 <p>Two files are generated: one is <code class="docutils literal notranslate"><span class="pre">chi_q_eigen_path.pdf</span></code>, which shows <span class="math notranslate nohighlight">\(\chi(q)\)</span>, and the other is <code class="docutils literal notranslate"><span class="pre">chi_q_eigen_path_inv.pdf</span></code>, which shows the inverse <span class="math notranslate nohighlight">\(1/\chi(q)\)</span>.</p>
@@ -111,7 +111,7 @@ The default is <code class="docutils literal notranslate"><span class="pre">pdf<
 <span class="go">...</span>
 
 <span class="gp">$ </span>cat<span class="w"> </span>chi_q_eigen_path.dat
-<span class="gp"># </span><span class="s2">&quot;X&quot;</span><span class="w"> </span><span class="m">0</span>.0,<span class="w"> </span><span class="s2">&quot;Gamma&quot;</span><span class="w"> </span><span class="m">0</span>.5,<span class="w"> </span><span class="s2">&quot;M&quot;</span><span class="w"> </span><span class="m">1</span>.20711,<span class="w"> </span><span class="s2">&quot;X&quot;</span><span class="w"> </span><span class="m">1</span>.70711,<span class="w"> </span><span class="s2">&quot;M&#39;&quot;</span><span class="w"> </span><span class="m">2</span>.06066,
+<span class="gp"># </span><span class="s2">"X"</span><span class="w"> </span><span class="m">0</span>.0,<span class="w"> </span><span class="s2">"Gamma"</span><span class="w"> </span><span class="m">0</span>.5,<span class="w"> </span><span class="s2">"M"</span><span class="w"> </span><span class="m">1</span>.20711,<span class="w"> </span><span class="s2">"X"</span><span class="w"> </span><span class="m">1</span>.70711,<span class="w"> </span><span class="s2">"M'"</span><span class="w"> </span><span class="m">2</span>.06066,
 <span class="go">0.000000000000000000e+00 9.794008258171953418e-01 9.794008258171951198e-01 9.794008258171951198e-01 1.763353990492932954e-04</span>
 <span class="go">3.125000000000000000e-02 9.724242604351043262e-01 9.724242604351041042e-01 9.724242604351035490e-01 1.065169599963056157e-04</span>
 <span class="go">6.250000000000000000e-02 9.524169229614609655e-01 9.524169229614607435e-01 9.524169229614607435e-01 -1.026114959849500075e-04</span>
@@ -124,7 +124,7 @@ The default is <code class="docutils literal notranslate"><span class="pre">pdf<
 </div>
 <p>The comment on the first line indicates the q-path label.
 For Gnuplot, one can set the x-label by the command</p>
-<div class="highlight-gnuplot notranslate"><div class="highlight"><pre><span></span><span class="k">set</span><span class="w"> </span><span class="nb">xtics</span><span class="w"> </span><span class="p">(</span><span class="s">&quot;X&quot;</span><span class="w"> </span><span class="mf">0.0</span><span class="o">,</span><span class="w"> </span><span class="s">&quot;Gamma&quot;</span><span class="w"> </span><span class="mf">0.5</span><span class="o">,</span><span class="w"> </span><span class="s">&quot;M&quot;</span><span class="w"> </span><span class="mf">1.20711</span><span class="o">,</span><span class="w"> </span><span class="s">&quot;X&quot;</span><span class="w"> </span><span class="mf">1.70711</span><span class="o">,</span><span class="w"> </span><span class="s">&quot;M&#39;&quot;</span><span class="w"> </span><span class="mf">2.06066</span><span class="p">)</span>
+<div class="highlight-gnuplot notranslate"><div class="highlight"><pre><span></span><span class="k">set</span><span class="w"> </span><span class="nb">xtics</span><span class="w"> </span><span class="p">(</span><span class="s">"X"</span><span class="w"> </span><span class="mf">0.0</span><span class="o">,</span><span class="w"> </span><span class="s">"Gamma"</span><span class="w"> </span><span class="mf">0.5</span><span class="o">,</span><span class="w"> </span><span class="s">"M"</span><span class="w"> </span><span class="mf">1.20711</span><span class="o">,</span><span class="w"> </span><span class="s">"X"</span><span class="w"> </span><span class="mf">1.70711</span><span class="o">,</span><span class="w"> </span><span class="s">"M'"</span><span class="w"> </span><span class="mf">2.06066</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>

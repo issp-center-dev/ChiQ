@@ -6,13 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>Multiple band Hubbard model &#8212; ChiQ  documentation</title>
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5349f25f" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=0fc419ee" />
     <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
     <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
     <script src="../_static/documentation_options.js?v=5929fcd5"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <link rel="author" title="About these documents" href="../about.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Reference Manual" href="../reference.html" />
@@ -76,11 +76,11 @@ In this tutorial, we consider the two-band Hubbard model with the following para
 <span class="n">nk0</span> <span class="o">=</span> <span class="mi">32</span>
 <span class="n">nk1</span> <span class="o">=</span> <span class="mi">32</span>
 <span class="n">nk2</span> <span class="o">=</span> <span class="mi">1</span>
-<span class="n">local_potential_matrix</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s1">&#39;local_pot.in&#39;</span><span class="p">}</span>
+<span class="n">local_potential_matrix</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s1">'local_pot.in'</span><span class="p">}</span>
 <span class="n">local_potential_factor</span> <span class="o">=</span> <span class="mf">8.8</span>
 
 <span class="c1">#[mpi]</span>
-<span class="c1">#command = &quot;mpirun -n #&quot;</span>
+<span class="c1">#command = "mpirun -n #"</span>
 
 <span class="p">[</span><span class="n">system</span><span class="p">]</span>
 <span class="n">T</span> <span class="o">=</span> <span class="mf">0.5</span>
@@ -105,7 +105,7 @@ In this tutorial, we consider the two-band Hubbard model with the following para
 <span class="p">[</span><span class="n">bse</span><span class="p">]</span>
 <span class="n">num_wb</span> <span class="o">=</span> <span class="mi">1</span>
 <span class="n">num_wf</span> <span class="o">=</span> <span class="mi">20</span>
-<span class="n">X0q_qpoints_saved</span> <span class="o">=</span> <span class="s2">&quot;q_path.dat&quot;</span>
+<span class="n">X0q_qpoints_saved</span> <span class="o">=</span> <span class="s2">"q_path.dat"</span>
 </pre></div>
 </div>
 <p>As for the previous example for the single-band Hubbard model, the <code class="docutils literal notranslate"><span class="pre">[model]</span></code> section specifies the model parameters.
@@ -142,7 +142,7 @@ dcore_check<span class="w"> </span>dmft_2orb.in
 <span class="mi">0</span> <span class="mi">0</span> <span class="mi">0</span>  <span class="n">Gamma</span>
 <span class="mi">1</span><span class="o">/</span><span class="mi">2</span> <span class="mi">1</span><span class="o">/</span><span class="mi">2</span> <span class="mi">0</span>  <span class="n">M</span>
 <span class="mi">1</span><span class="o">/</span><span class="mi">2</span> <span class="mi">0</span> <span class="mi">0</span>  <span class="n">X</span>
-<span class="mi">1</span><span class="o">/</span><span class="mi">4</span> <span class="mi">1</span><span class="o">/</span><span class="mi">4</span> <span class="mi">0</span>  <span class="n">M</span><span class="s1">&#39;</span>
+<span class="mi">1</span><span class="o">/</span><span class="mi">4</span> <span class="mi">1</span><span class="o">/</span><span class="mi">4</span> <span class="mi">0</span>  <span class="n">M</span><span class="s1">'</span>
 </pre></div>
 </div>
 <p>as follows:</p>
@@ -151,26 +151,26 @@ dcore_check<span class="w"> </span>dmft_2orb.in
 </div>
 <p>Next, we need to prepare the input file for the BSE calculation.</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">chiq_common</span><span class="p">]</span>
-<span class="nb">input</span> <span class="o">=</span> <span class="s2">&quot;dmft_bse.h5&quot;</span>
-<span class="n">output</span> <span class="o">=</span> <span class="s2">&quot;dmft_bse.out.h5&quot;</span>
-<span class="nb">type</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;chi0&quot;</span><span class="p">,</span> <span class="s2">&quot;bse&quot;</span><span class="p">]</span>  <span class="c1"># &quot;chi0&quot;, &quot;bse&quot;, &quot;scl&quot;, &quot;rpa&quot;, &quot;rrpa&quot;</span>
-<span class="n">omega_q</span> <span class="o">=</span> <span class="s2">&quot;q_path.dat&quot;</span>
+<span class="nb">input</span> <span class="o">=</span> <span class="s2">"dmft_bse.h5"</span>
+<span class="n">output</span> <span class="o">=</span> <span class="s2">"dmft_bse.out.h5"</span>
+<span class="nb">type</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"chi0"</span><span class="p">,</span> <span class="s2">"bse"</span><span class="p">]</span>  <span class="c1"># "chi0", "bse", "scl", "rpa", "rrpa"</span>
+<span class="n">omega_q</span> <span class="o">=</span> <span class="s2">"q_path.dat"</span>
 
 <span class="p">[</span><span class="n">chiq_main</span><span class="p">]</span>
-<span class="n">work_dir</span> <span class="o">=</span> <span class="s2">&quot;work/chiq&quot;</span>
+<span class="n">work_dir</span> <span class="o">=</span> <span class="s2">"work/chiq"</span>
 <span class="c1"># num_wf = 20  # If not specified, the value is determined from X_loc</span>
 
 <span class="p">[</span><span class="n">chiq_post</span><span class="p">]</span>
-<span class="n">output_dir</span> <span class="o">=</span> <span class="s2">&quot;bse&quot;</span>
-<span class="n">mode</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;eigen&quot;</span><span class="p">]</span>  <span class="c1"># &quot;matrix_element&quot;, &quot;eigen&quot;, &quot;linear_combination&quot;</span>
+<span class="n">output_dir</span> <span class="o">=</span> <span class="s2">"bse"</span>
+<span class="n">mode</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"eigen"</span><span class="p">]</span>  <span class="c1"># "matrix_element", "eigen", "linear_combination"</span>
 
-<span class="c1"># for mode=&quot;eigen&quot;</span>
+<span class="c1"># for mode="eigen"</span>
 <span class="c1">#vector = true  # output eigenvectors</span>
-<span class="n">order</span> <span class="o">=</span> <span class="s2">&quot;file&quot;</span>  <span class="c1"># &quot;descend&quot; (default), &quot;overlap&quot;, &quot;file&quot;</span>
-<span class="n">order_file</span> <span class="o">=</span> <span class="s2">&quot;eigenvec.in&quot;</span>  <span class="c1"># for order=&quot;file&quot;</span>
+<span class="n">order</span> <span class="o">=</span> <span class="s2">"file"</span>  <span class="c1"># "descend" (default), "overlap", "file"</span>
+<span class="n">order_file</span> <span class="o">=</span> <span class="s2">"eigenvec.in"</span>  <span class="c1"># for order="file"</span>
 
-<span class="c1"># for mode=&quot;linear_combination&quot;</span>
-<span class="c1"># coefs_file = &quot;/path/to/coefs.in&quot;</span>
+<span class="c1"># for mode="linear_combination"</span>
+<span class="c1"># coefs_file = "/path/to/coefs.in"</span>
 </pre></div>
 </div>
 <p>The <code class="docutils literal notranslate"><span class="pre">[chiq_common]</span></code> and <code class="docutils literal notranslate"><span class="pre">[chiq_main]</span></code> sections are the same as the previous example.
@@ -257,14 +257,14 @@ Therefore, this says that the 11th eigenvector is <span class="math notranslate 
 <p>In the plotting tool, <code class="docutils literal notranslate"><span class="pre">plot_chiq_path.py</span></code>, you can select the susceptibility to plot by specifying the eigenvector index by using the following file, <code class="docutils literal notranslate"><span class="pre">label.in</span></code>:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># from Table I in J. Otsuki et al. PRB 99, 165134 (2019)</span>
 <span class="p">{</span>
-<span class="c1">#		0: &quot;charge&quot;,</span>
-		<span class="mi">1</span><span class="p">:</span> <span class="s2">&quot;spin&quot;</span><span class="p">,</span>
-		<span class="mi">4</span><span class="p">:</span> <span class="s2">&quot;HS/LS&quot;</span><span class="p">,</span>
-<span class="c1">#		5: &quot;tau^x&quot;,</span>
-		<span class="mi">6</span><span class="p">:</span> <span class="s2">&quot;orb^3&quot;</span><span class="p">,</span>
-<span class="c1">#		9: &quot;sp-orb^1&quot;,</span>
-		<span class="mi">10</span><span class="p">:</span> <span class="s2">&quot;EI&quot;</span><span class="p">,</span>
-<span class="c1">#		13: &quot;sp-orb^{3z}&quot;,</span>
+<span class="c1">#		0: "charge",</span>
+		<span class="mi">1</span><span class="p">:</span> <span class="s2">"spin"</span><span class="p">,</span>
+		<span class="mi">4</span><span class="p">:</span> <span class="s2">"HS/LS"</span><span class="p">,</span>
+<span class="c1">#		5: "tau^x",</span>
+		<span class="mi">6</span><span class="p">:</span> <span class="s2">"orb^3"</span><span class="p">,</span>
+<span class="c1">#		9: "sp-orb^1",</span>
+		<span class="mi">10</span><span class="p">:</span> <span class="s2">"EI"</span><span class="p">,</span>
+<span class="c1">#		13: "sp-orb^{3z}",</span>
 <span class="p">}</span>
 </pre></div>
 </div>

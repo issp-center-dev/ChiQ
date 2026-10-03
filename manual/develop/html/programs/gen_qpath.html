@@ -6,12 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>gen_qpath &#8212; ChiQ  documentation</title>
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5349f25f" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=0fc419ee" />
     <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
     <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
     <script src="../_static/documentation_options.js?v=5929fcd5"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <link rel="author" title="About these documents" href="../about.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="gen_allq" href="gen_allq.html" />
@@ -69,7 +69,7 @@
 0 0 0  Gamma
 1/2 1/2 0  M
 1/2 0 0  X
-1/4 1/4 0  M&#39;
+1/4 1/4 0  M'
 </pre></div>
 </div>
 </dd>
@@ -93,29 +93,29 @@
 <p>Example of the standard output:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>gen_qpath.py<span class="w"> </span>dmft_square.in<span class="w"> </span>qpath.in
 
-<span class="go">Read k-grid from file &#39;dmft_square.in&#39;.</span>
+<span class="go">Read k-grid from file 'dmft_square.in'.</span>
 <span class="go">[model]</span>
 <span class="gp gp-VirtualEnv">(nk0, nk1, nk2)</span> <span class="go">= (32, 32, 1)</span>
 
-<span class="go">Read bvec (reciprocal vectors) from file &#39;dmft_square.in&#39;.</span>
+<span class="go">Read bvec (reciprocal vectors) from file 'dmft_square.in'.</span>
 <span class="go">bvec not found. Assume the identity matrix.</span>
 
-<span class="go">Read q-points from &#39;qpath.in&#39; and convert to grid points.</span>
+<span class="go">Read q-points from 'qpath.in' and convert to grid points.</span>
 <span class="go">q-path runs through (w.r.t. reciprocal primitive vectors)</span>
 <span class="go">[16  0  0] X</span>
 <span class="go">[0 0 0] Gamma</span>
 <span class="go">[16 16  0] M</span>
 <span class="go">[16  0  0] X</span>
-<span class="go">[8 8 0] M&#39;</span>
+<span class="go">[8 8 0] M'</span>
 
-<span class="go">File &#39;q_path.dat&#39; generated</span>
+<span class="go">File 'q_path.dat' generated</span>
 
 <span class="go">x-coordinate for plot</span>
 <span class="go">0.00000 X</span>
 <span class="go">0.50000 Gamma</span>
 <span class="go">1.20711 M</span>
 <span class="go">1.70711 X</span>
-<span class="go">2.06066 M&#39;</span>
+<span class="go">2.06066 M'</span>
 </pre></div>
 </div>
 <p>Example for a generated file <code class="docutils literal notranslate"><span class="pre">q_path.dat</span></code>:</p>
