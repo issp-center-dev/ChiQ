@@ -275,3 +275,16 @@ def test_verifier_rejects_poisoned_direct_internal_mode_before_work(tmp_path):
     assert "unsafe internal verifier environment" in result.stderr
     assert "Environment policy" not in result.stdout
     assert "source snapshot" not in result.stdout + result.stderr
+
+
+def test_ci_passes_selected_python_to_verifiers():
+    workflow = (ROOT / ".github/workflows/main.yml").read_text()
+    for name in ("verify_pip_install.sh", "verify_legacy_install.sh"):
+        step = workflow[:workflow.index("run: tests/python/non-mpi/packaging/" + name)]
+        env = step[step.rindex("env:"):]
+        assert "PYTHON: ${{ env.pythonLocation }}/bin/python" in env
+
+
+def test_build_tree_does_not_receive_source_checkout_tests():
+    cmake = (ROOT / "tests/CMakeLists.txt").read_text()
+    assert 'PATTERN "non-mpi/packaging" EXCLUDE' in cmake

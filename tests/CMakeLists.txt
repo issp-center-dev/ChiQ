@@ -8,6 +8,8 @@ add_subdirectory(c++)
 # add_subdirectory(python)
 
 # for python
-file(COPY ${CMAKE_SOURCE_DIR}/tests/python/ DESTINATION ${CMAKE_BINARY_DIR}/tests/python)
+# Packaging contract tests inspect the source checkout and run from there.
+file(COPY ${CMAKE_SOURCE_DIR}/tests/python/ DESTINATION ${CMAKE_BINARY_DIR}/tests/python
+  PATTERN "non-mpi/packaging" EXCLUDE)
 configure_file(python/pytest.ini ${CMAKE_BINARY_DIR}/tests/python/pytest.ini)
 configure_file(python/pytest.ini ${CMAKE_BINARY_DIR}/pytest.ini)

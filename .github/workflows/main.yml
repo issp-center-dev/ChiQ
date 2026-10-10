@@ -123,6 +123,7 @@ jobs:
       - name: Run authoritative wheel, sdist, and editable flow
         env:
           TMPDIR: ${{ runner.temp }}
+          PYTHON: ${{ env.pythonLocation }}/bin/python
         run: tests/python/non-mpi/packaging/verify_pip_install.sh
       - name: Retain pip manifests, artifacts, and verbose logs
         if: failure()
@@ -243,6 +244,7 @@ jobs:
       - name: Verify legacy install layout
         env:
           TMPDIR: ${{ runner.temp }}
+          PYTHON: ${{ env.pythonLocation }}/bin/python
         run: tests/python/non-mpi/packaging/verify_legacy_install.sh
       - name: Retain legacy diagnostics
         if: failure()
