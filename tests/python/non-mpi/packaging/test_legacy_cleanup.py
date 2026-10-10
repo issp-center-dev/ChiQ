@@ -43,12 +43,15 @@ def _configure(tmp_path, libdir="lib", prefix=None):
     return build, Path(prefix)
 
 
-def _install(build, destdir=None):
+def _install(build, destdir=None, prefix=None):
     environment = os.environ.copy()
     if destdir is not None:
         environment["DESTDIR"] = os.fspath(destdir)
+    command = ["cmake", "--install", os.fspath(build)]
+    if prefix is not None:
+        command += ["--prefix", os.fspath(prefix)]
     return subprocess.run(
-        ["cmake", "--install", os.fspath(build)],
+        command,
         env=environment,
         capture_output=True,
         text=True,
@@ -81,7 +84,7 @@ def _populate_obsolete(root):
 
 
 @pytest.mark.parametrize("libdir", ["lib/custom", "lib64"])
-def test_cleanup_uses_configure_time_prefix_for_relative_libdir(tmp_path, libdir):
+def test_cleanup_uses_configured_prefix_for_relative_libdir(tmp_path, libdir):
     configured_prefix = tmp_path / "configured-prefix"
     build, prefix = _configure(tmp_path, libdir=libdir, prefix=configured_prefix)
     root = _legacy_root(prefix, libdir)
@@ -102,6 +105,24 @@ def test_cleanup_uses_configure_time_prefix_for_relative_libdir(tmp_path, libdir
     assert not (root / "bse_solver-link.so").is_symlink()
     assert not (root / "chiq" / "_bse_solver-link.so").is_symlink()
     assert all(path.read_bytes() == b"sentinel" for path in sentinels)
+
+
+@pytest.mark.parametrize("libdir", ["lib", "lib64"])
+def test_cleanup_honors_install_time_prefix_override(tmp_path, libdir):
+    build, configured_prefix = _configure(
+        tmp_path, libdir=libdir, prefix=tmp_path / "configured-prefix"
+    )
+    configured_root = _legacy_root(configured_prefix, libdir)
+    configured_obsolete = _populate_obsolete(configured_root)
+    override_prefix = tmp_path / "override-prefix"
+    override_root = _legacy_root(override_prefix, libdir)
+    override_obsolete = _populate_obsolete(override_root)
+
+    result = _install(build, prefix=override_prefix)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not any(path.exists() for path in override_obsolete)
+    assert all(path.read_bytes() == b"obsolete" for path in configured_obsolete)
 
 
 def test_cleanup_combines_destdir_with_absolute_libdir(tmp_path):
@@ -207,6 +228,13 @@ def test_project_registers_cleanup_immediately_before_legacy_target_install():
     between = text[cleanup:target]
     assert between.count("install(") == 1
     assert cleanup < target
+
+
+def test_stale_bse_symlink_removal_resolves_prefix_at_install_time():
+    text = (REPOSITORY / "python" / "CMakeLists.txt").read_text(encoding="utf-8")
+    assert "CMAKE_INSTALL_FULL_LIBDIR" not in text
+    assert '\\${CMAKE_INSTALL_PREFIX}/\\${_obsolete_libdir}' in text
+    assert '\\$ENV{DESTDIR}\\${_obsolete_libdir}/bse-python/bse' in text
 
 
 def test_python_directory_installs_exclude_caches_bytecode_and_native_files():

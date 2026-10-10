@@ -1,9 +1,17 @@
-# Remove only obsolete native solver artifacts from the configured legacy
-# install directory. This script runs at install time so DESTDIR is honored.
+# Remove only obsolete native solver artifacts from the legacy install
+# directory. This script runs at install time so DESTDIR and an install-time
+# prefix override (cmake --install --prefix) are honored.
 
+set(_chiq_legacy_configured_libdir "@CMAKE_INSTALL_LIBDIR@")
+if(IS_ABSOLUTE "${_chiq_legacy_configured_libdir}")
+  set(_chiq_legacy_full_libdir "${_chiq_legacy_configured_libdir}")
+else()
+  set(_chiq_legacy_full_libdir
+      "${CMAKE_INSTALL_PREFIX}/${_chiq_legacy_configured_libdir}")
+endif()
 get_filename_component(
   _chiq_legacy_libdir
-  "$ENV{DESTDIR}@CMAKE_INSTALL_FULL_LIBDIR@/bse-python"
+  "$ENV{DESTDIR}${_chiq_legacy_full_libdir}/bse-python"
   ABSOLUTE
 )
 

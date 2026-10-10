@@ -34,8 +34,13 @@ if __name__ == \"__main__\":
   install(DIRECTORY package/chiq DESTINATION ${CMAKE_INSTALL_LIBDIR}/bse-python
     ${_chiq_install_excludes})
   # Remove only the exact stale symlink before installing the real package.
+  # Resolve the prefix at install time so cmake --install --prefix is honored.
   install(CODE "
-    set(_obsolete_bse \"\$ENV{DESTDIR}${CMAKE_INSTALL_FULL_LIBDIR}/bse-python/bse\")
+    set(_obsolete_libdir \"${CMAKE_INSTALL_LIBDIR}\")
+    if(NOT IS_ABSOLUTE \"\${_obsolete_libdir}\")
+      set(_obsolete_libdir \"\${CMAKE_INSTALL_PREFIX}/\${_obsolete_libdir}\")
+    endif()
+    set(_obsolete_bse \"\$ENV{DESTDIR}\${_obsolete_libdir}/bse-python/bse\")
     if(IS_SYMLINK \"\${_obsolete_bse}\")
       file(REMOVE \"\${_obsolete_bse}\")
     endif()
