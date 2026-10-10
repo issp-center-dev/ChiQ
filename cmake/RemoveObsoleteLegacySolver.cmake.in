@@ -1,0 +1,82 @@
+# Remove only obsolete native solver artifacts from the configured legacy
+# install directory. This script runs at install time so DESTDIR is honored.
+
+get_filename_component(
+  _chiq_legacy_libdir
+  "$ENV{DESTDIR}@CMAKE_INSTALL_FULL_LIBDIR@/bse-python"
+  ABSOLUTE
+)
+
+function(_chiq_reject_symlink_ancestors path)
+  get_filename_component(_current "${path}" ABSOLUTE)
+  while(TRUE)
+    if(IS_SYMLINK "${_current}")
+      message(FATAL_ERROR "Refusing legacy cleanup through symlink: ${_current}")
+    endif()
+    get_filename_component(_parent "${_current}" DIRECTORY)
+    if(_parent STREQUAL _current)
+      break()
+    endif()
+    set(_current "${_parent}")
+  endwhile()
+endfunction()
+
+_chiq_reject_symlink_ancestors("${_chiq_legacy_libdir}")
+if(NOT EXISTS "${_chiq_legacy_libdir}")
+  return()
+endif()
+if(NOT IS_DIRECTORY "${_chiq_legacy_libdir}")
+  message(FATAL_ERROR "Legacy install path is not a directory: ${_chiq_legacy_libdir}")
+endif()
+
+set(_chiq_solver_dir "${_chiq_legacy_libdir}/chiq")
+_chiq_reject_symlink_ancestors("${_chiq_solver_dir}")
+
+file(GLOB _chiq_old_top LIST_DIRECTORIES TRUE
+  "${_chiq_legacy_libdir}/bse_solver*.so"
+  "${_chiq_legacy_libdir}/bse_solver*.pyd"
+  "${_chiq_legacy_libdir}/bse_solver*.dylib"
+)
+set(_chiq_old_nested)
+if(EXISTS "${_chiq_solver_dir}")
+  if(NOT IS_DIRECTORY "${_chiq_solver_dir}")
+    message(FATAL_ERROR "Legacy ChiQ install path is not a directory: ${_chiq_solver_dir}")
+  endif()
+  file(GLOB _chiq_old_nested LIST_DIRECTORIES TRUE
+    "${_chiq_solver_dir}/_bse_solver*.so"
+    "${_chiq_solver_dir}/_bse_solver*.pyd"
+    "${_chiq_solver_dir}/_bse_solver*.dylib"
+  )
+endif()
+
+set(_chiq_old_artifacts ${_chiq_old_top} ${_chiq_old_nested})
+foreach(_candidate IN LISTS _chiq_old_artifacts)
+  get_filename_component(_candidate_absolute "${_candidate}" ABSOLUTE)
+  get_filename_component(_candidate_parent "${_candidate_absolute}" DIRECTORY)
+  if(NOT (_candidate_parent STREQUAL _chiq_legacy_libdir OR
+          _candidate_parent STREQUAL _chiq_solver_dir))
+    message(FATAL_ERROR "Legacy cleanup candidate escaped its directory: ${_candidate}")
+  endif()
+  if(NOT IS_SYMLINK "${_candidate}")
+    if(IS_DIRECTORY "${_candidate}")
+      message(FATAL_ERROR "Refusing to remove matching directory: ${_candidate}")
+    endif()
+    if(NOT UNIX)
+      message(FATAL_ERROR "Regular-file validation is unsupported on this platform")
+    endif()
+    execute_process(
+      COMMAND /bin/test -f "${_candidate}"
+      RESULT_VARIABLE _regular_result
+    )
+    if(NOT _regular_result EQUAL 0)
+      message(FATAL_ERROR "Refusing to remove non-regular file: ${_candidate}")
+    endif()
+  endif()
+endforeach()
+
+foreach(_candidate IN LISTS _chiq_old_artifacts)
+  file(REMOVE "${_candidate}")
+  if(EXISTS "${_candidate}" OR IS_SYMLINK "${_candidate}")
+    message(FATAL_ERROR "Failed to remove obsolete legacy solver: ${_candidate}")
+  endif()
+endforeach()

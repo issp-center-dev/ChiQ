@@ -15,12 +15,92 @@ Before beginning the installation, ensure that you have the following software i
 - **Python**: Required for using pybind11, which interfaces C++ with Python. Ensure Python is compatible with the required version of pybind11.
 - **CMake** (version 3 or higher): Required for building the software.
 - **GNU Make** or equivalent: Used for running make commands.
-- **C++ Compiler** (supporting C++11 standard): Necessary for compiling the source code.
+- **C++ Compiler** (supporting C++17 standard): Necessary for compiling the source code.
 - **Eigen3** (version 3.1 or higher): C++ header-only library for linear algebra.
 
 Additionally, make sure that you have write access to the installation directory (`$HOME/local` in the example below) and that Python's bin directory is in your system's PATH.
 
-Installation
+Quick install with pip
+----------------------
+
+For laptops, virtual environments, and CI jobs, the recommended path is a normal pip install:
+
+.. code-block:: bash
+
+    python3 -m pip install .
+
+For development, use an editable install:
+
+.. code-block:: bash
+
+    python3 -m pip install -e .
+
+Optional runtime dependencies are installed with extras:
+
+.. code-block:: bash
+
+    python3 -m pip install "chiq[plot]"
+
+Plotting commands require the ``chiq[plot]`` extra. ChiQ imports private DCore APIs, so use a
+fresh, isolated environment for the ``chiq[dcore]`` extra. It pins the reviewed boundary to
+DCore 4.2.0 and also installs ``mpi4py``:
+
+.. code-block:: bash
+
+    python3 -m venv .venv-chiq-dcore
+    . .venv-chiq-dcore/bin/activate
+    python3 -m pip install "chiq[dcore]"
+
+When installing from this checkout rather than from a package index, replace ``chiq`` in those
+commands with ``.`` (for example, ``python3 -m pip install ".[dcore]"``). Review compatibility
+before changing the DCore pin.
+
+The pip build compiles the C++ extension as ``chiq._bse_solver`` and installs console
+commands such as ``chiq_main`` and ``chiq_post``. If you previously used a CMake install,
+unset stale ``PYTHONPATH`` entries before testing a pip install so Python does not import an
+older ``lib/bse-python`` tree.
+
+Use the CMake workflow below when you need an HPC module environment, a custom compiler, a
+custom install prefix with ``chiqvars.sh``, or site-managed build flags.
+
+Supported installation and verification matrix
+----------------------------------------------
+
+ChiQ supports Python >=3.8. Although Python 3.8 is upstream end-of-life, CI continuously
+verifies Python 3.8 and 3.13. The packaging checks cover wheel, sdist, editable, and legacy
+CMake installations; pip and legacy CMake remain supported side by side. Endpoint CI uses
+fresh environments and intentionally reports dependency drift instead of silently relaxing
+version bounds.
+
+These checks do not promise every platform-specific filesystem operation. Portable
+wheel-member validation recognizes Windows ``.pyd`` extension names, but Windows snapshot
+no-follow behavior and Windows legacy cleanup are not acceptance targets. The snapshot verifier
+fails closed when a platform cannot provide the required no-follow file operation, and cleanup
+rules are never broadened to work around Windows locked files.
+
+Offline or module-based HPC installs
+------------------------------------
+
+On clusters without build isolation access to PyPI, install the build requirements into the
+environment first and then disable build isolation:
+
+.. code-block:: bash
+
+    python3 -m pip install scikit-build-core pybind11 cmake
+    python3 -m pip install . --no-build-isolation
+
+For MPI support, build ``mpi4py`` with the cluster MPI compiler after loading the relevant
+modules:
+
+.. code-block:: bash
+
+    MPICC=mpicc python3 -m pip install mpi4py --no-binary=mpi4py
+
+Editable installs do not automatically recompile the C++ extension when C++ sources change.
+After editing files under ``src/``, rerun the editable install command, adding
+``--no-build-isolation`` if your environment provides its own CMake/pybind11 modules.
+
+CMake installation
 ------------------
 
 First, clone the repository from GitHub:
@@ -71,8 +151,10 @@ After configuration, type the following to build, test, and install
     make test  # when -DTesting=ON is activated in cmake
     make install
 
-Python scripts such as ``chiq_main.py`` are installed in ``$HOME/local/bin``.
-A python package ``chiq`` and a shared library ``bse_solver.cpython-XXX-YYY.so`` (``XXX`` is the python version, and ``YYY`` is the os info) is installed in ``Home/local/lib/bse-python`` (or ``lib64/bse-python``).
+Both suffix-free commands such as ``chiq_main`` and deprecated ``.py`` wrappers such as
+``chiq_main.py`` are installed in ``$HOME/local/bin``.
+A python package ``chiq`` and a shared library ``_bse_solver.cpython-XXX-YYY.so`` (``XXX`` is the python version, and ``YYY`` is the os info) is installed in ``$HOME/local/lib/bse-python/chiq`` (or ``lib64/bse-python/chiq``).
+The ``chiq`` directory is the package itself; ``PYTHONPATH`` must contain its parent directory, ``$HOME/local/lib/bse-python``. Sourcing ``chiqvars.sh`` sets this correctly.
 A configurations file ``chiqvars.sh`` is installed in ``$HOME/local/share``, see the next section for details.
 
 Environment variables
@@ -94,7 +176,7 @@ Provided Python package and scripts depend on external Python packages. Before r
 
 .. code-block:: bash
 
-    python3 -m pip install numpy matplotlib scipy more-itertools
+    python3 -m pip install numpy scipy more-itertools h5py toml matplotlib
 
 Test of python package/scripts
 ------------------------------

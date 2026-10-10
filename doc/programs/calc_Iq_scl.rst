@@ -5,12 +5,12 @@ calc_Iq_scl
 
 .. code-block:: bash
 
-    calc_Iq_scl.py [-h] [--verbose] input_file
+    calc_Iq_scl [-h] [--verbose] input_file
 
 Description
 -----------
 
-``calc_Iq_scl.py`` is a script for calculating the q-dependent interactions and susceptibility based on the SCL formula. For the detailed method, see :ref:`Algorithm_scl`.
+``calc_Iq_scl`` is a script for calculating the q-dependent interactions and susceptibility based on the SCL formula. For the detailed method, see :ref:`Algorithm_scl`.
 
 Positional Arguments
 ---------------------
@@ -47,7 +47,7 @@ Basic usage:
 
 .. code-block:: console
 
-    $ calc_Iq_scl.py scl_2pole.in
+    $ calc_Iq_scl scl_2pole.in
 
 Example of the input file ``scl_2pole.in``:
 
@@ -84,7 +84,7 @@ Example of the standard output:
 
 .. code-block:: console
 
-    $ calc_Iq_scl.py scl_2pole.in
+    $ calc_Iq_scl scl_2pole.in
     Namespace(input_file="scl_2pole.in", verbose=False)
 
     Read file 'scl_2pole.in'

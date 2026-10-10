@@ -5,12 +5,12 @@ gen_qpath
 
 .. code-block:: bash
 
-    gen_qpath.py [-h] [-o OUTFILE] file_param file_qpoints
+    gen_qpath [-h] [-o OUTFILE] file_param file_qpoints
 
 Description
 -----------
 
-``gen_qpath.py`` is a script for generating a list of q-points on a specified q-path.
+``gen_qpath`` is a script for generating a list of q-points on a specified q-path.
 
 Positional Arguments
 ---------------------
@@ -53,13 +53,13 @@ Basic usage:
 
 .. code-block:: console
 
-    $ gen_qpath.py dcore.in qpath.in
+    $ gen_qpath dcore.in qpath.in
 
 Example of the standard output:
 
 .. code-block:: console
 
-    $ gen_qpath.py dmft_square.in qpath.in
+    $ gen_qpath dmft_square.in qpath.in
 
     Read k-grid from file 'dmft_square.in'.
     [model]
