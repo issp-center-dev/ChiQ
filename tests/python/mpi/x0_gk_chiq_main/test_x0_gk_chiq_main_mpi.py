@@ -15,7 +15,10 @@ import chiq  # noqa: E402
 from chiq import h5bse  # noqa: E402
 
 PACKAGE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(chiq.__file__)))
-TARGETS = [("0", "00.00.00"), ("0", "01.00.00"), ("1", "02.01.00"), ("1", "00.01.00")]
+# Sorted and split over 2 ranks as [3, 2] (more_itertools.divide), so rank 0 gets both
+# frequencies with different q: independent omega/q filtering would add (1, 00.00.00),
+# (1, 01.00.00) and (0, 02.01.00) on rank 0.
+TARGETS = [("0", "00.00.00"), ("0", "01.00.00"), ("1", "02.01.00"), ("1", "00.01.00"), ("1", "01.01.00")]
 
 
 def _toml(path, infile, outfile):
@@ -30,6 +33,22 @@ def _run(nproc, toml, cwd):
     env.setdefault("OMPI_MCA_rmaps_base_oversubscribe", "1")
     cmd = ["mpirun", "-np", str(nproc), sys.executable, "-m", "chiq.cli.chiq_main", toml]
     return subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, text=True)
+
+
+def _computed_per_rank(cwd, nproc):
+    """(omega, q) computed by each rank, from the chiq_main_<rank>.log files."""
+    per_rank = []
+    for rank in range(nproc):
+        done, omega = [], None
+        with open(os.path.join(cwd, "chiq_main_%d.log" % rank)) as f:
+            for line in f:
+                msg = line.rsplit(":", 1)[-1].strip()
+                if msg.startswith("omega = "):
+                    omega = msg.split("=")[1].strip()
+                elif msg.startswith("q = "):
+                    done.append((omega, msg.split("=")[1].strip()))
+        per_rank.append(done)
+    return per_rank
 
 
 def _chi0q(path):
@@ -58,8 +77,13 @@ def test_two_ranks_compute_exactly_the_targets(tmp_path):
     (tmp_path / "q.dat").write_text("".join("%s %s\n" % t for t in TARGETS))
     r = _run(2, _toml(tmp_path / "gk.toml", "gk.h5", "gk.out.h5"), str(tmp_path))
     assert r.returncode == 0, r.stdout + r.stderr
+    per_rank = _computed_per_rank(str(tmp_path), 2)  # before the next run overwrites the logs
     r = _run(1, _toml(tmp_path / "saved.toml", "saved.h5", "saved.out.h5"), str(tmp_path))
     assert r.returncode == 0, r.stdout + r.stderr
+
+    assert sorted(per_rank[0] + per_rank[1]) == sorted(TARGETS)  # no extras, no duplicates
+    assert len(per_rank[0]) == 3 and len(per_rank[1]) == 2
+    assert {w for w, _ in per_rank[0]} == {"0", "1"}  # the mixed-frequency rank
 
     gk = _chi0q(str(tmp_path / "gk.out.h5"))
     saved = _chi0q(str(tmp_path / "saved.out.h5"))

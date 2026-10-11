@@ -185,3 +185,27 @@ def test_remove_x0_source(gk_file):
         assert "bse/x0_source" not in h5f
         assert "bse/input/X0_loc" in h5f
         x0_gk.remove_x0_source(h5f)  # no-op when absent
+
+
+def test_kq_cache_is_bounded(gk_file):
+    src = GkX0Source(gk_file)
+    for q in np.ndindex(*DIV):
+        src.get(0, "%02d.%02d.%02d" % q)
+    assert len(src._kq_cache) <= x0_gk._KQ_CACHE_SIZE
+
+
+def test_dcore_chiq_passes_x0q_mode_to_the_writer():
+    """dcore_chiq and its worker need DCore to run; check the option plumbing statically."""
+    import ast
+
+    pkg = os.path.dirname(x0_gk.__file__)
+    worker = ast.parse(open(os.path.join(pkg, "dcore_chiq_worker.py")).read())
+    calls = [n for n in ast.walk(worker) if isinstance(n, ast.Call)
+             and getattr(n.func, "attr", None) == "save_X0q_for_bse"]
+    assert len(calls) == 1
+    kw = {k.arg: ast.dump(k.value) for k in calls[0].keywords}
+    assert "x0q_mode" in kw and "'X0q_mode'" in kw["x0q_mode"]
+
+    cli = open(os.path.join(pkg, "cli", "dcore_chiq.py")).read()
+    assert "params['X0q_mode'] = self._params['bse']['X0q_mode']" in cli
+    assert 'pars.add_option("bse", "X0q_mode", str, "save",' in cli

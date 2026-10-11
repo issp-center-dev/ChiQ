@@ -17,6 +17,7 @@ import h5py
 import numpy as np
 
 FORMAT = "gk"
+_KQ_CACHE_SIZE = 16  # k-q permutations kept per process (n_k integers each)
 VERSION = 1
 GROUP = "x0_source"
 
@@ -222,6 +223,8 @@ class GkX0Source:
         self.check_target(wb, q_label)
         q = parse_q_label(q_label, self.div)
         if q not in self._kq_cache:
+            if len(self._kq_cache) >= _KQ_CACHE_SIZE:
+                self._kq_cache.pop(next(iter(self._kq_cache)))
             self._kq_cache[q] = k_minus_q_index(self.div, q)
         return x0_from_g(self.G, self.block2_pairs, self.inner2_pairs, wb, self.num_wf,
                          self.iw_offset, self._kq_cache[q])
