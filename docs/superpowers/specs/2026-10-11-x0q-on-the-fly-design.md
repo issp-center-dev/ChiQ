@@ -40,6 +40,12 @@ All sizes below are **uncompressed**, complex128 (16 B).
 **Goal.** Add an opt-in mode in which `dcore_chiq` stores G(k) instead of X0(q),
 and the downstream programs reconstruct X0(q) for exactly the (wb, q) they need.
 
+**Compatibility promise (user requirement).**
+- Default mode: nothing written by `dcore_chiq` or `chiq_main` changes; outputs
+  are bit-identical to the current code.
+- gk mode: outputs equal saved-mode outputs within floating-point rounding
+  (direct sum vs. FFT), checked at the tolerances of §8.
+
 **Non-goals.**
 - The default (`X0q_mode = "save"`) keeps the current behavior and file layout
   byte-for-byte in what it writes. The legacy writer in `sumk_dft_chi.py` is **not
@@ -247,11 +253,12 @@ short window.
   (wraps the existing `h5BSE.get`) or `GkX0Source`.
 - `check_input` checks provider availability instead of `X0_q in datalist` for
   types whose `input_q == "X0_q"`.
-- **Target scheduling.** The main loop iterates exactly over this rank's
-  `(omega, q)` tuples. Today it filters omega and q independently, so a rank
-  can compute combinations it did not get (`chiq_main.py:537-566`). In saved mode,
-  tuples missing from the file are skipped with a log line, as today. This fix
-  applies to both modes; it is a separate commit with its own test.
+- **Target scheduling.** In gk mode, the main loop iterates exactly over this
+  rank's `(omega, q)` tuples. Saved mode keeps today's loop unchanged, including
+  its independent omega/q filtering (`chiq_main.py:537-566`), which can compute
+  combinations a rank was not assigned. Fixing that in saved mode would change
+  which datasets appear in existing workflows' output, so it is a separate
+  follow-up, not part of this change.
 - The reconstructed X0 is a local variable per (omega, q); it is not retained.
 - `calc_Iq_scl`: if `x0_source` is present, exit with an error saying that gk
   files are not supported by this command yet and to use `X0q_mode = "save"`.
@@ -296,7 +303,7 @@ Tolerances: raw X0 and X0_loc `rtol=1e-12`; final observables `rtol=1e-10`
 5. `chiq_main` end-to-end on synthetic files: a gk file and an equivalent saved
    file (X0_q materialized from the oracle) give identical outputs for `chi0`,
    `bse`, `scl`, then `rpa` and `rrpa`. Includes `[chiq_main] num_wf` truncation.
-6. Scheduling: a rank does not compute tuples it was not assigned.
+6. Scheduling (gk mode): a rank does not compute tuples it was not assigned.
 7. `calc_Iq_scl` on a gk file exits with the documented message.
 
 **MPI** (`tests/python/mpi/`): test 5 with 2 ranks, gk mode.
