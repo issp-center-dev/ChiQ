@@ -11,6 +11,7 @@ from more_itertools import divide
 
 from chiq import bse_toml
 from chiq import h5bse
+from chiq import x0_gk
 from chiq.cli._common import VERSION_MESSAGE, add_version_argument
 from chiq.mpi import COMM_WORLD as comm
 from chiq.solver import get_solver
@@ -98,6 +99,18 @@ class chi_base(object):
 
         self.datalist = self._set_datalist()
 
+        # X0(q) is either stored ('saved') or reconstructed from G(k) ('gk')
+        self.x0_source = None
+        if self.input_q == 'X0_q':
+            try:
+                with self.h5_in.h5py_file('r') as h5f:
+                    representation = x0_gk.detect_representation(h5f)
+                if representation == 'gk':
+                    self.x0_source = x0_gk.GkX0Source(file_in)
+            except x0_gk.X0SourceError as e:
+                print(f"Error in HDF5 input file: {e}", file=sys.stderr)
+                sys.exit(1)
+
         if n_iw is None:
             self.n_iw = self._get_niw()
         else:
@@ -117,7 +130,8 @@ class chi_base(object):
         # input_q
         try:
             key, _ = _parse_input(self.input_q)
-            assert key in datalist, f"Subgroup '{self.input_q}' not found."
+            if not (key == 'X0_q' and self.x0_source is not None):
+                assert key in datalist, f"Subgroup '{self.input_q}' not found."
 
             # input_local
             for input_local in self.input_local:
@@ -151,7 +165,10 @@ class chi_base(object):
 
         h5 = self.h5_in if from_output==False else self.h5_out
 
-        bm_h5bse = h5.get(key)
+        if self.x0_source is not None and key[0] == 'X0_q' and not from_output:
+            bm_h5bse = self.x0_source.get(key[1], key[2])
+        else:
+            bm_h5bse = h5.get(key)
         if bm_h5bse is False:
             return False
         assert isinstance(bm_h5bse, dict)
@@ -527,7 +544,22 @@ def main():
         # Make omega list
         # type_q = chi_worker.input_q  # "X0_q" or "chi0_q"
         type_q, from_output_q = _parse_input(chi_worker.input_q)  # "X0_q" or "chi0_q"
-        omega_set = {_X0qInfo[1] for _X0qInfo in chi_worker.datalist[type_q]}
+        if chi_worker.x0_source is None:
+            omega_set = {_X0qInfo[1] for _X0qInfo in chi_worker.datalist[type_q]}
+            x0q_keys = chi_worker.datalist[type_q]
+        else:
+            # X0(q) is reconstructed from G(k): compute exactly the (omega, q) of this rank
+            try:
+                if flag_calc_all:
+                    raise x0_gk.X0SourceError("omega_q must be given when X0(q) is reconstructed from G(k)")
+                for w, q in target_lists_all:
+                    chi_worker.x0_source.check_target(int(w), q)
+            except (x0_gk.X0SourceError, ValueError) as e:
+                if rank == 0:
+                    print(f"Error in omega_q: {e}", file=sys.stderr)
+                sys.exit(1)
+            omega_set = {int(w) for w, _ in target_lists}
+            x0q_keys = [(type_q, int(w), q) for w, q in target_lists]
 
         # Get Matrix for chi0Loc
         # Loop(1): Matsubara
@@ -557,7 +589,7 @@ def main():
                 results[(datatype, omega)] = bms_local[datatype]
 
             # Loop(2): wave_number
-            for _X0qInfo in chi_worker.datalist[type_q]:
+            for _X0qInfo in x0q_keys:
                 # _X0LocInfo = ('X0_q', omega, q)
                 if _X0qInfo[1] != omega:
                     continue

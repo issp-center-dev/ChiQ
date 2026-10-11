@@ -284,7 +284,9 @@ work if this becomes a limit.
 ## 8. Testing
 
 Tolerances: raw X0 and X0_loc `rtol=1e-12`; final observables `rtol=1e-10`
-(FFT vs. direct-sum rounding can be amplified near poles).
+with `atol = 1e-10 * max|value|` of the same quantity. The absolute part is
+needed because `I_q = X0^-1 - X^-1` has small elements produced by cancellation,
+whose elementwise relative error reaches ~1e-9 from rounding alone.
 
 **DCore-free unit tests** (`tests/python/non-mpi/x0_gk/`):
 1. Kernel vs. an independent oracle: explicit Python loops over k using `k-q`,

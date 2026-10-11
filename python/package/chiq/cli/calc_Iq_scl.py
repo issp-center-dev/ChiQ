@@ -11,6 +11,7 @@ from collections import OrderedDict
 
 from chiq.cli._common import add_version_argument
 from chiq.h5bse import h5BSE
+from chiq import x0_gk
 from chiq.matrix_dict import MatrixDict
 
 
@@ -109,6 +110,15 @@ def calc_Iq_scl(prms : dict):
     print(f"\nLoad data from '{file_in!r}'")
     h5in = h5BSE(file_in)
     h5in.open('r')  # Keep HDF5 file open to improve performance. Close manually.
+
+    try:
+        with h5in.h5py_file('r') as h5f:
+            representation = x0_gk.detect_representation(h5f)
+    except x0_gk.X0SourceError as e:
+        sys.exit(f"ERROR in {file_in!r}: {e}")
+    if representation == 'gk':
+        sys.exit(f"ERROR: {file_in!r} stores G(k) instead of X0(q) (dcore_chiq X0q_mode = \"gk\"). "
+                 f"calc_Iq_scl does not support this yet; rerun dcore_chiq with X0q_mode = \"save\".")
 
     beta = h5in.get(key=('beta'))
     print(f"  beta = {beta}")

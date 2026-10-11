@@ -139,6 +139,10 @@ class h5BSE(object):
         self._h5file.close()
         self._h5file = None
 
+    def h5py_file(self, mode="r"):
+        """Context manager yielding the h5py.File (the one kept open by open(), if any)."""
+        return _h5py_File(self._filename, mode, self._h5file)
+
     def save(self, key, data):
         if type(key) == type(""):
             key = tuple([key])
