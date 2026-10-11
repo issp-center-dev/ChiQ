@@ -139,6 +139,12 @@ class h5BSE(object):
         self._h5file.close()
         self._h5file = None
 
+    def compression_kwargs(self):
+        """Keyword arguments for h5py create_dataset that match this object's compression."""
+        if self._compression == "gzip":
+            return {"compression": "gzip", "compression_opts": self._compression_opts}
+        return {"compression": self._compression}
+
     def h5py_file(self, mode="r"):
         """Context manager yielding the h5py.File (the one kept open by open(), if any)."""
         return _h5py_File(self._filename, mode, self._h5file)

@@ -66,5 +66,23 @@ See `DCore document <https://issp-center-dev.github.io/DCore/master/reference/in
    "calc_only_chiloc", "Bool", "False", "Calculate only chi_loc but no X_loc (for SCL, rRPA). Do not activate skip_Xloc when using this option."
    "use_temp_file", "Bool", "False", "Whether or not temporary file is used in computing X0_q. This option will reduce the memory footprints."
    "X0q_qpoints_saved", "String", "quadrant", "Specifies for which q points X0q are saved in a HDF file. quadrant or path to a q_path.dat file."
+   "X0q_mode", "String", "save", "How X0(q) is provided to chiq_main: 'save' stores X0(q); 'gk' stores G(k) instead (see below)."
    "h5_compression", "String", "gzip", "Compression algorithm for HDF5 output"
    "h5_compression_opts", "Integer", "4", "Compression level of gzip for HDF5 output"
+
+Reducing the size of the HDF5 file (``X0q_mode``)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+By default (``X0q_mode = "save"``), X0(q) is stored for every q point selected by ``X0q_qpoints_saved``.
+Its size grows as the fourth power of the number of orbitals and linearly in the number of q points, and it usually dominates the file size.
+
+With ``X0q_mode = "gk"``, ``dcore_chiq`` stores the k-resolved Green's function G(k) instead, which grows only as the square of the number of orbitals.
+``chiq_main`` then computes X0(q) for exactly the (omega, q) listed in ``omega_q``; any q point on the k mesh can be requested, and ``X0q_qpoints_saved`` is ignored.
+The results agree with ``X0q_mode = "save"`` up to floating-point rounding.
+
+Notes:
+
+- ``omega_q`` is required in ``chiq_main`` for files written with ``X0q_mode = "gk"``.
+- ``calc_Iq_scl`` does not support ``X0q_mode = "gk"`` yet.
+- Rerunning ``dcore_chiq`` in an existing HDF5 file replaces the previous X0 data, but HDF5 does not return the freed space to the file system. Use a new ``h5_output_file`` or ``h5repack`` to obtain a smaller file.
+- After rerunning ``dcore_chiq``, recompute ``chi0``/``bse`` into a new ``chiq_main`` output file before running ``rpa``/``rrpa``, which read ``chi0_q`` from that output file.

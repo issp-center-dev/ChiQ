@@ -6,6 +6,7 @@ from mpi4py import MPI
 
 from .index_pair import IndexPair, IndexPair2
 from .h5bse import h5BSE
+from . import x0_gk
 from .tools import WallTime
 
 from dcore._dispatcher import HDFArchive, mpi, BlockGf, GfImFreq, MeshImFreq
@@ -470,9 +471,11 @@ class SumkDFTChi(SumkDFTChi_aux):
         nonlocal_order_parameter=False,
         temp_file=None,
         del_hopping=True,
+        x0q_mode="save",
     ):
         """
         list_wb: (list) list of bosonic frequencies (int) computed
+        x0q_mode: (str) 'save' stores X0(q); 'gk' stores G(k) instead (see chiq.x0_gk)
         n_wf_cutoff: (int) cutoff for fermionic frequencies stored (2*n_wf_cutoff points are saved)
         del_hopping: (bool) If this is True, hopping is deleted from the memory. Subsequent call of other methods may fail.
 
@@ -482,6 +485,7 @@ class SumkDFTChi(SumkDFTChi_aux):
 
         assert isinstance(list_wb, list)
         assert isinstance(n_wf_cutoff, int)
+        assert x0q_mode in ("save", "gk")
 
         wt = WallTime(str_time="\n Time:")
 
@@ -559,15 +563,64 @@ class SumkDFTChi(SumkDFTChi_aux):
             self.BS.open(h5_mode)
 
         self._save_X0_info(nonlocal_order_parameter=nonlocal_order_parameter)
-        for wb in list_wb:
-            assert isinstance(wb, int)
-            self._save_X0_data(wb, n_wf_cutoff, algo, q_dict, flag_save_X0_loc, qpoints_saved, temp_file=temp_file)
-            if flag_save_chi0_loc:
-                self._save_chi0_loc(wb)
+        if x0q_mode == "gk":
+            self._save_X0_source(list_wb, n_wf_cutoff, flag_save_X0_loc, flag_save_chi0_loc, groupname, temp_file=temp_file)
+        else:
+            if mpi.is_master_node():
+                with self.BS.h5py_file("a") as h5f:
+                    x0_gk.remove_x0_source(h5f, groupname)
+            for wb in list_wb:
+                assert isinstance(wb, int)
+                self._save_X0_data(wb, n_wf_cutoff, algo, q_dict, flag_save_X0_loc, qpoints_saved, temp_file=temp_file)
+                if flag_save_chi0_loc:
+                    self._save_chi0_loc(wb)
 
         if mpi.is_master_node():
             self.BS.close()
             wt.print_time("X0q")
+        if x0q_mode == "gk" and temp_file is not None and mpi.is_master_node():
+            os.remove(os.path.abspath(temp_file))
+        mpi.barrier()
+
+    def _save_X0_source(self, list_wb, n_wf_store, flag_save_X0_loc, flag_save_chi0_loc, groupname, temp_file=None):
+        """X0q_mode='gk': save G(k) and metadata instead of X0(q), plus X0_loc from k-averaged G"""
+        if mpi.is_master_node():
+            print("# X0q_mode='gk': saving G(k) instead of X0(q)")
+            temp_file_ar = None if temp_file is None else HDFArchive(os.path.abspath(temp_file), 'r')
+
+            block_g = list(self.gf_struct_solver[0].keys())
+            bname0 = block_g[0]
+            n_iwG = self.Sigma_imp_iw[0][bname0].data.shape[0]
+            n_in = get_block_size(self.Sigma_imp_iw[0][bname0])
+            assert self.n_k == self.nk_all
+            block2_pairs = [(c1, block_g.index(b1), c2, block_g.index(b2)) for c1, b1, c2, b2 in self.block2.pairlist]
+            inner2_pairs = list(self.inner2.pairlist)
+
+            with self.BS.h5py_file("a") as h5f:
+                kw = self.BS.compression_kwargs()
+                writer = x0_gk.X0SourceWriter(h5f, groupname, kw.get("compression"), kw.get("compression_opts"))
+                writer.write_meta(block_g, block2_pairs, inner2_pairs, n_wf_store, list_wb, n_iwG, self.div,
+                                  self.X0_info['beta'], (self.n_corr_shells, n_in))
+                for b, bname in enumerate(block_g):
+                    for c1, c2, i1, i2 in product(range(self.n_corr_shells), range(self.n_corr_shells), range(n_in), range(n_in)):
+                        g_wk = self.__get_G_iw_k(bname, c1, c2, i1, i2, temp_file_ar=temp_file_ar)
+                        writer.write_g_slice(b, c1, c2, i1, i2, g_wk)
+                gbar = writer.Gbar
+
+            for wb in list_wb:
+                assert isinstance(wb, int)
+                if flag_save_X0_loc:
+                    x0_loc = x0_gk.x0_loc_from_gbar(gbar, block2_pairs, inner2_pairs, wb, n_wf_store, n_iwG // 2)
+                    self.BS.save(key=('X0_loc', wb), data=x0_loc)
+                if flag_save_chi0_loc:
+                    self._save_chi0_loc(wb)
+
+            writer.finish()
+            if temp_file_ar is not None:
+                del temp_file_ar
+            print("  HDF5 does not reclaim space freed by deleting old X0_q data; "
+                  "use a fresh output file or h5repack to shrink an existing one.")
+        mpi.barrier()
 
     def _save_X0_info(self, nonlocal_order_parameter):
 

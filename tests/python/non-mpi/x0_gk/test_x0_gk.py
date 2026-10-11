@@ -177,3 +177,11 @@ def test_detect_saved_and_none(tmp_path):
         assert x0_gk.detect_representation(h5f) is None
         h5f.create_group("bse/input/X0_q")
         assert x0_gk.detect_representation(h5f) == "saved"
+
+
+def test_remove_x0_source(gk_file):
+    with h5py.File(gk_file, "a") as h5f:
+        x0_gk.remove_x0_source(h5f)
+        assert "bse/x0_source" not in h5f
+        assert "bse/input/X0_loc" in h5f
+        x0_gk.remove_x0_source(h5f)  # no-op when absent

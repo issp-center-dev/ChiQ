@@ -129,6 +129,13 @@ def detect_representation(h5f, groupname=""):
     return None
 
 
+def remove_x0_source(h5f, groupname=""):
+    """Delete an x0_source group (used when X0(q) is stored instead)."""
+    path = bse_root(groupname) + "/" + GROUP
+    if path in h5f:
+        del h5f[path]
+
+
 def _int_array(grp, name, ncol):
     arr = grp[name][()]
     if arr.ndim != 2 or arr.shape[1] != ncol or not np.issubdtype(arr.dtype, np.integer):
