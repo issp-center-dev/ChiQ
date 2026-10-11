@@ -194,6 +194,28 @@ def test_kq_cache_is_bounded(gk_file):
     assert len(src._kq_cache) <= x0_gk._KQ_CACHE_SIZE
 
 
+@pytest.mark.parametrize("n_iwG, n_k", [(8, 24), (1024, 64**3), (2**22, 2**22)])
+def test_g_chunks_are_bounded(n_iwG, n_k):
+    chunks = x0_gk._g_chunks(n_iwG, n_k)
+    assert chunks[:4] == (1, 1, 1, 1)
+    assert 1 <= chunks[4] <= n_iwG and 1 <= chunks[5] <= n_k
+    assert 16 * chunks[4] * chunks[5] <= max(x0_gk._CHUNK_BYTES, 16)
+    if 16 * n_iwG * n_k <= x0_gk._CHUNK_BYTES:
+        assert chunks[4:] == (n_iwG, n_k)
+
+
+def test_writer_with_small_chunks_round_trips(setup, tmp_path, monkeypatch):
+    G, block2, inner2 = setup
+    monkeypatch.setattr(x0_gk._g_chunks, "__defaults__", (16 * 5,))
+    path = str(tmp_path / "small.h5")
+    S.write_gk_file(path, G, block2, inner2, NUM_WF, LIST_WB, DIV, BETA)
+    with h5py.File(path, "r") as h5f:
+        assert h5f["bse/x0_source/G/0"].chunks == (1, 1, 1, 1, 1, 5)
+    got = GkX0Source(path).get(1, "01.02.01")
+    ref = S.oracle_x0(G, block2, inner2, 1, NUM_WF, N_IWG // 2, DIV, (1, 2, 1))
+    _assert_dict_close(got, ref)
+
+
 def test_dcore_chiq_passes_x0q_mode_to_the_writer():
     """dcore_chiq and its worker need DCore to run; check the option plumbing statically."""
     import ast

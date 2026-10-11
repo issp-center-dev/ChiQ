@@ -18,8 +18,18 @@ import numpy as np
 
 FORMAT = "gk"
 _KQ_CACHE_SIZE = 16  # k-q permutations kept per process (n_k integers each)
+_CHUNK_BYTES = 16 * 2**20  # target size of one G chunk (HDF5 requires < 4 GiB)
 VERSION = 1
 GROUP = "x0_source"
+
+
+def _g_chunks(n_iwG, n_k, chunk_bytes=_CHUNK_BYTES):
+    """Chunk shape for G/<b>: one (c1, c2, i1, i2) slice, split along k and then iw
+    so that a chunk stays below ``chunk_bytes`` for any mesh size."""
+    n_elem = max(1, chunk_bytes // np.dtype(np.complex128).itemsize)
+    ck = min(n_k, n_elem)
+    cw = min(n_iwG, max(1, n_elem // ck))
+    return (1, 1, 1, 1, cw, ck)
 
 
 class X0SourceError(Exception):
@@ -274,7 +284,7 @@ class X0SourceWriter:
                 kwargs["compression_opts"] = self._compression_opts
         self._dsets = [
             g.create_dataset(f"G/{b}", shape=shape, dtype=np.complex128,
-                             chunks=(1, 1, 1, 1, int(n_iwG), n_k), **kwargs)
+                             chunks=_g_chunks(int(n_iwG), n_k), **kwargs)
             for b in range(len(block1_names))
         ]
         self.Gbar = [np.zeros(shape[:5], dtype=np.complex128) for _ in block1_names]

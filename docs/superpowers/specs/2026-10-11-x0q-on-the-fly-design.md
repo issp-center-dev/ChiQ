@@ -120,7 +120,8 @@ bse/<g>/x0_source/                   (group)
                                      #   same order as info/inner_name
   G/<b1 index>    : complex128[n_c, n_c, N_in, N_in, n_iwG, n_k]
                     # layout of Gk_corr[bname] (sumk_dft_chi.py:879);
-                    # chunks = (1, 1, 1, 1, n_iwG, n_k)
+                    # chunks = (1, 1, 1, 1, n_iwG, n_k), split along k and then iw
+                    #   to stay below 16 MiB (HDF5 limits a chunk to < 4 GiB)
 ```
 
 k index flattening: `k = kz + div[2]*(ky + div[1]*kx)` (`sumk_dft_chi.py:341`).
