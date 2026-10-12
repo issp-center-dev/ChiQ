@@ -43,7 +43,7 @@ Optional runtime dependencies are installed with extras:
 
 Plotting commands require the ``chiq[plot]`` extra. ChiQ imports private DCore APIs, so use a
 fresh, isolated environment for the ``chiq[dcore]`` extra. It pins the reviewed boundary to
-DCore 4.2.0 and also installs ``mpi4py``:
+DCore 4.2.0 (with ``dcorelib<1``, which DCore 4.2.0 requires) and also installs ``mpi4py``:
 
 .. code-block:: bash
 

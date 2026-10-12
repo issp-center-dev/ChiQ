@@ -78,7 +78,7 @@ _CORE_REQUIREMENTS = ("numpy>=1.23", "scipy", "more-itertools", "h5py", "toml")
 _EXTRA_REQUIREMENTS = {
     "plot": ("matplotlib",),
     "mpi": ("mpi4py",),
-    "dcore": ("dcore==4.2.0", "mpi4py"),
+    "dcore": ("dcore==4.2.0", "dcorelib<1", "mpi4py"),
     "gpu": ("cupy",),
     "test": ("pytest",),
 }
