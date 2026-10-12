@@ -216,7 +216,10 @@ def test_symlink_ancestor_fails_closed(tmp_path):
 
     result = _install(build)
 
-    assert result.returncode != 0
+    assert result.returncode != 0, result.stdout + result.stderr
+    # CMake < 4 runs install scripts with policies unset; a policy warning means
+    # a condition may have been evaluated with OLD semantics (e.g. while(TRUE)).
+    assert "Policy CMP" not in result.stderr
     assert candidate.read_bytes() == b"obsolete"
     assert sentinel.read_bytes() == b"unchanged"
 
@@ -271,6 +274,8 @@ def test_legacy_verifier_covers_isolated_build_runtime_and_full_suites():
     assert 'CHIQ_WHEEL_BUILD=OFF' in text
     assert '-DTesting=ON' in text
     assert 'v2.13.6' in text
+    assert 'PYBIND11_V2_13_6=a2e59f0e7065404b44dfe92a28aca47ba1378dc4' in text
+    assert 'describe --tags' not in text  # CI submodule checkouts carry no tags
     assert 'ctest --output-on-failure' in text
     assert 'runtime_smoke.py' in text
     assert '--mode wheel' in text

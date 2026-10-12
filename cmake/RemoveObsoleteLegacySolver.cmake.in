@@ -15,17 +15,21 @@ get_filename_component(
   ABSOLUTE
 )
 
+# Install scripts run with policies unset, so avoid constructs whose meaning
+# depends on them: with CMP0012 OLD (CMake < 4), while(TRUE) is false.
 function(_chiq_reject_symlink_ancestors path)
   get_filename_component(_current "${path}" ABSOLUTE)
-  while(TRUE)
+  set(_more ON)
+  while(_more)
     if(IS_SYMLINK "${_current}")
       message(FATAL_ERROR "Refusing legacy cleanup through symlink: ${_current}")
     endif()
     get_filename_component(_parent "${_current}" DIRECTORY)
     if(_parent STREQUAL _current)
-      break()
+      set(_more OFF)
+    else()
+      set(_current "${_parent}")
     endif()
-    set(_current "${_parent}")
   endwhile()
 endfunction()
 
