@@ -220,7 +220,7 @@ private:
 /**
  * @brief Pybind11 module definition for BSE solver
  */
-PYBIND11_MODULE(bse_solver, m) {
+PYBIND11_MODULE(_bse_solver, m) {
   // Create Python class binding
   py::class_<BSESolver>(m, "BSESolver")
 	.def(py::init<double, const std::vector<int> &, const std::vector<int> &, const std::vector<int> &>()) // Constructor binding
