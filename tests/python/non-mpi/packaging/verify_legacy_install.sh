@@ -129,9 +129,11 @@ PYTHON_LIBRARY=${PYTHON_LIBRARY:-$("$PYTHON" -c "import os, sysconfig; print(os.
 CMAKE_PLATFORM_ARGS=()
 
 test -f "$REPO/extern/pybind11/include/pybind11/pybind11.h"
-PYBIND11_TAG=$(git -C "$REPO/extern/pybind11" describe --tags --exact-match HEAD)
-if [[ "$PYBIND11_TAG" != "v2.13.6" ]]; then
-  echo "Expected populated pybind11 v2.13.6, found $PYBIND11_TAG" >&2
+# Compare the commit, not the tag: CI checks submodules out without tags.
+PYBIND11_V2_13_6=a2e59f0e7065404b44dfe92a28aca47ba1378dc4
+PYBIND11_COMMIT=$(git -C "$REPO/extern/pybind11" rev-parse HEAD)
+if [[ "$PYBIND11_COMMIT" != "$PYBIND11_V2_13_6" ]]; then
+  echo "Expected populated pybind11 v2.13.6 ($PYBIND11_V2_13_6), found $PYBIND11_COMMIT" >&2
   exit 1
 fi
 

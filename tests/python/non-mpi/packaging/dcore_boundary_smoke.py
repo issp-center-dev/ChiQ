@@ -27,7 +27,9 @@ REQUIRED_CALLABLES = {
 
 REQUIRED_MEMBERS = {
     "dcore.impurity_solvers": ("solver_classes", "compute_basis_rot"),
-    "mpi4py": ("MPI",),
+    # A submodule is an attribute of its package only once imported, so import
+    # mpi4py.MPI itself rather than looking up mpi4py.MPI on the package.
+    "mpi4py.MPI": ("COMM_WORLD",),
 }
 
 
