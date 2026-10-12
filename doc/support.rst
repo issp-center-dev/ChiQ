@@ -4,6 +4,6 @@ Support
 .. toctree::
    :maxdepth: 2
 
-   .. support/faqs
+   support/faqs
 
    support/issues
