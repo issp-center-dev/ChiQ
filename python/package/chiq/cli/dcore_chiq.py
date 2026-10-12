@@ -510,7 +510,14 @@ def _build_dmft_bse_solver_class(_DMFTCoreSolver):
             params['div'] = lattice_model.nkdiv()
             params['bse_h5_out_file'] = os.path.abspath(self._params['bse']['h5_output_file'])
             params['use_temp_file'] = self._params['bse']['use_temp_file']
-            if self._params['bse']['X0q_qpoints_saved'] == 'quadrant':
+            params['X0q_mode'] = self._params['bse']['X0q_mode']
+            if params['X0q_mode'] not in ('save', 'gk'):
+                sys.exit(f"ERROR: [bse] X0q_mode must be 'save' or 'gk', got {params['X0q_mode']!r}")
+            if params['X0q_mode'] == 'gk':
+                print(" X0q_mode = 'gk': G(k) is saved instead of X0(q); X0q_qpoints_saved is ignored.")
+                print(" Recompute chi0/bse into a fresh chiq_main output file after rerunning dcore_chiq.")
+                params['X0q_qpoints_saved'] = 'quadrant'
+            elif self._params['bse']['X0q_qpoints_saved'] == 'quadrant':
                 params['X0q_qpoints_saved'] = 'quadrant'
             else:
                 q_points = []
@@ -738,6 +745,9 @@ def dcore_chiq(filename, np=1):
         pars.add_option("bse", "use_temp_file", bool, False, "Whether or not temporary file is used in computing X0_q. This option will reduce the memory footprints.")
         pars.add_option("bse", "X0q_qpoints_saved", str, 'quadrant', "Specifies for which q points X0q are saved in a HDF file. quadrant or path to a q_path.dat file.")
 
+    pars.add_option("bse", "X0q_mode", str, "save",
+                    "How X0(q) is provided to chiq_main: 'save' stores X0(q) for the q points of X0q_qpoints_saved; "
+                    "'gk' stores G(k) instead and chiq_main computes X0(q) for the q points in omega_q (much smaller file).")
     pars.add_option("bse", "h5_compression", str, "gzip", "Compression algorithm for HDF5 output")
     pars.add_option("bse", "h5_compression_opts", int, 4, "Compression level of gzip for HDF5 output")
 

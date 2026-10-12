@@ -45,4 +45,5 @@ class SumkDFTWorkerBSE(SumkDFTWorkerBase):
                             qpoints_saved=self.params['X0q_qpoints_saved'],
                             h5_file=self.params['bse_h5_out_file'],
                             temp_file=temp_file,
-                            nonlocal_order_parameter=False)
+                            nonlocal_order_parameter=False,
+                            x0q_mode=self.params.get('X0q_mode', 'save'))
