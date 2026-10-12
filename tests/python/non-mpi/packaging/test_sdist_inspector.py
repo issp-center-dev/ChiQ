@@ -343,7 +343,16 @@ def test_pending_size_override_does_not_resize_following_pax_carrier(tmp_path):
     )
     write_raw_archive(archive, prefixed)
 
-    assert artifact_inspector.validate_sdist(archive)["root"] == ROOT
+    with tarfile.open(archive) as parsed:
+        names = parsed.getnames()
+    if len(names) == len(set(names)):
+        assert artifact_inspector.validate_sdist(archive)["root"] == ROOT
+    else:
+        # Some CPython patch releases (e.g. 3.13.16) compute the data offset of
+        # stacked PAX headers differently and list a member twice; the
+        # inspector must then fail closed instead of accepting the archive.
+        with pytest.raises(artifact_inspector.ArtifactError, match="duplicate"):
+            artifact_inspector.validate_sdist(archive)
 
 
 @pytest.mark.parametrize(

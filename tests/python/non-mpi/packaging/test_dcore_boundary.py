@@ -76,7 +76,7 @@ def test_boundary_smoke_checks_every_private_dcore_symbol_used_by_cli():
     }
     assert smoke.REQUIRED_MEMBERS == {
         "dcore.impurity_solvers": ("solver_classes", "compute_basis_rot"),
-        "mpi4py": ("MPI",),
+        "mpi4py.MPI": ("COMM_WORLD",),
     }
 
 
@@ -101,9 +101,9 @@ def _fake_boundary_modules(root):
         solver_classes={},
         compute_basis_rot=lambda: None,
     )
-    modules["mpi4py"] = SimpleNamespace(
-        __file__=str(root / "mpi4py" / "__init__.py"),
-        MPI=object(),
+    modules["mpi4py.MPI"] = SimpleNamespace(
+        __file__=str(root / "mpi4py" / "MPI.so"),
+        COMM_WORLD=object(),
     )
     return modules
 
@@ -128,7 +128,7 @@ def test_installed_boundary_checks_dependency_versions_and_all_module_origins(
     assert seen_versions == ["dcore", "mpi4py"]
 
 
-@pytest.mark.parametrize("outside", ["mpi4py", "dcore.tools"])
+@pytest.mark.parametrize("outside", ["mpi4py.MPI", "dcore.tools"])
 def test_installed_boundary_rejects_dependency_module_outside_environment(
         tmp_path, monkeypatch, outside):
     smoke = _load_smoke_module()
@@ -151,7 +151,7 @@ def test_installed_boundary_reports_module_without_filesystem_origin(
     smoke = _load_smoke_module()
     expected_root = tmp_path / "venv"
     modules = _fake_boundary_modules(expected_root)
-    del modules["mpi4py"].__file__
+    del modules["mpi4py.MPI"].__file__
     monkeypatch.setattr(smoke.importlib, "import_module", modules.__getitem__)
     monkeypatch.setattr(
         smoke.importlib.metadata,

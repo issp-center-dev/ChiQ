@@ -373,6 +373,10 @@ def _open_source_leaf(root_fd, path, index_mode):
             executable = bool(after.st_mode & 0o111)
             if before_executable != executable:
                 raise SnapshotError("executable mode race for %s" % path)
+            # (st_dev, st_ino) alone is not enough: Linux file systems reuse the
+            # inode number of a file that is unlinked and recreated.
+            if _source_state(before) != _source_state(after):
+                raise SnapshotError("leaf replacement race for %s" % path)
             expected_executable = index_mode == "100755"
             if executable != expected_executable:
                 raise SnapshotError("executable mode differs from index for %s" % path)

@@ -25,7 +25,8 @@ dependencies = [
 [project.optional-dependencies]
 plot = ["matplotlib"]
 mpi = ["mpi4py"]
-dcore = ["dcore==4.2.0", "mpi4py"]
+# DCore 4.2.0 imports dcorelib.__version__, which dcorelib 1.0 no longer provides.
+dcore = ["dcore==4.2.0", "dcorelib<1", "mpi4py"]
 gpu = ["cupy"]
 test = ["pytest"]
 

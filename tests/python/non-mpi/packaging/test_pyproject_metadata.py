@@ -47,7 +47,7 @@ def test_pyproject_pins_endpoint_build_frontends_and_dcore_boundary():
         "cmake>=3.15",
     ]
     extras = d["project"]["optional-dependencies"]
-    assert extras["dcore"] == ["dcore==4.2.0", "mpi4py"]
+    assert extras["dcore"] == ["dcore==4.2.0", "dcorelib<1", "mpi4py"]
     assert extras["mpi"] == ["mpi4py"]
 
 
