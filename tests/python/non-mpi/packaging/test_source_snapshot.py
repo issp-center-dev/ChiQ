@@ -284,6 +284,31 @@ def test_rejects_symlink_ancestor(repo, tmp_path):
         source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
 
 
+def test_leaf_rewrite_with_same_inode_between_stat_and_open_fails_closed(
+        repo, tmp_path, monkeypatch):
+    # Same (st_dev, st_ino) as before, as when Linux reuses a freed inode number.
+    real_open = source_snapshot._open
+    rewritten = {"done": False}
+
+    def rewriting_open(path, flags, mode=0o777, *, dir_fd=None):
+        if (
+            path == "README"
+            and (flags & os.O_ACCMODE) == os.O_RDONLY
+            and not rewritten["done"]
+        ):
+            rewritten["done"] = True
+            (repo / "README").write_bytes(b"attacker replacement\n")
+        return real_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(source_snapshot, "_open", rewriting_open)
+
+    with pytest.raises(source_snapshot.SnapshotError, match="replaced|race"):
+        source_snapshot.create_snapshot(repo, tmp_path / "snapshot", io.StringIO())
+
+    copied = tmp_path / "snapshot" / "README"
+    assert not copied.exists() or copied.read_bytes() != b"attacker replacement\n"
+
+
 def test_leaf_replacement_between_stat_and_open_fails_closed(repo, tmp_path, monkeypatch):
     real_open = source_snapshot._open
     replaced = {"done": False}
