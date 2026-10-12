@@ -39,10 +39,9 @@ def test_top_level_bse_solver_shim_warns_and_forwards():
 
 def test_bse_solver_warning_is_independent_from_bse_in_fresh_process():
     env = dict(os.environ)
-    env["PYTHONPATH"] = os.pathsep.join((
-        os.path.join(ROOT, "python", "package"),
-        os.path.join(ROOT, "build", "src"),
-    ))
+    # Resolve modules exactly as this process does, so the test works for the
+    # build tree, the legacy install layout and an installed wheel alike.
+    env["PYTHONPATH"] = os.pathsep.join(p for p in sys.path if p)
     code = """
 import importlib
 import json
