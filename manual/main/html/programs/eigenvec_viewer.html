@@ -6,13 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>eigenvec_viewer &#8212; ChiQ  documentation</title>
-    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5349f25f" />
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=0fc419ee" />
     <link rel="stylesheet" type="text/css" href="../_static/wild.css?v=755527b2" />
     <link rel="stylesheet" type="text/css" href="../_static/chiq.css?v=a9ac29d5" />
     <script src="../_static/documentation_options.js?v=5929fcd5"></script>
-    <script src="../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <link rel="author" title="About these documents" href="../about.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Algorithms" href="../algorithms.html" />
@@ -107,9 +107,9 @@ Therefore, there are 8 numbers in one line.</p>
 <h4>No option<a class="headerlink" href="#no-option" title="Link to this heading">¶</a></h4>
 <p>Without any option, <code class="docutils literal notranslate"><span class="pre">eigenvec_viewer.py</span></code> simply prints the eigenvectors as follows:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>eigenvec_viewer.py<span class="w"> </span>chi_q_eigenvec.00.00.00.dat
-<span class="go">Namespace(filein=&#39;chi_q_eigenvec.00.00.00.dat&#39;, atoms=None, spin_orbit=False, spin_charge=False, weight=None, group=None, l=None, time_reversal=False, fileout=False, basis_order=None)</span>
+<span class="go">Namespace(filein='chi_q_eigenvec.00.00.00.dat', atoms=None, spin_orbit=False, spin_charge=False, weight=None, group=None, l=None, time_reversal=False, fileout=False, basis_order=None)</span>
 
-<span class="go">Load &#39;chi_q_eigenvec.00.00.00.dat&#39;</span>
+<span class="go">Load 'chi_q_eigenvec.00.00.00.dat'</span>
 <span class="go"> (n_eigen, dim) = (4, 4)</span>
 
 <span class="go">Decompose dim=4</span>
@@ -256,9 +256,9 @@ The result above corresponds to the Pauli matrices. From this output, we can ide
 The eigenvectors for <span class="math notranslate nohighlight">\(\boldsymbol{q}=(1/2, 1/2, 0)\)</span> (M point) are shown below with <code class="docutils literal notranslate"><span class="pre">-a</span></code> and <code class="docutils literal notranslate"><span class="pre">--spin-charge</span></code> options.
 <span class="math notranslate nohighlight">\(U^\mathrm{(ch)}_{a, (m m')}\)</span>, <span class="math notranslate nohighlight">\(U^\mathrm{(spz)}_{a, (m m')}\)</span>, <span class="math notranslate nohighlight">\(U^\mathrm{(sp+)}_{a, (m m')}\)</span>, and <span class="math notranslate nohighlight">\(U^\mathrm{(sp-)}_{a, (m m')}\)</span> defined above are now shown as <span class="math notranslate nohighlight">\(2 \times 2\)</span> matrices.</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>eigenvec_viewer.py<span class="w"> </span>chi_q_eigenvec.16.16.00.dat<span class="w"> </span>-a<span class="w"> </span><span class="m">1</span><span class="w"> </span>--spin-charge
-<span class="go">Namespace(filein=&#39;chi_q_eigenvec.16.16.00.dat&#39;, atoms=1, spin_orbit=False, spin_charge=True, weight=None, group=None, l=None, time_reversal=False, fileout=False, basis_order=None)</span>
+<span class="go">Namespace(filein='chi_q_eigenvec.16.16.00.dat', atoms=1, spin_orbit=False, spin_charge=True, weight=None, group=None, l=None, time_reversal=False, fileout=False, basis_order=None)</span>
 
-<span class="go">Load &#39;chi_q_eigenvec.16.16.00.dat&#39;</span>
+<span class="go">Load 'chi_q_eigenvec.16.16.00.dat'</span>
 <span class="go"> (n_eigen, dim) = (16, 16)</span>
 
 <span class="go">Decompose dim=16</span>
