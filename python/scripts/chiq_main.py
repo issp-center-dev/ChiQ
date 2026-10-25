@@ -13,8 +13,7 @@ from chiq import __version__ as version
 from chiq import bse_toml
 from chiq import h5bse
 from chiq.mpi import COMM_WORLD as comm
-
-import bse_solver  # shared library implemented with C++
+from chiq.solver import get_solver
 
 
 def get_calc_flg(w_or_q, target_lists, target="w"):
@@ -548,7 +547,7 @@ def main():
                     continue
 
             # BSE solver
-            solver = bse_solver.BSESolver(chi_worker.beta, matinfo_A, matinfo_B, matinfo_C)
+            solver = get_solver(dict_tool["backend"], chi_worker.beta, matinfo_A, matinfo_B, matinfo_C)
 
             # Set local quantities (X_loc, X0_loc, etc)
             bms_local = chi_worker.get_matrix_local(omega)

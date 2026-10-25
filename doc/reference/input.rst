@@ -22,6 +22,7 @@ Below is a template of the input file.
     [chiq_main]
     work_dir = "work/chiq"
     # num_wf = 20  # If not specified, the value is determined from X_loc
+    # backend = "cpp"  # solver backend: "cpp" (default), "numpy", or "cupy"
 
     [chiq_post]
     output_dir = ""
@@ -61,6 +62,7 @@ The ``[chiq_common]`` section contains general settings that apply to both progr
 
    "work_dir", "string", ``""``, "Working directory where intermediate files are stored. The empty string (default value) means the current directory."
    "num_wf", "int", "Not specified", "Number of fermionic Matsubara frequencies. If not specified, num_wf is determined from X_loc in the input HDF5 file. num_wf can be smaller than the actual number of Matsubara frequencies in the input file."
+   "backend", "string", ``"cpp"``, "Solver backend. ``""cpp""`` (default) uses the compiled C++ solver and is recommended for production. ``""numpy""`` is a pure-Python/NumPy reimplementation that reproduces the C++ results (useful for debugging or compiler-free environments) but is single-threaded and typically several times to ~20x slower per solve (heaviest for the inversion-based ``bse``/``scl``/``rrpa`` schemes; see ``tests/python/non-mpi/solver/benchmark_backends.py``). ``""cupy""`` is reserved for a future GPU backend and is not yet enabled."
 
 [chiq_post] section
 ~~~~~~~~~~~~~~~~~~~~

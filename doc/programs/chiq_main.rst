@@ -10,7 +10,7 @@ chiq_main
 Description
 -----------
 
-``chiq_main.py`` is a main script for solving the Bethe-Salpeter equation. MPI-based parallel computation is supported. A shared library implemented in C++ is called internally.
+``chiq_main.py`` is a main script for solving the Bethe-Salpeter equation. MPI-based parallel computation is supported. The solver backend is selected by the ``backend`` option in the ``[chiq_main]`` section (see :ref:`input`): ``"cpp"`` (default) calls the compiled C++ shared library, ``"numpy"`` uses an equivalent pure-Python implementation, and ``"cupy"`` is reserved for a future GPU backend.
 
 Positional Arguments
 ---------------------
